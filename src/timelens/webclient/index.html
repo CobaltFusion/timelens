@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>TimeLens v1</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+    <style>
+        body {
+            margin: 0;
+            background: #444444;
+            color: #eee;
+            font-family: monospace;
+            overflow-y: scroll;
+            scrollbar-gutter: stable;
+        }
+
+        #id_control_panel {
+            border: 1px dashed rgb(118, 118, 223);
+        }
+
+        #scope_panel canvas {
+            display: block;
+            visibility: hidden;
+            background: black;
+            border: 2px solid #00ff88;
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <p id="id_above_panel"></p>
+    <div id="id_control_panel"></div>
+    <div id="id_scope_panel"></div>
+    <script src="assertions.js"></script>
+    <script src="collector.js"></script>
+    <script src="input_controls.js"></script>
+    <script src="scope_controls.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
