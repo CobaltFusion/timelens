@@ -4,69 +4,98 @@ import asyncio
 import contextlib
 from contextlib import asynccontextmanager
 import json
-import time
-import random
+import os
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CHANNELS = [
-    ("State", ["IDLE", "RUN", "ERROR"]),
-    ("Enable", [0, 1]),
-    ("Voltage", [0, 1, 2, 4, 5, 6, 7]),
-]
+async def tail_file(path, callback):
+    logging.warning(f"file: {path}")
 
-event_queue = asyncio.Queue(maxsize=1000)
+    with open(path, "r", encoding="utf-8") as f:
+        f.seek(0)  # start at end
 
+        while True:
+            line = f.readline()
+            if not line:
+                await asyncio.sleep(0.1)
+                continue
 
-async def sample_generator(queue: asyncio.Queue):
-    last_values = {}
-    clock = 0
-    count = 0
+            #logging.warning(f"message: {line.strip()}")
+            await callback(line, path)
+
+async def watch_directory(path, callback):
+    known = set()
 
     while True:
-        ts = int(time.time() * 1000)
+        current = {
+            f for f in os.listdir(path)
+            if f.endswith(".vson")
+        }
 
-        count += 1
-        if count == 30:
-            count = 0
-            clock = int(not clock)
+        new_files = current - known
+        for fname in new_files:
+            full_path = os.path.join(path, fname)
+            asyncio.create_task(tail_file(full_path, callback))
 
-        ch, values = random.choice(CHANNELS)
-        new_val = random.choice(values)
+        known = current
+        await asyncio.sleep(1)
 
-        if last_values.get(ch) != new_val:
-            last_values[ch] = new_val
-            sample = {
-                "type": "event",
-                "ts": ts,
-                "channel": ch,
-                "value": new_val,
-            }
-            await queue.put(sample)
+async def handle_line(line, path):
 
-        # Clock signal
-        await queue.put({
-            "type": "event",
-            "ts": ts,
-            "channel": "Clock",
-            "value": clock,
-        })
+    if line.startswith('['):
+        line = line[1:]
 
-        await asyncio.sleep(0.1)
+    if line.endswith(',\n'):
+        line = line[:-2]
+    try:
+        evt = json.loads(line)
+    except json.JSONDecodeError:
+        logging.error("line error: %s", line)
+        return
+
+    evt["source"] = os.path.basename(path)
+
+    await broadcast(evt)
+
+
+clients = set()
+
+async def broadcast(message):
+
+    dead = []
+    data = json.dumps(message)
+
+    for ws in clients:
+        try:
+            logging.warning(f"broadcast: {message}")
+            await ws.send_text(data)
+        except:
+            dead.append(ws)
+
+    for ws in dead:
+        clients.remove(ws)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(sample_generator(event_queue))
+
+    path = Path("/tmp/logs/telemetry")
+    if not path.is_dir():
+        path = "c:/temp/logs/telemetry"
+    logging.warning("Monitoring path: %s", path)
+
+    task = asyncio.create_task(
+
+        watch_directory(path, handle_line)
+    )
     try:
-        # yield means, run the task.
-        logger.info("socket ready?")
         yield
-        logger.info("socket stopping?")
     finally:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -74,17 +103,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    clients.add(websocket)
+
     try:
         while True:
-            sample = await event_queue.get()
-            await websocket.send_text(json.dumps(sample))
+            await asyncio.sleep(3600)
     except WebSocketDisconnect:
-        pass
+        clients.remove(websocket)
+
+# this silences harmless message that would otherwise appear when 'F12' it pressed in the browser
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+def devtools():
+    return JSONResponse({})
+
+
+app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
 
 
 # every line has 1 'ts' timestamp

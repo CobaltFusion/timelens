@@ -11,30 +11,34 @@ function makeEvent(name, type, begin_time, end_time, value = 0) {
 
 class Collector {
     constructor() {
-        this.width = 200;
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
+        this.running = true;
+        this.origin = 0;
 
-        this.incoming.push(makeEvent("cycle", EventType.OPEN, 0));
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10, 230));
+        // this uses the 'host' where we are loading this application from
+        this.ws = new WebSocket(`ws://${window.location.host}/ws`);
+        this.ws.onmessage = (event) => {
 
-        this.incoming.push(makeEvent("process_image", EventType.OPEN, 231, 0));
-        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, 310, 400));
-        this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 300)); // intentionally out-of-order
-        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, 0, 500)); // intentionally omitted
-
-        const host = "localhost";
-        const ws = new WebSocket(`ws://${host}/ws`);
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            const { name, type, ts, te, value } = data;
-
-            const eventType = EventType[type];
-
-            if (!eventType) {
-                console.warn(`Unknown event type: ${type}, name: ${name}`);
+            if (this.running === false) {
+                this.origin = 0;
                 return;
             }
-            this.incoming.push(makeEvent(name, EventType[type], ts, te, value));
+
+            const data = JSON.parse(event.data);
+            const { name, cat, ph, pid, tid, absTs } = data;
+
+            if (this.origin === 0) {
+                this.origin = absTs;
+            }
+            const ts = (absTs - this.origin) / 1000.0; // make times relative and in milliseconds
+
+            const te = ts;
+            const value = 0;
+            let type = EventType.OPEN;
+            if (ph === 'E') {
+                type = EventType.CLOSE;
+            }
+            this.incoming.push(makeEvent(name, type, ts, te, value));
         }
     }
 
@@ -49,10 +53,30 @@ class Collector {
     }
 
     stop() {
+        this.running = false;
         // stop receiving more data.
     }
 
     start() {
+        this.running = true;
         // re-start receiving data
+    }
+
+    reset() {
+        this.clear();
+
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: "control", action: "reset" }));
+        }
+    }
+
+    dummy() {
+        this.incoming.push(makeEvent("cycle", EventType.OPEN, 0));
+        this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10, 230));
+
+        this.incoming.push(makeEvent("process_image", EventType.OPEN, 231, 0));
+        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, 310, 400));
+        this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 300)); // intentionally out-of-order
+        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, 0, 500)); // intentionally omitted
     }
 }

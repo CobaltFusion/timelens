@@ -15,7 +15,6 @@ class Widget {
         this._createContainer();
     }
 
-
     _createContainer() {
         // Outer box
         this.container = document.createElement("div");
