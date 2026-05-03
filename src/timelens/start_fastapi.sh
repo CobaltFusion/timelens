@@ -17,7 +17,8 @@ source timelens-venv/bin/activate
 pip install --upgrade pip
 
 # 4. Install dependencies
-pip install fastapi uvicorn
+pip install fastapi
+pip install uvicorn
 
 # 5. Start the app
 exec uvicorn server:app --reload --host 0.0.0.0 --port 8080

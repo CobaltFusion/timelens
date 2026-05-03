@@ -44,6 +44,16 @@ function addControls() {
     startButton.textContent = "Start";
     startButton.addEventListener("click", () => collector.start());
     controls.appendChild(startButton);
+
+    const resetButton = document.createElement("button");
+    resetButton.textContent = "Reset";
+    resetButton.addEventListener("click", () => collector.reset());
+    controls.appendChild(resetButton);
+
+    const dummyButton = document.createElement("button");
+    dummyButton.textContent = "Add dummy data";
+    dummyButton.addEventListener("click", () => collector.dummy());
+    controls.appendChild(dummyButton);
 }
 
 function addScope(collector) {

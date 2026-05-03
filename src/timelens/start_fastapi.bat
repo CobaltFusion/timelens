@@ -18,6 +18,9 @@
 :: pip install fastapi
 :: pip install gunicorn
 
+:: change to the script directory (and drive)
+cd /d "%~dp0"
+
 start http://localhost:8080
 uvicorn server:app --reload --port 8080
 
