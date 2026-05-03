@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SCRIPTDIR=$(realpath $(dirname $0))
+cd $SCRIPTDIR
+
 set -e  # stop if anything fails
 
 # 1. Create venv (only if it doesn't exist)
