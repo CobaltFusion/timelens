@@ -9,10 +9,14 @@
 :: ## Uvicorn is a lightning-fast ASGI server, optimized for handling asynchronous code. It's essential for running FastAPI applications
 ::    because it handles incoming HTTP requests and manages the lifecycle of these requests
 ::
-
-:: `pip install fastapi gunicorn` for the runtime
-:: or
 :: `pip install "fastapi[all]"` to include documentation and validation tools
+
+:: To setup a local isolated test environment:
+::
+:: python3 -m venv timelens-venv
+:: source timelens-venv/bin/activate
+:: pip install fastapi
+:: pip install gunicorn
 
 start http://localhost:8080
 uvicorn server:app --reload --port 8080
