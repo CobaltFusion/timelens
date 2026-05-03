@@ -14,6 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 async def tail_file(path, callback):
     logging.warning(f"file: {path}")
 
@@ -26,8 +27,9 @@ async def tail_file(path, callback):
                 await asyncio.sleep(0.1)
                 continue
 
-            #logging.warning(f"message: {line.strip()}")
+            # logging.warning(f"message: {line.strip()}")
             await callback(line, path)
+
 
 async def watch_directory(path, callback):
     known = set()
@@ -45,6 +47,7 @@ async def watch_directory(path, callback):
 
         known = current
         await asyncio.sleep(1)
+
 
 async def handle_line(line, path):
 
@@ -65,6 +68,7 @@ async def handle_line(line, path):
 
 
 clients = set()
+
 
 async def broadcast(message):
 
@@ -101,7 +105,15 @@ async def lifespan(app: FastAPI):
         with contextlib.suppress(asyncio.CancelledError):
             await task
 
+
+async def handle_reset():
+    logging.warning("RESET received")
+
+
 app = FastAPI(lifespan=lifespan)
+
+# the order of the handlers below matters, the app.mount need to be last, otherwise it will shadow the other handlers
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -110,33 +122,23 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            await asyncio.sleep(3600)
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+
+            if msg.get("action") == "reset":
+                await handle_reset()
+
     except WebSocketDisconnect:
         clients.remove(websocket)
 
-# this silences harmless message that would otherwise appear when 'F12' it pressed in the browser
+
 @app.get("/.well-known/appspecific/com.chrome.devtools.json")
 def devtools():
+    # this silences harmless message that would otherwise appear when 'F12' it pressed in the browser
     return JSONResponse({})
 
 
 app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
-
-
-# every line has 1 'ts' timestamp
-# "B" are begin events
-# "E" are end events
-
-# [{ "args": {"name": "sensormanager" }, "name": "process_name", "cat": "__metadata", "ph": "M", "pid": 1027858, "tid": 0, "ts": 0 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383938506941 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383938507212 },
-# {"name": "Execute", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383938507224 },
-# {"name": "Execute", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383943480149 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021303 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021324 },
-# {"name": "Execute", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021331 },
-# {"name": "Execute", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021353 },
-# {"name": "Serialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021358 },
-# {"name": "Serialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021369 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949445027 },
-# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949445046 },

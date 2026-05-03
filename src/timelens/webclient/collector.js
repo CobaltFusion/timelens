@@ -6,6 +6,7 @@ const EventType = {
 };
 
 function makeEvent(name, type, begin_time, end_time, value = 0) {
+    console.log("make: %s, type: %s, b: %s, e: %s ", name, type, begin_time, end_time);
     return { name, type, begin_time, end_time, value }
 }
 
@@ -25,20 +26,22 @@ class Collector {
             }
 
             const data = JSON.parse(event.data);
-            const { name, cat, ph, pid, tid, absTs } = data;
+            // notice that the variables MUST correspond with the actual JSON field names here!
+            const { name, cat, ph, pid, tid, ts } = data;
 
             if (this.origin === 0) {
-                this.origin = absTs;
+                this.origin = ts;
             }
-            const ts = (absTs - this.origin) / 1000.0; // make times relative and in milliseconds
 
-            const te = ts;
+            const relative_ts = (ts - this.origin) / 1000.0; // make times relative and in milliseconds
+
+            const te = relative_ts;
             const value = 0;
             let type = EventType.OPEN;
             if (ph === 'E') {
                 type = EventType.CLOSE;
             }
-            this.incoming.push(makeEvent(name, type, ts, te, value));
+            this.incoming.push(makeEvent(name, type, relative_ts, te, value));
         }
     }
 
