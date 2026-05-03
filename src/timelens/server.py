@@ -85,3 +85,22 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_text(json.dumps(sample))
     except WebSocketDisconnect:
         pass
+
+
+# every line has 1 'ts' timestamp
+# "B" are begin events
+# "E" are end events
+
+# [{ "args": {"name": "sensormanager" }, "name": "process_name", "cat": "__metadata", "ph": "M", "pid": 1027858, "tid": 0, "ts": 0 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383938506941 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383938507212 },
+# {"name": "Execute", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383938507224 },
+# {"name": "Execute", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383943480149 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021303 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021324 },
+# {"name": "Execute", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021331 },
+# {"name": "Execute", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021353 },
+# {"name": "Serialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949021358 },
+# {"name": "Serialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949021369 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "B", "pid": 1027858, "tid": 1027858, "ts": 6383949445027 },
+# {"name": "Deserialize", "cat": "<cat>", "ph": "E", "pid": 1027858, "tid": 1027858, "ts": 6383949445046 },
