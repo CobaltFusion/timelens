@@ -17,4 +17,4 @@ pip install --upgrade pip
 pip install fastapi uvicorn
 
 # 5. Start the app
-exec uvicorn server:app --reload --port 8080
+exec uvicorn server:app --reload --host 0.0.0.0 --port 8080
