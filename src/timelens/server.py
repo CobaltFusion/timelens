@@ -15,40 +15,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-async def tail_file(path, callback):
-    logging.warning(f"file: {path}")
-
-    with open(path, "r", encoding="utf-8") as f:
-        f.seek(0)  # start at end
-
-        while True:
-            line = f.readline()
-            if not line:
-                await asyncio.sleep(0.1)
-                continue
-
-            # logging.warning(f"message: {line.strip()}")
-            await callback(line, path)
-
-
-async def watch_directory(path, callback):
-    known = set()
-
-    while True:
-        current = {
-            f for f in os.listdir(path)
-            if f.endswith(".vson")
-        }
-
-        new_files = current - known
-        for fname in new_files:
-            full_path = os.path.join(path, fname)
-            asyncio.create_task(tail_file(full_path, callback))
-
-        known = current
-        await asyncio.sleep(1)
-
-
 async def handle_line(line, path):
 
     if line.startswith('['):
@@ -65,6 +31,124 @@ async def handle_line(line, path):
     evt["source"] = os.path.basename(path)
 
     await broadcast(evt)
+
+
+class LogWatcher:
+    def __init__(self, path, callback):
+        self.path = path
+        self.callback = callback
+
+        self.watch_task = None
+        self.tail_tasks = set()
+
+        self._running = False
+
+    async def start(self):
+        if self._running:
+            return
+
+        logging.warning(f"Starting watcher on {self.path}")
+        self._running = True
+        self.watch_task = asyncio.create_task(self._watch_directory())
+
+    async def stop(self):
+        if not self._running:
+            return
+
+        logging.warning("Stopping watcher")
+        self._running = False
+
+        # Stop directory watcher
+        if self.watch_task:
+            self.watch_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.watch_task
+            self.watch_task = None
+
+        # Stop all tail tasks
+        for task in self.tail_tasks:
+            task.cancel()
+
+        for task in self.tail_tasks:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        self.tail_tasks.clear()
+
+    async def restart(self):
+        logging.warning("Restarting watcher")
+        await self.stop()
+        await self.start()
+
+    async def _watch_directory(self):
+        known = set()
+
+        try:
+            while True:
+                try:
+                    current = {
+                        f for f in os.listdir(self.path)
+                        if f.endswith(".vson")
+                    }
+                except FileNotFoundError:
+                    logging.error(f"Directory not found: {self.path}")
+                    await asyncio.sleep(1)
+                    continue
+
+                new_files = current - known
+
+                for fname in new_files:
+                    full_path = os.path.join(self.path, fname)
+                    logging.warning(f"New file detected: {full_path}")
+
+                    task = asyncio.create_task(self._tail_file(full_path))
+                    self.tail_tasks.add(task)
+
+                    # Remove from set when done
+                    task.add_done_callback(self.tail_tasks.discard)
+
+                known = current
+                await asyncio.sleep(1)
+
+        except asyncio.CancelledError:
+            logging.warning("Directory watcher cancelled")
+            raise
+
+        finally:
+            # Ensure all tail tasks are cancelled
+            for task in self.tail_tasks:
+                task.cancel()
+
+            for task in self.tail_tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+            self.tail_tasks.clear()
+
+    async def _tail_file(self, path):
+        logging.warning(f"Start tailing: {path}")
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                while True:
+                    line = f.readline()
+
+                    if not line:
+                        await asyncio.sleep(0.1)
+                        continue
+
+                    logging.warning(
+                        f"{os.path.basename(path)}: {line.strip()}")
+
+                    # Ordered processing (important!)
+                    await self.callback(line, path)
+
+        except asyncio.CancelledError:
+            logging.warning(f"Stopped tailing: {path}")
+            raise
+
+        except Exception as e:
+            logging.error(f"Error in tail_file({path}): {e}")
 
 
 clients = set()
@@ -94,20 +178,19 @@ async def lifespan(app: FastAPI):
         path = "c:/temp/logs/telemetry"
     logging.warning("Monitoring path: %s", path)
 
-    task = asyncio.create_task(
+    watcher = LogWatcher(path, handle_line)
+    app.state.watcher = watcher
+    await watcher.start()
 
-        watch_directory(path, handle_line)
-    )
     try:
-        yield
+        yield   # <-- REQUIRED
     finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        await watcher.stop()
 
 
-async def handle_reset():
+async def handle_reset(app: FastAPI):
     logging.warning("RESET received")
+    await app.state.watcher.restart()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -123,13 +206,14 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
+
             try:
                 msg = json.loads(data)
             except json.JSONDecodeError:
                 continue
 
             if msg.get("action") == "reset":
-                await handle_reset()
+                await handle_reset(websocket.app)
 
     except WebSocketDisconnect:
         clients.remove(websocket)
@@ -137,7 +221,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json")
 def devtools():
-    # this silences harmless message that would otherwise appear when 'F12' it pressed in the browser
+    # this silences a harmless message that would otherwise appear when 'F12' it pressed in the browser
     return JSONResponse({})
 
 
