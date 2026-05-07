@@ -22,7 +22,7 @@ class Widget {
         this.container.style.display = "inline-block";
         this.container.style.borderRadius = "8px";
         this.container.style.overflow = "hidden"; // clips inner content nicely
-        this.container.style.background = "#1111"; // dark, matches scope vibe
+        this.container.style.background = "#1111"; // dark
         this.container.style.border = "1px solid #00ff88";
         this.container.style.boxShadow = "0 4px 22px rgba(0,0,0,0.4)";
 
@@ -221,12 +221,12 @@ class BarStack {
     }
 }
 
-class Scope {
+class Graph {
     constructor(collector) {
         this.collector = collector;
         this.index = 0;
         this.canvas = document.createElement("canvas");
-        this.canvas.classList.add("scope");
+        this.canvas.classList.add("graph");
 
         this.mouseX = 0;
         this.mouseY = 0;
@@ -245,7 +245,7 @@ class Scope {
     mount(parent) {
         this.parent = parent;
         if (!(parent instanceof HTMLElement)) {
-            throw new TypeError("Scope: 'parent' must be a valid HTMLElement (is the name of the control correct?)");
+            throw new TypeError("Graph: 'parent' must be a valid HTMLElement (is the name of the control correct?)");
         }
         this._build();
     }

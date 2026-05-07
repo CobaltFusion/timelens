@@ -1,5 +1,5 @@
 // not using modules yet
-//import { Scope } from "./scope_controls.js";
+//import { Graph } from "./scope_controls.js";
 
 // [] array
 // {} object
@@ -30,7 +30,7 @@ function addControls() {
     const controls = document.getElementById("id_control_panel");
 
     const addButton = document.createElement("button");
-    addButton.textContent = "Add Scope";
+    addButton.textContent = "Add Graph";
     addButton.addEventListener("click", () => addScope(collector));
     controls.appendChild(addButton);
 
@@ -57,11 +57,11 @@ function addControls() {
 }
 
 function addScope(collector) {
-    const scope_panel = document.getElementById("id_scope_panel");
-    const scope = new Scope(collector);
+    const graph_panel = document.getElementById("id_graph_panel");
+    const graph = new Graph(collector);
     const widget = new Widget({
-        parent: scope_panel,
-        component: scope,
+        parent: graph_panel,
+        component: graph,
         onClose: () => {
             widgets.delete(widget);
         }
