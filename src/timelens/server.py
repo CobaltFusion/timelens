@@ -137,8 +137,7 @@ class LogWatcher:
                         await asyncio.sleep(0.1)
                         continue
 
-                    logging.warning(
-                        f"{os.path.basename(path)}: {line.strip()}")
+                    # logging.warning(f"{os.path.basename(path)}: {line.strip()}")
 
                     # Ordered processing (important!)
                     await self.callback(line, path)

@@ -22,7 +22,7 @@
 cd /d "%~dp0"
 
 start http://localhost:8080
-uvicorn server:app --reload --port 8080
+uvicorn server:app --reload --host 0.0.0.0 --port 8080
 
 ::  server -> refers to the file server.py
 ::  app    -> refers to the variable 'app' in 'server.py' that is the main entrypoint for the application
