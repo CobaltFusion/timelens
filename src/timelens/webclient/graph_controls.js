@@ -105,7 +105,6 @@ class BarStack {
         let entry = this.lines.get(id);
         if (!entry) {
             entry = this.makeLine();
-            console.log("new line: " + entry.y);
             this.lines.set(id, entry);
         }
         return entry;
@@ -183,6 +182,7 @@ class BarStack {
 
     // show the text by default, but show 'hover' if the mouse is over the bar
     drawBar(line, event, hover) {
+
         assert(typeof event.name === "string", "event.name must be string");
 
         const color = getColor(this.color);
@@ -196,7 +196,6 @@ class BarStack {
         const x1 = Math.round(bt * scale);
         const x2 = Math.round(et * scale);
 
-        //console.log("draw: y: " + line.y + " x1: " + x1 + " x2: " + x2);
         const width = x2 - x1;
         const isHovered = this.mouseX >= x1 && this.mouseX <= x2 && this.mouseY >= line.y && this.mouseY <= line.y + this.height;
 
