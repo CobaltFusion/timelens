@@ -117,6 +117,10 @@ class Collector {
         }
     }
 
+    resume_audio() {
+        audio.resume();
+    }
+
     dummy() {
         this.incoming.push(makeEvent("cycle", EventType.OPEN, 0, 0, "groupid"));
         this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 230 * 1000, "groupid"));
