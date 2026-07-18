@@ -66,10 +66,11 @@ class LogWatcher:
             self.watch_task = None
 
         # Stop all tail tasks
-        for task in self.tail_tasks:
+        tasks = list(self.tail_tasks)
+        for task in tasks:
             task.cancel()
 
-        for task in self.tail_tasks:
+        for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
@@ -115,11 +116,12 @@ class LogWatcher:
             raise
 
         finally:
+            tasks = list(self.tail_tasks)
             # Ensure all tail tasks are cancelled
-            for task in self.tail_tasks:
+            for task in tasks:
                 task.cancel()
 
-            for task in self.tail_tasks:
+            for task in tasks:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
 
