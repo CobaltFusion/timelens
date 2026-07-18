@@ -18,11 +18,25 @@
 :: pip install fastapi
 :: pip install gunicorn
 
+setlocal
+
 :: change to the script directory (and drive)
 cd /d "%~dp0"
 
+if not exist "venv\" (
+    py -3.13 -m venv venv
+    if errorlevel 1 exit /b %errorlevel%
+)
+
+call venv\Scripts\activate.bat
+python --version
+python -m pip install --upgrade pip
+
+cd /d "%~dp0"\src\timelens
+python -m pip install -r requirements.txt
+
 start http://localhost:8080
-uvicorn server:app --reload --host 0.0.0.0 --port 8080
 
 ::  server -> refers to the file server.py
 ::  app    -> refers to the variable 'app' in 'server.py' that is the main entrypoint for the application
+python -m uvicorn server:app --reload --host 0.0.0.0 --port 8080
