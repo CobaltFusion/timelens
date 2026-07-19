@@ -32,9 +32,10 @@ call venv\Scripts\activate.bat
 python --version
 python -m pip install --upgrade pip
 
-cd /d "%~dp0"\src\timelens
-python -m pip install -r requirements.txt
+# installs the required module from pyproject.toml
+pip install .
 
+cd /d "%~dp0"\src\timelens
 start http://localhost:8080
 
 ::  server -> refers to the file server.py
