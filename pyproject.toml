@@ -1,0 +1,15 @@
+[project]
+name = "timelens"
+version = "0.1.0"
+
+dependencies = [
+    "fastapi",
+    "watchfiles",
+    "uvicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
