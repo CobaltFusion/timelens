@@ -1,0 +1,76 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="m5xzG43fLhCbZgqudaPB">
+    <mxGraphModel dx="1178" dy="801" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-2" parent="1" style="shape=wedgeCallout;whiteSpace=wrap;html=1;align=left;tipX=-0.367;tipY=0.921;direction=west;perimeterSpacing=0;comic=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;shapeInsidePadding=20;overflow=visible;noLabel=0;portConstraint=none;portConstraintRotation=0;spacingTop=0;spacing=5;" value="&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Serves:&lt;/span&gt;&lt;ul&gt;&lt;li&gt;html / js / css&lt;/li&gt;&lt;li&gt;a websocket entry point&lt;/li&gt;&lt;li&gt;handles search, watching for triggers, and compacts the data for visualization.&lt;br&gt;&lt;br&gt;&lt;/li&gt;&lt;/ul&gt;Library/Platform:&lt;div&gt;&lt;ul&gt;&lt;li&gt;Python&amp;nbsp;&lt;/li&gt;&lt;li&gt;FastAPI&amp;nbsp;&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="340" x="20" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-6" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="Browser" vertex="1">
+          <mxGeometry height="220" width="410" x="410" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-28" edge="1" parent="P3Vi-YAWHYYvR9TPbQ4V-6" source="P3Vi-YAWHYYvR9TPbQ4V-17" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;shadow=1;strokeColor=#82b366;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#d5e8d4;" target="P3Vi-YAWHYYvR9TPbQ4V-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-17" parent="P3Vi-YAWHYYvR9TPbQ4V-6" style="rounded=0;whiteSpace=wrap;html=1;" value="Collector" vertex="1">
+          <mxGeometry height="50" width="90" x="30" y="117.5" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-38" edge="1" parent="P3Vi-YAWHYYvR9TPbQ4V-6" source="P3Vi-YAWHYYvR9TPbQ4V-19" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;shadow=1;strokeColor=#d79b00;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#ffe6cc;" target="P3Vi-YAWHYYvR9TPbQ4V-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-19" parent="P3Vi-YAWHYYvR9TPbQ4V-6" style="rounded=0;whiteSpace=wrap;html=1;" value="InputControls&amp;nbsp;" vertex="1">
+          <mxGeometry height="45" width="90" x="30" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-30" edge="1" parent="P3Vi-YAWHYYvR9TPbQ4V-6" source="P3Vi-YAWHYYvR9TPbQ4V-20" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;shadow=1;strokeColor=#82b366;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#d5e8d4;" target="P3Vi-YAWHYYvR9TPbQ4V-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-20" parent="P3Vi-YAWHYYvR9TPbQ4V-6" style="rounded=0;whiteSpace=wrap;html=1;" value="Graph" vertex="1">
+          <mxGeometry height="45" width="100" x="170" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-21" parent="P3Vi-YAWHYYvR9TPbQ4V-6" style="rounded=0;whiteSpace=wrap;html=1;" value="BarStack" vertex="1">
+          <mxGeometry height="45" width="80" x="320" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-40" parent="P3Vi-YAWHYYvR9TPbQ4V-6" style="rounded=0;whiteSpace=wrap;html=1;" value="Widget (1..n)" vertex="1">
+          <mxGeometry height="45" width="100" x="170" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-47" edge="1" parent="P3Vi-YAWHYYvR9TPbQ4V-6" source="P3Vi-YAWHYYvR9TPbQ4V-20" style="endArrow=none;html=1;rounded=0;shadow=1;strokeColor=#82b366;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;flowAnimation=0;fillColor=#d5e8d4;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="P3Vi-YAWHYYvR9TPbQ4V-40" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="160" y="390" as="sourcePoint" />
+            <mxPoint x="210" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-7" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="Anywhere / Server / Embedded Device" vertex="1">
+          <mxGeometry height="220" width="340" x="20" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-23" edge="1" parent="P3Vi-YAWHYYvR9TPbQ4V-7" source="P3Vi-YAWHYYvR9TPbQ4V-3" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=-0.007;entryY=0.377;entryDx=0;entryDy=0;shadow=1;strokeColor=#82b366;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#d5e8d4;entryPerimeter=0;" target="P3Vi-YAWHYYvR9TPbQ4V-35">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="220" y="115" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-3" parent="P3Vi-YAWHYYvR9TPbQ4V-7" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;shapeInside=1;fixedSize=1;" value="Logfiles / Telemetry" vertex="1">
+          <mxGeometry height="80" width="110" x="25" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-35" parent="P3Vi-YAWHYYvR9TPbQ4V-7" style="rounded=0;whiteSpace=wrap;html=1;" value="Server" vertex="1">
+          <mxGeometry height="80" width="80" x="220" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-9" parent="1" style="shape=wedgeCallout;whiteSpace=wrap;html=1;align=left;tipX=-0.067;tipY=0.711;direction=west;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;comic=1;jiggle=2;spacing=5;" value="Client:&lt;br&gt;&lt;ul&gt;&lt;li&gt;html / js / css&lt;/li&gt;&lt;li&gt;a websocket entry point&lt;/li&gt;&lt;li&gt;handles search, watching for triggers, and compacts the data for visualization.&lt;br&gt;&lt;br&gt;&lt;/li&gt;&lt;/ul&gt;Library/Platform:&lt;div&gt;&lt;ul&gt;&lt;li&gt;Javascript&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="300" x="410" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-22" edge="1" parent="1" source="P3Vi-YAWHYYvR9TPbQ4V-35" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;shadow=1;strokeColor=#82b366;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#d5e8d4;exitX=1.008;exitY=0.679;exitDx=0;exitDy=0;exitPerimeter=0;" target="P3Vi-YAWHYYvR9TPbQ4V-17">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320.56" y="217.5" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-37" parent="1" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;Overview&lt;/h1&gt;&lt;div&gt;The arrows denote the flow of information.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;ul&gt;&lt;li&gt;The Server &#39;serves&#39; the pages&lt;/li&gt;&lt;li&gt;The Collector connects to the server to open the websocket connection.&lt;/li&gt;&lt;li&gt;The Collector started as only listening for event on the websocket, but now also sender commands back to the server, so maybe we should rename it &#39;Connection&#39; ?&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="160" width="520" x="20" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="P3Vi-YAWHYYvR9TPbQ4V-39" edge="1" parent="1" source="P3Vi-YAWHYYvR9TPbQ4V-17" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.986;entryY=0.43;entryDx=0;entryDy=0;entryPerimeter=0;shadow=1;strokeColor=#d79b00;strokeWidth=4;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=0;fillColor=#ffe6cc;exitX=-0.01;exitY=0.341;exitDx=0;exitDy=0;exitPerimeter=0;" target="P3Vi-YAWHYYvR9TPbQ4V-35">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="410" y="200" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
