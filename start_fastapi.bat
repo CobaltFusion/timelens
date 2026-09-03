@@ -32,8 +32,8 @@ call venv\Scripts\activate.bat
 python --version
 python -m pip install --upgrade pip
 
-# installs the required module from pyproject.toml
-pip install .
+:: installs the required modules from pyproject.toml
+pip install -e .
 
 cd /d "%~dp0"\src\timelens
 start http://localhost:8080
