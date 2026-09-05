@@ -5,6 +5,7 @@ import contextlib
 import json
 import logging
 import socket
+import uuid
 from ipaddress import IPv4Network
 
 import psutil
@@ -29,6 +30,7 @@ def get_ipv4_interfaces():
                 continue
 
             network = IPv4Network(f"{address.address}/{address.netmask}", strict=False)
+
             if network.is_loopback:
                 continue
 
@@ -40,6 +42,7 @@ def get_ipv4_interfaces():
 class PeerDiscovery:
     def __init__(self, http_port):
         self.http_port = http_port
+        self.instance_id = uuid.uuid4().hex
         self.running = False
         self.task = None
 
@@ -65,25 +68,14 @@ class PeerDiscovery:
             self.task = None
 
     async def _listen(self):
-        sock = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_DGRAM,
-        )
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         try:
-            sock.setsockopt(
-                socket.SOL_SOCKET,
-                socket.SO_REUSEADDR,
-                1,
-            )
-
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("", DISCOVERY_PORT))
             sock.settimeout(0.5)
 
-            logger.info(
-                "Listening for peer discovery on UDP port %d",
-                DISCOVERY_PORT,
-            )
+            logger.info("Listening for peer discovery on UDP port %d", DISCOVERY_PORT)
 
             while self.running:
                 try:
@@ -93,12 +85,7 @@ class PeerDiscovery:
                         logger.info("Ignoring unknown discovery packet: %r", data)
                         continue
 
-                    response = json.dumps(
-                        {
-                            "name": socket.gethostname(),
-                            "port": self.http_port,
-                        }
-                    ).encode()
+                    response = json.dumps({"name": socket.gethostname(), "port": self.http_port, "instance_id": self.instance_id}).encode()
 
                     # Reply to the sender's ephemeral port.
                     sock.sendto(response, address)
@@ -146,7 +133,9 @@ class PeerDiscovery:
                     sock.bind((address, 0))
                     sock.setblocking(False)
 
-                    sockets.append((ifname, address, broadcast, sock))
+                    network = IPv4Network(f"{address}/{netmask}", strict=False)
+
+                    sockets.append((ifname, address, broadcast, network, sock))
 
                     logger.info("Broadcasting discovery on %s (%s) to %s", ifname, address, broadcast)
 
@@ -164,7 +153,9 @@ class PeerDiscovery:
                 if remaining <= 0:
                     break
 
-                receive_tasks = [asyncio.create_task(loop.sock_recvfrom(sock, 4096)) for _, _, _, sock in sockets]
+                # Associate each receive task with the subnet of the
+                # interface on which it is listening.
+                receive_tasks = {asyncio.create_task(loop.sock_recvfrom(sock, 4096)): network for _, _, _, network, sock in sockets}
 
                 if not receive_tasks:
                     break
@@ -182,8 +173,11 @@ class PeerDiscovery:
                     break
 
                 for task in done:
+                    network = receive_tasks[task]
+
                     try:
                         data, address = task.result()
+
                     except (asyncio.CancelledError, OSError):
                         continue
 
@@ -194,6 +188,8 @@ class PeerDiscovery:
                             continue
 
                         peer["address"] = address[0]
+                        peer["subnet"] = str(network)
+
                         peers.append(peer)
 
                     except (json.JSONDecodeError, TypeError):
@@ -204,5 +200,5 @@ class PeerDiscovery:
             return list(unique.values())
 
         finally:
-            for _, _, _, sock in sockets:
+            for _, _, _, _, sock in sockets:
                 sock.close()
