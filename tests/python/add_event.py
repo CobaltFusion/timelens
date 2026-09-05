@@ -19,14 +19,7 @@ def _timestamp_us() -> int:
 
 
 def write_event(name: str, category: str, phase: str) -> None:
-    event = {
-        "name": name,
-        "cat": category,
-        "ph": phase,
-        "pid": 123,
-        "tid": 345,
-        "ts": _timestamp_us(),
-    }
+    event = {"name": name, "cat": category, "ph": phase, "pid": 123, "tid": 345, "ts": _timestamp_us()}
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -36,28 +29,12 @@ def write_event(name: str, category: str, phase: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Generate a telemetry B/E event for testing."
-    )
+    parser = argparse.ArgumentParser(description="Generate a telemetry B/E event for testing.")
 
-    parser.add_argument(
-        "name",
-        help="Name of the telemetry event.",
-    )
-
-    parser.add_argument(
-        "category",
-        help="Telemetry category.",
-    )
-
-    parser.add_argument(
-        "duration_ms",
-        type=float,
-        help="Duration of the event in milliseconds.",
-    )
-
+    parser.add_argument("name", help="Name of the telemetry event.")
+    parser.add_argument("category", help="Telemetry category.")
+    parser.add_argument("duration_ms", type=float, help="Duration of the event in milliseconds.")
     args = parser.parse_args()
-
     write_event(args.name, args.category, "B")
 
     try:
