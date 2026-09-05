@@ -52,18 +52,22 @@ function addControls() {
 
     const dummyButton = document.createElement("button");
     dummyButton.textContent = "Add dummy data";
-
     dummyButton.addEventListener("click", () => collector.dummy());
-
-    // dummyButton.addEventListener("click", async () => {
-    //     if (collector.audio.state === "suspended") {
-    //         await collector.audio.resume();
-    //     }
-
-    //     collector.dummy();
-    // });
     controls.appendChild(dummyButton);
 
+    async function updateAudioButton() {
+        const state = await collector.audioState();
+        audioButton.textContent = `Toggle Audio (${state})`;
+    }
+
+    const audioButton = document.createElement("button");
+    audioButton.addEventListener("click", async () => {
+        await collector.enableAudio();
+        await updateAudioButton();
+    });
+
+    controls.appendChild(audioButton);
+    updateAudioButton();
 }
 
 function addScope(collector) {

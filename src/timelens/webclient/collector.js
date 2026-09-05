@@ -65,10 +65,11 @@ class Collector {
         this.running = true;
 
         // this uses the 'host' where we are loading this application from
-        this.ws = new WebSocket(`ws://${window.location.host}/ws`);
+        const wsUrl = `ws://${window.location.host}/ws`;
+        this.ws = new WebSocket(wsUrl);
         //this.ws = new WebSocket(`ws://172.16.2.17:8080/ws`);
 
-        console.log("Connection to ")
+        console.log("Collector connecting to", wsUrl);
         this.ws.onmessage = (event) => {
 
             const data = JSON.parse(event.data);
@@ -117,11 +118,21 @@ class Collector {
         }
     }
 
-    resume_audio() {
-        audio.resume();
+    async enableAudio() {
+        if (audio.state !== "running") {
+            await audio.resume();
+        }
+
+        console.log("Audio state:", audio.state);
+        return audio.state;
+    }
+
+    audioState() {
+        return audio.state;
     }
 
     dummy() {
+
         this.incoming.push(makeEvent("cycle", EventType.OPEN, 0, 0, "groupid"));
         this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 230 * 1000, "groupid"));
 
@@ -130,16 +141,16 @@ class Collector {
         this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 300 * 1000, "groupid")); // intentionally out-of-order
         //this.incoming.push(makeEvent("cycle", EventType.CLOSE, 0, 500*1000, "groupid")); // intentionally omitted
 
-        // beep(500, 0, 0.1);
-        // beep(600, 0.1, 0.6);
-        // beep(700, 0.7, 0.4);
-        // beep(500, 1.1, 0.1);
-        // beep(600, 1.2, 0.5);
+        beep(500, 0, 0.1);
+        beep(600, 0.1, 0.6);
+        beep(700, 0.7, 0.4);
+        beep(500, 1.1, 0.1);
+        beep(600, 1.2, 0.5);
 
-        // let t = 0;
-        // for (let i = 0; i < 100; ++i) {
-        //     const duration = randomNote(t); // randomNote returns its duration
-        //     t += duration;
-        // }
+        let t = 0;
+        for (let i = 0; i < 20; ++i) {
+            const duration = randomNote(t); // randomNote returns its duration
+            t += duration;
+        }
     }
 }
