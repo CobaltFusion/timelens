@@ -2,43 +2,119 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <title>TimeLens v1</title>
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeLens Instances</title>
 
     <style>
         body {
-            margin: 0;
-            background: #444444;
-            color: #eee;
-            font-family: monospace;
-            overflow-y: scroll;
-            scrollbar-gutter: stable;
+            font-family: sans-serif;
+            margin: 2rem;
         }
 
-        #id_control_panel {
-            border: 1px dashed rgb(118, 118, 223);
+        h1 {
+            margin-bottom: 1rem;
         }
 
-        #graph_panel canvas {
+        #servers {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .server {
             display: block;
-            visibility: hidden;
-            background: black;
-            border: 2px solid #00ff88;
-            margin: 10px;
+            padding: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .server:hover {
+            background: #f0f0f0;
+        }
+
+        .server-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .server-address {
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .error {
+            color: #b00020;
         }
     </style>
 </head>
 
 <body>
-    <p id="id_above_panel"></p>
-    <div id="id_control_panel"></div>
-    <div id="id_graph_panel"></div>
-    <script src="assertions.js"></script>
-    <script src="collector.js"></script>
-    <script src="input_controls.js"></script>
-    <script src="graph_controls.js"></script>
-    <script src="main.js"></script>
+
+    <h1>TimeLens Instances</h1>
+
+    <div id="servers">
+        Discovering TimeLenses...
+    </div>
+
+    <script>
+        async function discoverServers() {
+            const container = document.getElementById("servers");
+
+            try {
+                const response = await fetch("/api/servers");
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                container.replaceChildren();
+
+                if (!data.servers || data.servers.length === 0) {
+                    container.textContent = "No TimeLens servers found.";
+                    return;
+                }
+
+                for (const server of data.servers) {
+                    const link = document.createElement("a");
+
+                    link.className = "server";
+                    link.href = `http://${server.address}:${server.port}/graph.html`;
+
+                    const name = document.createElement("div");
+                    name.className = "server-name";
+                    name.textContent = server.name;
+
+                    const address = document.createElement("div");
+                    address.className = "server-address";
+                    address.textContent = `${server.address}:${server.port}`;
+
+                    link.appendChild(name);
+                    link.appendChild(address);
+
+                    container.appendChild(link);
+                }
+            } catch (error) {
+                console.error("Server discovery failed:", error);
+
+                container.replaceChildren();
+
+                const errorElement = document.createElement("div");
+                errorElement.className = "error";
+                errorElement.textContent =
+                    `Failed to discover servers: ${error.message}`;
+
+                container.appendChild(errorElement);
+            }
+        }
+
+        discoverServers();
+    </script>
+
 </body>
 
 </html>

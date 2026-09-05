@@ -2,25 +2,26 @@
 
 import asyncio
 import contextlib
-from contextlib import asynccontextmanager
 import json
-import os
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
-from fastapi.responses import FileResponse
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from timelens.peer_discovery import PeerDiscovery
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_line(line, path):
 
-    if line.startswith('['):
+    if line.startswith("["):
         line = line[1:]
 
-    if line.endswith(',\n'):
+    if line.endswith(",\n"):
         line = line[:-2]
     try:
         evt = json.loads(line)
@@ -87,10 +88,7 @@ class LogWatcher:
         try:
             while True:
                 try:
-                    current = {
-                        f for f in os.listdir(self.path)
-                        if f.endswith(".vson")
-                    }
+                    current = {f for f in os.listdir(self.path) if f.endswith(".vson")}
                 except FileNotFoundError:
                     logging.error(f"Directory not found: {self.path}")
                     await asyncio.sleep(1)
@@ -131,7 +129,7 @@ class LogWatcher:
         logging.warning(f"Start tailing: {path}")
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 while True:
                     line = f.readline()
 
@@ -183,8 +181,12 @@ async def lifespan(app: FastAPI):
     app.state.watcher = watcher
     await watcher.start()
 
+    peer_discovery = PeerDiscovery(http_port=8000)
+    app.state.peer_discovery = peer_discovery
+    await peer_discovery.start()
+
     try:
-        yield   # <-- REQUIRED
+        yield  # <-- REQUIRED
     finally:
         await watcher.stop()
 
@@ -224,6 +226,12 @@ async def websocket_endpoint(websocket: WebSocket):
 def devtools():
     # this silences a harmless message that would otherwise appear when 'F12' it pressed in the browser
     return JSONResponse({})
+
+
+@app.get("/api/servers")
+async def servers():
+    peers = await app.state.peer_discovery.discover()
+    return JSONResponse({"servers": peers})
 
 
 app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
