@@ -13,8 +13,8 @@ LOG_DIR = Path(r"C:\temp\logs\telemetry")
 # Epoch for all timestamps in this process.
 _EPOCH_NS = time.perf_counter_ns()
 
-# Protect writes if multiple threads are logging.
-_LOCK = threading.Lock()
+# One log file per thread.
+_thread_log = threading.local()
 
 
 def _timestamp_us() -> int:
@@ -22,23 +22,24 @@ def _timestamp_us() -> int:
     return (time.perf_counter_ns() - _EPOCH_NS) // 1_000
 
 
-def _get_log_file() -> Path:
-    """
-    Create a filename such as:
+def _get_log_file():
+    """Return the unbuffered log file for the current thread."""
+    if not hasattr(_thread_log, "file"):
+        pid = os.getpid()
+        tid = threading.get_native_id()
 
-        telemetry_processname_1029693_1029693.vson
+        # Replace this with whatever identifies your application.
+        process_name = Path(os.path.basename(__file__)).stem
 
-    The first number is the process ID and the second is the thread ID.
-    """
-    pid = os.getpid()
-    tid = threading.get_native_id()
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Replace this with whatever identifies your application.
-    process_name = Path(os.path.basename(__file__)).stem
+        filename = LOG_DIR / f"telemetry_{process_name}_{pid}_{tid}.vson"
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+        # buffering=0 means writes go directly through the unbuffered
+        # Python file object.
+        _thread_log.file = filename.open("ab", buffering=0)
 
-    return LOG_DIR / f"telemetry_{process_name}_{pid}_{tid}.vson"
+    return _thread_log.file
 
 
 def _write_event(name: str, category: str, phase: str) -> None:
@@ -51,10 +52,9 @@ def _write_event(name: str, category: str, phase: str) -> None:
         "ts": _timestamp_us(),
     }
 
-    with _LOCK:
-        with _get_log_file().open("a", encoding="utf-8") as f:
-            json.dump(event, f)
-            f.write(",\n")
+    data = (json.dumps(event) + ",\n").encode("utf-8")
+
+    _get_log_file().write(data)
 
 
 def telemetry(category: str):
