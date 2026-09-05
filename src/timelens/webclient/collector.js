@@ -67,15 +67,15 @@ class Collector {
     constructor() {
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
         this.running = true;
+        this.audioEnabled = false;
+        this.setAudio();
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
         this.ws = new WebSocket(wsUrl);
-        //this.ws = new WebSocket(`ws://172.16.2.17:8080/ws`);
-
         console.log("Collector connecting to", wsUrl);
-        this.ws.onmessage = (event) => {
 
+        this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // notice that the variables MUST correspond with the actual JSON field names here!
             let te = 0;
@@ -131,21 +131,27 @@ class Collector {
         }
     }
 
-    async toggleAudio() {
-        if (audio.state === "running") {
-            await audio.suspend();
+    setAudio() {
+        if (this.audioEnabled) {
+            audio.resume();
         } else {
-            await audio.resume();
+            audio.suspend();
         }
-        return audio.state;
     }
 
-    audioState() {
-        return audio.state;
+    async toggleAudio() {
+        this.audioEnabled = !this.audioEnabled;
+        this.setAudio();
+        return this.audioEnabled;
+    }
+
+    isAudioEnabled() {
+        return this.audioEnabled;
     }
 
     dummy() {
 
+        this.setAudio();
         this.incoming.push(makeEvent("cycle", EventType.OPEN, 0, 0, "groupid"));
         this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 230 * 1000, "groupid"));
 

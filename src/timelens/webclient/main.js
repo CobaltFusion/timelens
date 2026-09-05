@@ -56,8 +56,8 @@ function addControls() {
     controls.appendChild(dummyButton);
 
     async function updateAudioButton() {
-        const state = await collector.audioState();
-        audioButton.textContent = (state === "running") ? "Audio (On) " : "Audio (Muted)";
+        const audioEnabled = await collector.isAudioEnabled();
+        audioButton.textContent = (audioEnabled) ? "Audio (On) " : "Audio (Muted)";
     }
 
     const audioButton = document.createElement("button");
