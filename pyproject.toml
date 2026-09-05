@@ -6,6 +6,7 @@ dependencies = [
     "fastapi",
     "watchfiles",
     "uvicorn",
+    "psutil",
 ]
 
 [project.optional-dependencies]
