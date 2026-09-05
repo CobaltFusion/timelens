@@ -131,12 +131,12 @@ class Collector {
         }
     }
 
-    async enableAudio() {
-        if (audio.state !== "running") {
+    async toggleAudio() {
+        if (audio.state === "running") {
+            await audio.suspend();
+        } else {
             await audio.resume();
         }
-
-        console.log("Audio state:", audio.state);
         return audio.state;
     }
 

@@ -57,12 +57,12 @@ function addControls() {
 
     async function updateAudioButton() {
         const state = await collector.audioState();
-        audioButton.textContent = `Toggle Audio (${state})`;
+        audioButton.textContent = (state === "running") ? "Audio (On) " : "Audio (Muted)";
     }
 
     const audioButton = document.createElement("button");
     audioButton.addEventListener("click", async () => {
-        await collector.enableAudio();
+        await collector.toggleAudio();
         await updateAudioButton();
     });
 
