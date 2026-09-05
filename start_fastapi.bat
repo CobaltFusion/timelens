@@ -39,13 +39,13 @@ if not exist "venv\" (
     echo Creating virtual environment...
     py -3.13 -m venv venv
     if errorlevel 1 exit /b %errorlevel%
+
+    echo Installing dependencies...
+    python -m pip install -e ".[dev]"
+    if errorlevel 1 exit /b %errorlevel%
 )
 
 call venv\Scripts\activate.bat
-if errorlevel 1 exit /b %errorlevel%
-
-echo Installing dependencies...
-python -m pip install -e ".[dev]"
 if errorlevel 1 exit /b %errorlevel%
 
 python --version
@@ -53,5 +53,4 @@ python --version
 cd /d "%~dp0src\timelens"
 
 start http://localhost:8080
-
 python -m uvicorn server:app --reload --host 0.0.0.0 --port 8080
