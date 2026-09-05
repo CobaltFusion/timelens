@@ -34,6 +34,7 @@ if not exist "venv\" (
     echo Installing dependencies...
     python -m pip install --upgrade pip
     python -m pip install -e .
+    python -m pip install -e ".[dev]"
 ) else (
     call venv\Scripts\activate.bat
 )
