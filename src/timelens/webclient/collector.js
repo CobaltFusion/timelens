@@ -59,6 +59,10 @@ function makeEvent(name, type, begin_time, end_time, groupId, value) {
     };
 }
 
+function containsIgnoreCase(text, search) {
+    return text.toLowerCase().includes(search.toLowerCase());
+}
+
 class Collector {
     constructor() {
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
@@ -86,6 +90,15 @@ class Collector {
             }
             const groupId = tid; // use tid as grouping for single line
             this.incoming.push(makeEvent(name, type, ts, te, groupId, value));
+
+            if (te === 0 && containsIgnoreCase(name, "error")) {
+                console.log("Error beeping");
+                beep(1300, 0, 0.03, "square");
+            }
+            if (te === 0 && containsIgnoreCase(name, "message")) {
+                console.log("Message beeping");
+                beep(800, 0, 0.05);
+            }
         }
     }
 
