@@ -90,7 +90,7 @@ class LogWatcher:
                 try:
                     current = {f for f in os.listdir(self.path) if f.endswith(".vson")}
                 except FileNotFoundError:
-                    logging.error(f"Directory not found: {self.path}")
+                    #logging.error(f"Directory not found: {self.path}")
                     await asyncio.sleep(1)
                     continue
 
@@ -174,6 +174,7 @@ async def lifespan(app: FastAPI):
 
     path = Path("/tmp/logs/telemetry")
     if not path.is_dir():
+        logging.warning("Path missing: %s", path)
         path = "c:/temp/logs/telemetry"
     logging.warning("Monitoring path: %s", path)
 
