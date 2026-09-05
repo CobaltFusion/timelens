@@ -90,7 +90,7 @@ class LogWatcher:
                 try:
                     current = {f for f in os.listdir(self.path) if f.endswith(".vson")}
                 except FileNotFoundError:
-                    #logging.error(f"Directory not found: {self.path}")
+                    # logging.error(f"Directory not found: {self.path}")
                     await asyncio.sleep(1)
                     continue
 
@@ -182,7 +182,7 @@ async def lifespan(app: FastAPI):
     app.state.watcher = watcher
     await watcher.start()
 
-    peer_discovery = PeerDiscovery(http_port=8000)
+    peer_discovery = PeerDiscovery(http_port=8080)
     app.state.peer_discovery = peer_discovery
     await peer_discovery.start()
 
