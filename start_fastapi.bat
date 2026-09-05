@@ -18,22 +18,27 @@
 :: pip install fastapi
 :: pip install gunicorn
 
+@echo off
 setlocal
 
 :: change to the script directory (and drive)
 cd /d "%~dp0"
 
 if not exist "venv\" (
+    echo Creating virtual environment...
     py -3.13 -m venv venv
     if errorlevel 1 exit /b %errorlevel%
+
+    call venv\Scripts\activate.bat
+
+    echo Installing dependencies...
+    python -m pip install --upgrade pip
+    python -m pip install -e .
+) else (
+    call venv\Scripts\activate.bat
 )
 
-call venv\Scripts\activate.bat
 python --version
-python -m pip install --upgrade pip
-
-:: installs the required modules from pyproject.toml
-pip install -e .
 
 cd /d "%~dp0"\src\timelens
 start http://localhost:8080
