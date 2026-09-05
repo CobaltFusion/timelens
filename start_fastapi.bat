@@ -21,29 +21,37 @@
 @echo off
 setlocal
 
-:: change to the script directory (and drive)
+:: Change to the script directory (and drive)
 cd /d "%~dp0"
 
+:: Handle "reinstall" argument
+if /i "%~1"=="reinstall" (
+    echo Reinstall requested.
+    if exist "venv\" (
+        echo Removing existing virtual environment...
+        rmdir /s /q "venv"
+        if errorlevel 1 exit /b %errorlevel%
+    )
+)
+
+:: Create virtual environment if needed
 if not exist "venv\" (
     echo Creating virtual environment...
     py -3.13 -m venv venv
     if errorlevel 1 exit /b %errorlevel%
-
-    call venv\Scripts\activate.bat
-
-    echo Installing dependencies...
-    python -m pip install --upgrade pip
-    python -m pip install -e .
-    python -m pip install -e ".[dev]"
-) else (
-    call venv\Scripts\activate.bat
 )
+
+call venv\Scripts\activate.bat
+if errorlevel 1 exit /b %errorlevel%
+
+echo Installing dependencies...
+python -m pip install -e ".[dev]"
+if errorlevel 1 exit /b %errorlevel%
 
 python --version
 
-cd /d "%~dp0"\src\timelens
+cd /d "%~dp0src\timelens"
+
 start http://localhost:8080
 
-::  server -> refers to the file server.py
-::  app    -> refers to the variable 'app' in 'server.py' that is the main entrypoint for the application
 python -m uvicorn server:app --reload --host 0.0.0.0 --port 8080
