@@ -220,13 +220,29 @@ class BarStack {
         }
     }
 
-    drawTextOnBar(hover, duration, x, y) {
-        this.ctx.fillStyle = "black";
+    drawTextOnBar(name, x, width, y, height) {
+        const horizontalPadding = 4;
+        const availableWidth = width - horizontalPadding * 2;
+
+        if (availableWidth <= 0) {
+            return;
+        }
+
         this.ctx.font = "10px monospace";
+        let text = name;
+
+        if (this.ctx.measureText(text).width > availableWidth) {
+            text = `${name.slice(0, 3)}...`;
+
+            if (this.ctx.measureText(text).width > availableWidth) {
+                return;
+            }
+        }
+
+        this.ctx.fillStyle = "#07131f";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText(`${hover} (${duration.toFixed(3)} ms)`, x, y
-        );
+        this.ctx.fillText(text, x + width / 2, y + height / 2);
     }
 
     drawTooltip(hover, duration) {
@@ -292,6 +308,8 @@ class BarStack {
             this.ctx.fillStyle = color;
             this.ctx.fillRect(x1, y, width, line.height);
         }
+
+        this.drawTextOnBar(event.name, x1, width, y, line.height);
 
         if (isHovered) {
             this.hover = { name: hover, duration: durationMs };
