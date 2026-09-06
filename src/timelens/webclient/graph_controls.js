@@ -94,7 +94,7 @@ function getColor(c) {
 class Line {
     constructor(y) {
         this.y = y;
-        this.height = 20;
+        this.height = 19;
         this.lineSpacing = 20;
 
         // Limitation: no support for nested events with the same name.
@@ -349,9 +349,41 @@ class Graph {
         return startIndex;
     }
 
+    drawGrid(ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        const width = this.canvas.width / dpr;
+        const height = this.canvas.height / dpr;
+
+        ctx.save();
+        ctx.lineWidth = 1;
+
+        for (let x = 0; x <= width; x += 50) {
+            const isMajorLine = x % 100 === 0;
+            ctx.strokeStyle = isMajorLine
+                ? "rgba(52, 229, 189, 0.16)"
+                : "rgba(142, 161, 189, 0.08)";
+            ctx.beginPath();
+            ctx.moveTo(x + 0.5, 0);
+            ctx.lineTo(x + 0.5, height);
+            ctx.stroke();
+        }
+
+        for (let y = 0; y <= height; y += 20) {
+            ctx.strokeStyle = "rgba(142, 161, 189, 0.08)";
+            ctx.beginPath();
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(width, y + 0.5);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
     render() {
         const ctx = this.canvas.getContext("2d");
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const dpr = window.devicePixelRatio || 1;
+        ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+        this.drawGrid(ctx);
 
         const bars = new BarStack(ctx, this.mouseX, this.mouseY);
         const data = this.collector.data();
