@@ -230,32 +230,10 @@ def devtools():
     return JSONResponse({})
 
 
-def filter_discovered_peers(peers):
-    """Keep one entry per instance_id from the globally preferred subnet."""
-
-    if not peers:
-        return []
-
-    subnet_counts = Counter(peer["subnet"] for peer in peers)
-    preferred_subnet = max(subnet_counts, key=subnet_counts.get)
-
-    result = {}
-    for peer in peers:
-        if peer["subnet"] != preferred_subnet:
-            continue
-
-        instance_id = peer["instance_id"]
-
-        if instance_id not in result:
-            result[instance_id] = peer
-
-    return list(result.values())
-
-
 @app.get("/api/servers")
 async def servers():
     peer_discovery: PeerDiscovery = app.state.peer_discovery
-    peers = filter_discovered_peers(await peer_discovery.discover())
+    peers = await peer_discovery.discover()
     return JSONResponse({"servers": peers})
 
 
