@@ -6,32 +6,14 @@
     <title>TimeLens v1</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 
-    <style>
-        body {
-            margin: 0;
-            background: #444444;
-            color: #eee;
-            font-family: monospace;
-            overflow-y: scroll;
-            scrollbar-gutter: stable;
-        }
-
-        #id_control_panel {
-            border: 1px dashed rgb(118, 118, 223);
-        }
-
-        #graph_panel canvas {
-            display: block;
-            visibility: hidden;
-            background: black;
-            border: 2px solid #00ff88;
-            margin: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="graph.css">
 </head>
 
 <body>
-    <p id="id_above_panel"></p>
+    <p id="id_above_panel">
+        TimeLens / live trace console
+        <a class="home-link" href="/" aria-label="Return to server discovery">Server list</a>
+    </p>
     <div id="id_control_panel"></div>
     <div id="id_graph_panel"></div>
     <script src="assertions.js"></script>
