@@ -153,12 +153,42 @@
                     return;
                 }
 
+                // filter out duplicate detection of servers (including localhost)
+                // that are found multiple times. This happens for localhost if it has multiple interfaces
+                // and happens for other servers if there are multiple interfaces connected those servers.
+                // (ie. via an internal network and an external network)
+                const localAddress = window.location.hostname;
+
+                // Group servers by instance_id.
+                const grouped = new Map();
+
                 for (const server of data.servers) {
+                    const servers = grouped.get(server.instance_id) ?? [];
+                    servers.push(server);
+                    grouped.set(server.instance_id, servers);
+                }
+
+                // Select one server for each instance_id.
+                const servers = [];
+
+                for (const candidates of grouped.values()) {
+                    if (candidates.length === 1) {
+                        servers.push(candidates[0]);
+                        continue;
+                    }
+
+                    const preferred = candidates.filter(server =>
+                        isAddressInSubnet(localAddress, server.subnet)
+                    );
+
+                    servers.push(preferred[0] ?? candidates[0]);
+                }
+
+                for (const server of servers) {
                     const link = document.createElement("a");
 
                     link.className = "server";
-                    link.href =
-                        `http://${server.address}:${server.port}/graph.html`;
+                    link.href = `http://${server.address}:${server.port}/graph.html`;
 
                     link.innerHTML = `
                         <span class="name">${server.name}</span>
@@ -172,12 +202,45 @@
             } catch (error) {
                 console.error(error);
                 container.replaceChildren();
-                showMessage(
-                    container,
-                    `Failed to discover servers: ${error.message}`,
-                    true
-                );
+                showMessage(container, `Failed to discover servers: ${error.message}`, true);
             }
+        }
+
+        function isAddressInSubnet(address, subnet) {
+            const [network, prefixLength] = subnet.split("/");
+            const prefix = Number(prefixLength);
+
+            const addressNumber = ipv4ToNumber(address);
+            const networkNumber = ipv4ToNumber(network);
+
+            if (addressNumber === null || networkNumber === null) {
+                return false;
+            }
+
+            const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+            return (addressNumber & mask) === (networkNumber & mask);
+        }
+
+        function ipv4ToNumber(address) {
+            const parts = address.split(".");
+
+            if (parts.length !== 4) {
+                return null;
+            }
+
+            let result = 0;
+
+            for (const part of parts) {
+                const value = Number(part);
+
+                if (!Number.isInteger(value) || value < 0 || value > 255) {
+                    return null;
+                }
+
+                result = (result * 256) + value;
+            }
+
+            return result >>> 0;
         }
 
         function showMessage(container, message, error = false) {
