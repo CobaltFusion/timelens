@@ -69,6 +69,7 @@ class Collector {
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;
+        this.triggerWord = "gevBoardcapture";
         this.setAudio();
 
         // this uses the 'host' where we are loading this application from
@@ -115,6 +116,14 @@ class Collector {
 
     data() {
         return this.incoming; // returns a reference, not a copy
+    }
+
+    setTriggerWord(triggerWord) {
+        this.triggerWord = String(triggerWord);
+    }
+
+    getTriggerWord() {
+        return this.triggerWord;
     }
 
     stop() {

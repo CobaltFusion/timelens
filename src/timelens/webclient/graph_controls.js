@@ -295,7 +295,6 @@ class Graph {
         this.index = 0;
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("graph");
-        this.triggerWord = "gevBoardcapture";   // hardcoded trigger word
 
         this.mouseX = 0;
         this.mouseY = 0;
@@ -326,12 +325,13 @@ class Graph {
 
     findTriggerIndex(data) {
         let startIndex = 0;
-        if (this.triggerWord) {
+        const triggerWord = this.collector.getTriggerWord();
+        if (triggerWord) {
             for (let i = data.length - 1; i >= 0; --i) {
                 const event = data[i];
                 if (event.type !== EventType.OPEN)
                     continue;
-                if (containsIgnoreCase(event.name, this.triggerWord)) {
+                if (containsIgnoreCase(event.name, triggerWord)) {
                     startIndex = i;
                     break;
                 }
