@@ -44,6 +44,20 @@ function addControls() {
     triggerWordLabel.appendChild(triggerWordInput);
     controls.appendChild(triggerWordLabel);
 
+    const gridScaleLabel = document.createElement("span");
+    gridScaleLabel.textContent = "Graph width:";
+    controls.appendChild(gridScaleLabel);
+
+    new NumericControl({
+        parent: controls,
+        value: collector.getMillisecondsPerGraphWidth(),
+        step: 10,
+        inputStep: 1,
+        min: 0.1,
+        unit: "ms",
+        onChange: (value) => collector.setMillisecondsPerGraphWidth(value)
+    });
+
     const addButton = document.createElement("button");
     addButton.textContent = "Add Graph";
     addButton.addEventListener("click", () => addScope(collector));

@@ -114,6 +114,14 @@ input {
 
 input:focus-visible, button:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 .2rem var(--accent-glow); }
 
+#id_control_panel .numeric-control-input {
+    width: 4rem;
+    min-width: 4rem;
+    margin: 0 .25rem;
+    padding: .35rem .4rem;
+    text-align: center;
+}
+
 #id_graph_panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 
 #id_graph_panel > div {
