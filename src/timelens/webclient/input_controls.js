@@ -214,6 +214,7 @@ class NumericControl {
         parent,
         value = 0,
         step = 1,
+        inputStep = step,
         min = -Infinity,
         max = Infinity,
         unit = "",
@@ -222,6 +223,7 @@ class NumericControl {
         this.parent = parent;
         this.value = value;
         this.step = step;
+        this.inputStep = inputStep;
         this.min = min;
         this.max = max;
         this.unit = unit;
@@ -250,12 +252,9 @@ class NumericControl {
         this.plusBtn.textContent = "+";
 
         this.input = document.createElement("input");
+        this.input.classList.add("numeric-control-input");
         this.input.type = "number";
-        this.input.step = this.step;
-        this.input.style.margin = "0 10px";
-        this.input.style.minWidth = "30px";
-        this.input.style.width = "30px";
-        this.input.style.padding = "2px 2px 2px 10px";
+        this.input.step = this.inputStep;
 
         this.unitSpan = document.createElement("span");
         this.unitSpan.textContent = this.unit ? ` ${this.unit}` : "";

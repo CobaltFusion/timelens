@@ -70,6 +70,7 @@ class Collector {
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
         this.triggerWord = "";
+        this.millisecondsPerGraphWidth = 10;
         this.setAudio();
 
         // this uses the 'host' where we are loading this application from
@@ -124,6 +125,18 @@ class Collector {
 
     getTriggerWord() {
         return this.triggerWord;
+    }
+
+    setMillisecondsPerGraphWidth(milliseconds) {
+        const value = Number(milliseconds);
+
+        if (Number.isFinite(value) && value > 0) {
+            this.millisecondsPerGraphWidth = value;
+        }
+    }
+
+    getMillisecondsPerGraphWidth() {
+        return this.millisecondsPerGraphWidth;
     }
 
     stop() {

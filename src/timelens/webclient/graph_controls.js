@@ -128,10 +128,11 @@ class Line {
 }
 
 class BarStack {
-    constructor(ctx, mouseX, mouseY) {
+    constructor(ctx, mouseX, mouseY, pixelsPerMillisecond) {
         this.ctx = ctx;
         this.mouseX = mouseX;
         this.mouseY = mouseY;
+        this.scale = pixelsPerMillisecond;
         this.color = 1;
         this.y = 20;
         this.height = 12;
@@ -266,7 +267,7 @@ class BarStack {
         const et = (event.end_time - this.beginTime) / 1000;
         const durationMs = et - bt;
 
-        const scale = 25;
+        const scale = this.scale;
         const x1 = Math.round(bt * scale);
         const x2 = Math.round(et * scale);
 
@@ -357,8 +358,10 @@ class Graph {
         ctx.save();
         ctx.lineWidth = 1;
 
-        for (let x = 0; x <= width; x += 50) {
-            const isMajorLine = x % 100 === 0;
+        const minorGridLineCount = 20;
+        for (let index = 0; index <= minorGridLineCount; ++index) {
+            const x = width * index / minorGridLineCount;
+            const isMajorLine = index % 2 === 0;
             ctx.strokeStyle = isMajorLine
                 ? "rgba(52, 229, 189, 0.16)"
                 : "rgba(142, 161, 189, 0.08)";
@@ -382,10 +385,16 @@ class Graph {
     render() {
         const ctx = this.canvas.getContext("2d");
         const dpr = window.devicePixelRatio || 1;
+        const graphWidth = this.canvas.width / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
         this.drawGrid(ctx);
 
-        const bars = new BarStack(ctx, this.mouseX, this.mouseY);
+        const bars = new BarStack(
+            ctx,
+            this.mouseX,
+            this.mouseY,
+            graphWidth / this.collector.getMillisecondsPerGraphWidth()
+        );
         const data = this.collector.data();
 
         let startIndex = this.findTriggerIndex(data);
