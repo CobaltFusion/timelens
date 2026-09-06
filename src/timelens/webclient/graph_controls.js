@@ -242,7 +242,13 @@ class BarStack {
         this.ctx.fillStyle = "#07131f";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText(text, x + width / 2, y + height / 2);
+        const dpr = window.devicePixelRatio || 1;
+        const snapToPixel = (value) => Math.round(value * dpr) / dpr;
+        this.ctx.fillText(
+            text,
+            snapToPixel(x + width / 2),
+            snapToPixel(y + height / 2)
+        );
     }
 
     drawTooltip(hover, duration) {
@@ -453,14 +459,18 @@ class Graph {
 
     resize(width, height) {
         const dpr = window.devicePixelRatio || 1;
+        const pixelWidth = Math.round(width * dpr);
+        const pixelHeight = Math.round(height * dpr);
+        const displayWidth = pixelWidth / dpr;
+        const displayHeight = pixelHeight / dpr;
 
-        // Set the *displayed* size (CSS pixels)
-        this.canvas.style.width = width + "px";
-        this.canvas.style.height = height + "px";
+        // Keep the displayed size aligned with the backing-store pixel grid.
+        this.canvas.style.width = displayWidth + "px";
+        this.canvas.style.height = displayHeight + "px";
 
         // Set the *actual* resolution (device pixels)
-        this.canvas.width = Math.floor(width * dpr);
-        this.canvas.height = Math.floor(height * dpr);
+        this.canvas.width = pixelWidth;
+        this.canvas.height = pixelHeight;
 
         // Scale drawing operations
         const ctx = this.canvas.getContext("2d");
