@@ -32,7 +32,7 @@ class Widget {
         this.closeButton.style.display = "flex";
         this.closeButton.style.alignItems = "center";
         this.closeButton.style.justifyContent = "center";
-        this.closeButton.style.fontSize = "8px";
+        this.closeButton.style.fontSize = "11px";
         this.closeButton.style.lineHeight = "1";
         this.closeButton.style.padding = "0";
         this.closeButton.textContent = "x";
@@ -41,16 +41,19 @@ class Widget {
         this.closeButton.style.top = "0px";
         this.closeButton.style.right = "0px";
 
-        this.closeButton.style.width = "14px";
-        this.closeButton.style.height = "14px";
+        this.closeButton.style.width = "20px";
+        this.closeButton.style.height = "20px";
+        this.closeButton.style.minWidth = "20px";
+        this.closeButton.style.minHeight = "20px";
 
         this.closeButton.style.border = "none";
-        this.closeButton.style.borderRadius = "50%";
+        this.closeButton.style.borderRadius = "0 8px 0 8px";
         this.closeButton.style.background = "rgba(0,0,0,0.6)";
         this.closeButton.style.color = "#00ff88";
         this.closeButton.style.cursor = "pointer";
 
         this.closeButton.addEventListener("click", () => {
+            this.resizeObserver.disconnect();
             this.container.remove();
             this.onClose();
         });
@@ -59,12 +62,19 @@ class Widget {
         this.container.appendChild(this.closeButton);
         this.component.mount(this.container);
         this.parent.appendChild(this.container);
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+        this.resizeObserver.observe(this.container);
         this.resize();
     }
 
     resize() {
-        const rect = this.parent.getBoundingClientRect();
-        this.component.resize(rect.width * 0.8, 200);
+        const styles = window.getComputedStyle(this.container);
+        const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+        const width = Math.max(0, this.container.clientWidth - horizontalPadding);
+        const height = Math.max(0, this.container.clientHeight - verticalPadding);
+
+        this.component.resize(width, height);
     }
 }
 
