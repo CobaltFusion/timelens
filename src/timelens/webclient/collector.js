@@ -68,8 +68,8 @@ class Collector {
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
         this.running = true;
         this.audioEnabled = false;
-        this.cutoffTime = 0;
-        this.triggerWord = "gevBoardcapture";
+        this.cutoffTime = 0;  // event from before this time are dropped
+        this.triggerWord = "";
         this.setAudio();
 
         // this uses the 'host' where we are loading this application from
@@ -162,16 +162,18 @@ class Collector {
         return this.audioEnabled;
     }
 
+    asTime(msTime) {
+        return this.cutoffTime + (msTime * 1000);
+    }
+
     dummy() {
-
         this.setAudio();
-        this.incoming.push(makeEvent("cycle", EventType.OPEN, 0, 0, "groupid"));
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 100 * 1000, "groupid"));
-
-        this.incoming.push(makeEvent("process_image", EventType.OPEN, 13 * 1000, 0, "groupid"));
-        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, 15 * 1000, 40 * 1000, "groupid"));
-        this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 20 * 1000, "groupid")); // intentionally out-of-order
-        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, 0, 500*1000, "groupid")); // intentionally omitted
+        const startOffset = this.cutoffTime;
+        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), this.asTime(100), "groupid"));
+        this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, "groupid"));
+        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), "groupid"));
+        this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), "groupid")); // intentionally out-of-order
+        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, this.asTime(0), this.asTime(500), "groupid")); // intentionally omitted
 
         beep(1300, 0.0, 0.05, "square");
 

@@ -196,7 +196,6 @@ class BarStack {
                 const lane = line.getLane(drawEvent.begin_time);
                 line.occupyLane(lane, drawEvent.end_time);
                 drawEvent.lane = lane;
-
                 this.drawEvent(line, drawEvent);
             }
 
@@ -257,7 +256,7 @@ class BarStack {
         const et = (event.end_time - this.beginTime) / 1000;
         const durationMs = et - bt;
 
-        const scale = 100;
+        const scale = 25;
         const x1 = Math.round(bt * scale);
         const x2 = Math.round(et * scale);
 
