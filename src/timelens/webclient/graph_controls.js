@@ -263,8 +263,10 @@ class BarStack {
         const tooltipWidth = metrics.width + padding * 2;
         const tooltipHeight = 16;
 
-        // Position near mouse
-        const tx = this.mouseX + 12;
+        // Position near the mouse, but keep the tooltip inside the graph.
+        const dpr = window.devicePixelRatio || 1;
+        const canvasWidth = this.ctx.canvas.width / dpr;
+        const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
         const ty = this.mouseY - 24;
 
         // Background
