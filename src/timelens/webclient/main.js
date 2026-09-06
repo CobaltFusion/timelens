@@ -29,21 +29,35 @@ const collector = new Collector();
 function addControls() {
     const controls = document.getElementById("id_control_panel");
 
+    const triggerWordLabel = document.createElement("label");
+    triggerWordLabel.textContent = "Trigger word: ";
+    triggerWordLabel.htmlFor = "id_trigger_word";
+
+    const triggerWordInput = document.createElement("input");
+    triggerWordInput.id = "id_trigger_word";
+    triggerWordInput.type = "text";
+    triggerWordInput.value = collector.getTriggerWord();
+    triggerWordInput.addEventListener("input", () => {
+        collector.setTriggerWord(triggerWordInput.value);
+    });
+
+    triggerWordLabel.appendChild(triggerWordInput);
+    controls.appendChild(triggerWordLabel);
+
     const addButton = document.createElement("button");
     addButton.textContent = "Add Graph";
     addButton.addEventListener("click", () => addScope(collector));
     controls.appendChild(addButton);
 
+    // const stopButton = document.createElement("button");
+    // stopButton.textContent = "Stop";
+    // stopButton.addEventListener("click", () => collector.stop());
+    // controls.appendChild(stopButton);
 
-    const stopButton = document.createElement("button");
-    stopButton.textContent = "Stop";
-    stopButton.addEventListener("click", () => collector.stop());
-    controls.appendChild(stopButton);
-
-    const startButton = document.createElement("button");
-    startButton.textContent = "Start";
-    startButton.addEventListener("click", () => collector.start());
-    controls.appendChild(startButton);
+    // const startButton = document.createElement("button");
+    // startButton.textContent = "Start";
+    // startButton.addEventListener("click", () => collector.start());
+    // controls.appendChild(startButton);
 
     const resetButton = document.createElement("button");
     resetButton.textContent = "Reset";
