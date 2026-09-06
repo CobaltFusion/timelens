@@ -52,5 +52,11 @@ python --version
 
 cd /d "%~dp0src\timelens"
 
+if /i "%~1"=="test" (
+    pytest
+    if errorlevel 1 exit /b %errorlevel%
+    exit
+)
+
 start http://localhost:8080
 python -m uvicorn server:app --reload --host 0.0.0.0 --port 8080
