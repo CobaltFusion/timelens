@@ -68,6 +68,7 @@ class Collector {
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
         this.running = true;
         this.audioEnabled = false;
+        this.cutoffTime = 0;
         this.setAudio();
 
         // this uses the 'host' where we are loading this application from
@@ -88,18 +89,21 @@ class Collector {
                 te = ts;
                 ts = 0;
             }
+            else {
+                if (containsIgnoreCase(name, "error")) {
+                    console.log("Error beeping");
+                    beep(1300, 0, 0.03, "square");
+                }
+                if (containsIgnoreCase(name, "message")) {
+                    console.log("Message beeping");
+                    beep(800, 0, 0.05);
+                }
+            }
             const groupId = tid; // use tid as grouping for single line
+            this.cutoffTime = ts - (0.7 * 60 * 1000 * 1000); // keep last 700ms of data (ts is in microseconds since start of the source data process)
             this.incoming.push(makeEvent(name, type, ts, te, groupId, value));
-
-            if (te === 0 && containsIgnoreCase(name, "error")) {
-                console.log("Error beeping");
-                beep(1300, 0, 0.03, "square");
-            }
-            if (te === 0 && containsIgnoreCase(name, "message")) {
-                console.log("Message beeping");
-                beep(800, 0, 0.05);
-            }
-        }
+            this.trimIncomingData(this.cutoffTime);
+        };
     }
 
     clear() {
@@ -153,23 +157,29 @@ class Collector {
 
         this.setAudio();
         this.incoming.push(makeEvent("cycle", EventType.OPEN, 0, 0, "groupid"));
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 230 * 1000, "groupid"));
+        this.incoming.push(makeEvent("capture_image", EventType.DURATION, 10 * 1000, 100 * 1000, "groupid"));
 
-        this.incoming.push(makeEvent("process_image", EventType.OPEN, 231 * 1000, 0, "groupid"));
-        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, 310 * 1000, 400 * 1000, "groupid"));
-        this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 300 * 1000, "groupid")); // intentionally out-of-order
+        this.incoming.push(makeEvent("process_image", EventType.OPEN, 13 * 1000, 0, "groupid"));
+        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, 15 * 1000, 40 * 1000, "groupid"));
+        this.incoming.push(makeEvent("process_image", EventType.CLOSE, 0, 20 * 1000, "groupid")); // intentionally out-of-order
         //this.incoming.push(makeEvent("cycle", EventType.CLOSE, 0, 500*1000, "groupid")); // intentionally omitted
 
-        beep(500, 0, 0.1);
-        beep(600, 0.1, 0.6);
-        beep(700, 0.7, 0.4);
-        beep(500, 1.1, 0.1);
-        beep(600, 1.2, 0.5);
+        beep(1300, 0.0, 0.05, "square");
 
-        let t = 0;
-        for (let i = 0; i < 20; ++i) {
-            const duration = randomNote(t); // randomNote returns its duration
-            t += duration;
+        // let t = 0;
+        // for (let i = 0; i < 20; ++i) {
+        //     const duration = randomNote(t); // randomNote returns its duration
+        //     t += duration;
+        // }
+    }
+
+    trimIncomingData(cutoffTime) {
+        const beforeLength = this.incoming.length;
+        while (
+            this.incoming.length > 0 &&
+            this.incoming[0].begin_time < cutoffTime
+        ) {
+            this.incoming.shift();
         }
     }
 }

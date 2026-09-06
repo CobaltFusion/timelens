@@ -9,9 +9,10 @@ class Widget {
         if (!(this.parent instanceof HTMLElement)) {
             throw new TypeError("parent must be an HTMLElement");
         }
-        if (!(isComponent(this.component))) {
+        if (!isComponent(this.component)) {
             throw new TypeError("component must be an object of 'Component' ducktype");
         }
+
         this._createContainer();
     }
 
@@ -83,9 +84,36 @@ function getColor(c) {
 class Line {
     constructor(y) {
         this.y = y;
-        this.openMap = new Map(); // limitation: no support for nested events with the same name
+        this.height = 20;
+        this.lineSpacing = 20;
+
+        // Limitation: no support for nested events with the same name.
+        this.openMap = new Map();
         this.closedEvents = [];
+
         this.lastEndTime = 0;
+
+        // End time of the event currently occupying each lane.
+        this.lanes = [];
+    }
+
+    getLane(beginTime) {
+        for (let i = 0; i < this.lanes.length; ++i) {
+            if (beginTime >= this.lanes[i]) {
+                return i;
+            }
+        }
+
+        this.lanes.push(0);
+        return this.lanes.length - 1;
+    }
+
+    occupyLane(lane, endTime) {
+        this.lanes[lane] = endTime;
+    }
+
+    getHeight() {
+        return Math.max(1, this.lanes.length) * this.lineSpacing;
     }
 }
 
@@ -99,6 +127,7 @@ class BarStack {
         this.height = 12;
         this.lines = new Map();
         this.beginTime = Infinity;
+        this.hover = null;
     }
 
     getLine(id) {
@@ -112,36 +141,82 @@ class BarStack {
 
     makeLine() {
         const line = new Line(this.y);
-        this.y += 20;
         return line;
     }
 
+    layoutLine(line) {
+        const events = [];
+
+        for (const event of line.closedEvents) {
+            events.push(event);
+        }
+
+        for (const event of line.openMap.values()) {
+            events.push({ ...event, end_time: line.lastEndTime });
+        }
+
+        events.sort((a, b) => a.begin_time - b.begin_time);
+
+        line.lanes = [];
+
+        for (const event of events) {
+            const lane = line.getLane(event.begin_time);
+            line.occupyLane(lane, event.end_time);
+            event.lane = lane;
+        }
+    }
+
+    layout() {
+        let y = 20;
+
+        for (const [, line] of this.lines) {
+            line.y = y;
+            this.layoutLine(line);
+            y += line.getHeight();
+        }
+    }
+
     drawEvent(line, event) {
-        const duration = event.end_time - event.begin_time;
-        this.drawBar(line, event, event.name);
+        const y = line.y + event.lane * line.lineSpacing;
+        this.drawBar(line, event, event.name, y);
     }
 
     drawEvents() {
-        for (const [, line] of this.lines) { // ignore id
+        this.layout();
+
+        for (const [, line] of this.lines) {
             const unclosedEvents = Array.from(line.openMap.values());
+
             for (const event of unclosedEvents) {
-                event.end_time = line.lastEndTime;      // notice: modifies the event without copying
-                this.drawEvent(line, event);
+                const drawEvent = {
+                    ...event,
+                    end_time: line.lastEndTime
+                };
+
+                const lane = line.getLane(drawEvent.begin_time);
+                line.occupyLane(lane, drawEvent.end_time);
+                drawEvent.lane = lane;
+
+                this.drawEvent(line, drawEvent);
             }
 
             for (const event of line.closedEvents) {
                 this.drawEvent(line, event);
             }
         }
+        // Draw the tooltip last so it is always on top.
+        if (this.hover) {
+            this.drawTooltip(this.hover.name, this.hover.duration);
+        }
     }
 
     drawTextOnBar(hover, duration, x, y) {
-        // width label
         this.ctx.fillStyle = "black";
         this.ctx.font = "10px monospace";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText(`${hover} (${duration.toFixed(3)} ms)`, x, y);
+        this.ctx.fillText(`${hover} (${duration.toFixed(3)} ms)`, x, y
+        );
     }
 
     drawTooltip(hover, duration) {
@@ -163,26 +238,16 @@ class BarStack {
         // Background
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
         this.ctx.fillRect(tx, ty, tooltipWidth, tooltipHeight);
-
-        // Border
         this.ctx.strokeStyle = "#00ff88";
         this.ctx.strokeRect(tx, ty, tooltipWidth, tooltipHeight);
-
-        // Text
         this.ctx.fillStyle = "#00ff88";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "middle";
-
-        this.ctx.fillText(
-            text,
-            tx + padding,
-            ty + tooltipHeight / 2
-        );
+        this.ctx.fillText(text, tx + padding, ty + tooltipHeight / 2);
     }
 
-    // show the text by default, but show 'hover' if the mouse is over the bar
-    drawBar(line, event, hover) {
-
+    // Show the text by default, but show 'hover' if the mouse is over the bar.
+    drawBar(line, event, hover, y) {
         assert(typeof event.name === "string", "event.name must be string");
 
         const color = getColor(this.color);
@@ -192,12 +257,17 @@ class BarStack {
         const et = (event.end_time - this.beginTime) / 1000;
         const durationMs = et - bt;
 
-        const scale = 2;
+        const scale = 100;
         const x1 = Math.round(bt * scale);
         const x2 = Math.round(et * scale);
 
         const width = x2 - x1;
-        const isHovered = this.mouseX >= x1 && this.mouseX <= x2 && this.mouseY >= line.y && this.mouseY <= line.y + this.height;
+
+        const isHovered =
+            this.mouseX >= x1 &&
+            this.mouseX <= x2 &&
+            this.mouseY >= y &&
+            this.mouseY <= y + line.height;
 
         if (event.type === EventType.OPEN) {
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
@@ -206,16 +276,15 @@ class BarStack {
             gradient.addColorStop(1, "rgba(0,0,0,0)");
 
             this.ctx.fillStyle = gradient;
-            this.ctx.fillRect(x1, line.y, width, this.height);
+            this.ctx.fillRect(x1, y, width, line.height);
         }
         else {
             this.ctx.fillStyle = color;
-            this.ctx.fillRect(x1, line.y, width, this.height);
+            this.ctx.fillRect(x1, y, width, line.height);
         }
 
         if (isHovered) {
-            //this.drawTextOnBar(hover, durationMs, x1 + width / 2, line.y + this.height / 2);
-            this.drawTooltip(hover, durationMs);
+            this.hover = { name: hover, duration: durationMs };
         }
     }
 }
@@ -226,6 +295,7 @@ class Graph {
         this.index = 0;
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("graph");
+        this.triggerWord = "gevBoardcapture";   // hardcoded trigger word
 
         this.mouseX = 0;
         this.mouseY = 0;
@@ -250,22 +320,24 @@ class Graph {
     }
 
     _build() {
-
-        // this.speed = 67;
-        // const control = new NumericControl({
-        //     parent: this.parent,
-        //     value: 10,
-        //     step: 1,
-        //     min: 0,
-        //     max: 120,
-        //     unit: "ms",
-        //     onChange: (v) => {
-        //         this.speed = v;
-        //     }
-        // });
-
         this.parent.appendChild(this.canvas);
         this.canvas.style.visibility = "visible";
+    }
+
+    findTriggerIndex(data) {
+        let startIndex = 0;
+        if (this.triggerWord) {
+            for (let i = data.length - 1; i >= 0; --i) {
+                const event = data[i];
+                if (event.type !== EventType.OPEN)
+                    continue;
+                if (containsIgnoreCase(event.name, this.triggerWord)) {
+                    startIndex = i;
+                    break;
+                }
+            }
+        }
+        return startIndex;
     }
 
     render() {
@@ -275,7 +347,9 @@ class Graph {
         const bars = new BarStack(ctx, this.mouseX, this.mouseY);
         const data = this.collector.data();
 
-        for (const event of data) {
+        let startIndex = this.findTriggerIndex(data);
+        for (let i = startIndex; i < data.length; ++i) {
+            const event = data[i];
             const line = bars.getLine(event.groupId);
             if (event.end_time > line.lastEndTime) {
                 line.lastEndTime = event.end_time;
