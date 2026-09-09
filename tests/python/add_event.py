@@ -4,6 +4,7 @@ import argparse
 import json
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -12,27 +13,18 @@ LOG_FILE = LOG_DIR / "telemetry_test_123_345.vson"
 
 PID = 123
 
-
-def _timestamp_us(start_ns: int) -> int:
-    """Return microseconds since start_ns."""
-    return (time.perf_counter_ns() - start_ns) // 1_000
+# VSON timestamp epoch.
+_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
-def write_event(
-    name: str,
-    category: str,
-    phase: str,
-    tid: int,
-    start_ns: int,
-) -> None:
-    event = {
-        "name": name,
-        "cat": category,
-        "ph": phase,
-        "pid": PID,
-        "tid": tid,
-        "ts": _timestamp_us(start_ns),
-    }
+def _timestamp_us() -> int:
+    """Return microseconds since 1-Jan-2026 UTC."""
+    now = datetime.now(timezone.utc)
+    return int((now - _EPOCH).total_seconds() * 1_000_000)
+
+
+def write_event(name: str, category: str, phase: str, tid: int) -> None:
+    event = {"name": name, "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": _timestamp_us()}
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -43,13 +35,12 @@ def write_event(
 
 def add_event(name: str, category: str, duration_ms: float) -> None:
     """Write a single event immediately."""
-    start_ns = time.perf_counter_ns()
-    write_event(name, category, "B", tid=345, start_ns=start_ns)
+    write_event(name, category, "B", tid=345)
 
     try:
         time.sleep(duration_ms / 1000.0)
     finally:
-        write_event(name, category, "E", tid=345, start_ns=start_ns)
+        write_event(name, category, "E", tid=345)
 
 
 @dataclass(frozen=True)
@@ -77,39 +68,36 @@ class EventScheduler:
             if remaining_ns <= 0:
                 return
 
-            # Sleep when there is plenty of time left, then busy-wait
-            # for the final millisecond for better timing accuracy.
+            # Sleep for the coarse part and busy-wait for the
+            # final millisecond to get better timing accuracy.
             if remaining_ns > 1_000_000:
                 time.sleep((remaining_ns - 500_000) / 1_000_000_000)
 
     def play(self) -> None:
-        """Play all scheduled events according to their start offsets."""
+        """Play all scheduled events at their requested offsets."""
         actions = []
 
         for event in self.events:
-            actions.append(
-                (
-                    event.start_ms,
-                    0,  # B before E at the same timestamp.
-                    event,
-                    "B",
-                )
-            )
+            actions.append((event.start_ms, 0, event, "B"))
             actions.append((event.start_ms + event.duration_ms, 1, event, "E"))
 
+        # Sort by timestamp. B is emitted before E at the same timestamp.
         actions.sort(key=lambda action: (action[0], action[1]))
 
-        start_ns = time.perf_counter_ns()
+        # Monotonic clock is used for scheduling so system clock changes
+        # do not affect the timing of the generated sequence.
+        playback_start_ns = time.perf_counter_ns()
 
         for offset_ms, _, event, phase in actions:
-            target_ns = start_ns + int(offset_ms * 1_000_000)
+            target_ns = playback_start_ns + int(offset_ms * 1_000_000)
+
             self._wait_until(target_ns)
 
-            write_event(event.name, event.category, phase, tid=event.tid, start_ns=start_ns)
+            write_event(event.name, event.category, phase, tid=event.tid)
 
 
 def sequence_test() -> None:
-    """Generate a 300 ms event containing overlapping events."""
+    """Generate a 300 ms event containing several timed events."""
     scheduler = EventScheduler()
     scheduler.schedule_event(tid=100, name="test", start=0, duration_ms=300)
     scheduler.schedule_event(tid=100, name="prepare", start=0, duration_ms=20)
