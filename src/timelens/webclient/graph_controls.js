@@ -360,20 +360,15 @@ class Graph {
     }
 
     findTriggerIndex(data) {
-        let startIndex = 0;
         const triggerWord = this.collector.getTriggerWord();
-        if (triggerWord) {
-            for (let i = data.length - 1; i >= 0; --i) {
-                const event = data[i];
-                if (event.type !== EventType.OPEN)
-                    continue;
-                if (containsIgnoreCase(event.name, triggerWord)) {
-                    startIndex = i;
-                    break;
-                }
-            }
-        }
-        return startIndex;
+        if (!triggerWord)
+            return 0;
+
+        const index = data.findLastIndex(event =>
+            event.type === EventType.OPEN &&
+            containsIgnoreCase(event.name, triggerWord));
+
+        return index >= 0 ? index : 0;
     }
 
     drawGrid(ctx) {
