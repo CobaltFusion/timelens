@@ -34,6 +34,19 @@ if /i "%~1"=="reinstall" (
     )
 )
 
+@REM  where node >nul 2>&1
+@REM  if errorlevel 1 (
+@REM      echo Node.js is not installed. Skipping ESLint check.
+@REM  ) else (
+@REM      echo Checking JavaScript with ESLint...
+@REM      call npx eslint src
+@REM      if errorlevel 1 (
+@REM          echo.
+@REM          echo ERROR: ESLint reported errors. TimeLens will not be started.
+@REM          exit /b 1
+@REM      )
+@REM  )
+
 :: Create virtual environment if needed
 if not exist "venv\" (
     echo Creating virtual environment...

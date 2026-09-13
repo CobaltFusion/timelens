@@ -1,3 +1,12 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe"
+    "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+    "editor.renderValidationDecorations": "on",
+
+    "workbench.colorCustomizations": {
+        "editorError.foreground": "#ff0000",
+        "editorError.border": "#ff0000",
+        "editorWarning.foreground": "#ff9900",
+        "editorWarning.border": "#ff9900"
+    },
+    "js/ts.validate.enabled": false
 }

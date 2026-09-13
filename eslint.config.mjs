@@ -1,7 +1,25 @@
 import js from "@eslint/js";
 import globals from "globals";
-import { defineConfig } from "eslint/config";
 
-export default defineConfig([
-  { files: ["**/*.{js,mjs,cjs}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: globals.browser } },
-]);
+export default [
+  {
+    ignores: [
+      "node_modules/**",
+      "venv/**"
+    ]
+  },
+  js.configs.recommended,
+  {
+    files: ["src/timelens/webclient/**/*.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: globals.browser
+    },
+    rules: {
+      "eqeqeq": "error",
+      "prefer-const": "error",
+      "no-var": "error"
+    }
+  }
+];
