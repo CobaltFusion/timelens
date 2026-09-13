@@ -44,6 +44,20 @@ function addControls() {
     triggerWordLabel.appendChild(triggerWordInput);
     controls.appendChild(triggerWordLabel);
 
+    const offsetLabel = document.createElement("span");
+    offsetLabel.textContent = "Offset:";
+    controls.appendChild(offsetLabel);
+
+    new NumericControl({
+        parent: controls,
+        value: collector.getOffset(),
+        step: 10,
+        inputStep: 1,
+        min: -Infinity,
+        unit: "ms",
+        onChange: (value) => collector.setOffset(value)
+    });
+
     const gridScaleLabel = document.createElement("span");
     gridScaleLabel.textContent = "Graph width:";
     controls.appendChild(gridScaleLabel);
