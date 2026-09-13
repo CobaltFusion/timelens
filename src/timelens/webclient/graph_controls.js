@@ -232,7 +232,7 @@ class BarStack {
             return;
         }
 
-        this.ctx.font = "10px monospace";
+        this.ctx.font = "14px monospace";
         let text = name;
 
         if (this.ctx.measureText(text).width > availableWidth) {
