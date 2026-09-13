@@ -1,3 +1,7 @@
+/**
+ * @typedef {"open" | "close" | "duration" | "value"} EventType
+ */
+
 const EventType = {
     OPEN: "open",           // only has a valid begin_time
     CLOSE: "close",         // only has a valid end_time
@@ -46,14 +50,33 @@ function randomNote(startTime = 0) {
     return duration;
 }
 
+/**
+ * @typedef {Object} TSEvent
+ * @property {string} name
+ * @property {string} type
+ * @property {number} begin_time
+ * @property {number} end_time
+ * @property {number} groupId
+ * @property {number} value
+ */
+
+/**
+ * @param {string} name
+ * @param {string} type
+ * @param {number} begin_time
+ * @param {number} end_time
+ * @param {number} groupId
+ * @param {number} value
+ * @returns {TSEvent}
+ */
 function makeEvent(name, type, begin_time, end_time, groupId, value) {
     //console.log("make: %s, type: %s, b: %s, e: %s ", name, type, begin_time, end_time);
 
     return {
         name: name,
         type: type,
-        begin_time: begin_time,
-        end_time: end_time,
+        begin_time: begin_time,     // microseconds (us)
+        end_time: end_time,         // microseconds (us)
         groupId: groupId,
         value: value
     };
@@ -63,14 +86,38 @@ function containsIgnoreCase(text, search) {
     return text.toLowerCase().includes(search.toLowerCase());
 }
 
+/**
+ * A Collector for events received in Chrome JSON trace format.
+ *
+ * Incoming WebSocket messages are expected to contain Chrome JSON trace-style event
+ * fields:
+ *   name, cat, ph, pid, tid, ts
+ *
+ * All timestamps (`ts` and `te`) are in microseconds (�s).
+ * They represent time elapsed since the start of the source process.
+ *
+ * For complete events:
+ *   ph != 'E'  -> `ts` is the event start time.
+ *
+ * For end events:
+ *   ph == 'E'  -> the incoming `ts` is interpreted as the end time (`te`),
+ *                 and `ts` is set to zero because `makeEvent()` represents
+ *                 the event as an open/close pair.
+ *
+ * The `tid` field is used as the group ID, so events from the same
+ * thread are displayed on the same graph line.
+ */
 class Collector {
     constructor() {
+        /** @type {TSEvent[]} */
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
         this.triggerWord = "";
-        this.millisecondsPerGraphWidth = 10;
+        this.millisecondsPerGraphWidth = 1000;
+        this.lastTimepoint = 0;
+
         this.setAudio();
 
         // this uses the 'host' where we are loading this application from
@@ -83,6 +130,8 @@ class Collector {
             // notice that the variables MUST correspond with the actual JSON field names here!
             let te = 0;
             let { name, cat, ph, pid, tid, ts } = data;
+
+            console.log("message: ", name);
 
             const value = 0;
             let type = EventType.OPEN;
@@ -102,8 +151,10 @@ class Collector {
                 }
             }
             const groupId = tid; // use tid as grouping for single line
-            this.cutoffTime = ts - (0.7 * 60 * 1000 * 1000); // keep last 700ms of data (ts is in microseconds since start of the source data process)
+            const minute = 60 * 1e6; // us
+            this.cutoffTime = ts - minute; // keep last minute
             this.incoming.push(makeEvent(name, type, ts, te, groupId, value));
+            this.lastTimepoint = Math.max(ts, te, this.lastTimepoint);
             this.trimIncomingData(this.cutoffTime);
         };
     }
@@ -137,6 +188,10 @@ class Collector {
 
     getMillisecondsPerGraphWidth() {
         return this.millisecondsPerGraphWidth;
+    }
+
+    getLastTimepoint() {
+        return this.lastTimepoint;
     }
 
     stop() {
@@ -181,12 +236,11 @@ class Collector {
 
     dummy() {
         this.setAudio();
-        const startOffset = this.cutoffTime;
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), this.asTime(100), "groupid"));
-        this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, "groupid"));
-        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), "groupid"));
-        this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), "groupid")); // intentionally out-of-order
-        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, this.asTime(0), this.asTime(500), "groupid")); // intentionally omitted
+        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), this.asTime(100), 0, 0));
+        this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, 0, 0));
+        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), 0, 0));
+        this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), 0, 0)); // intentionally out-of-order
+        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, this.asTime(0), this.asTime(500), 0 ,0)); // intentionally omitted
 
         beep(1300, 0.0, 0.05, "square");
 
@@ -197,13 +251,15 @@ class Collector {
         // }
     }
 
+    // this function is approximately O(n), still data is copied, so its not ideal.
     trimIncomingData(cutoffTime) {
-        const beforeLength = this.incoming.length;
-        while (
-            this.incoming.length > 0 &&
-            this.incoming[0].begin_time < cutoffTime
-        ) {
-            this.incoming.shift();
+        const index = this.incoming.findIndex(event => event.begin_time >= cutoffTime);
+
+        if (index < 0) {
+            this.incoming.length = 0;
+            return;
         }
+        // starting at array index 0, remove index elements.
+        this.incoming.splice(0, index);
     }
 }

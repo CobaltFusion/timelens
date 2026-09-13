@@ -15,11 +15,11 @@ COUNTER_FILE = LOG_DIR / "telemetry_test.counter"
 PID = 123
 
 # VSON timestamp epoch.
-_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(2026, 9, 1, tzinfo=timezone.utc)
 
 
 def _timestamp_us() -> int:
-    """Return microseconds since 1-Jan-2026 UTC."""
+    """Return microseconds since 1-Sept-2026 UTC."""
     now = datetime.now(timezone.utc)
     return int((now - _EPOCH).total_seconds() * 1_000_000)
 
@@ -85,14 +85,9 @@ class EventScheduler:
         """Wait until the monotonic clock reaches target_ns."""
         while True:
             remaining_ns = target_ns - time.perf_counter_ns()
-
             if remaining_ns <= 0:
                 return
-
-            # Sleep for the coarse part and busy-wait for the
-            # final millisecond to get better timing accuracy.
-            if remaining_ns > 1_000_000:
-                time.sleep((remaining_ns - 500_000) / 1_000_000_000)
+            time.sleep(remaining_ns / 1_000_000_000)
 
     def play(self) -> None:
         """Play all scheduled events at their requested offsets."""
@@ -108,9 +103,8 @@ class EventScheduler:
         # Use a monotonic clock for scheduling so system clock changes
         # do not affect the timing of the generated sequence.
         playback_start_ns = time.perf_counter_ns()
-
         for offset_ms, _, event, phase in actions:
-            target_ns = playback_start_ns + int(offset_ms * 1_000_000)
+            target_ns = playback_start_ns + int(offset_ms * 1000_000)
 
             self._wait_until(target_ns)
 

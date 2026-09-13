@@ -91,6 +91,10 @@ function getColor(c) {
     return `hsl(${hue}, 100%, 50%)`;
 }
 
+function containsIgnoreCase(text, search) {
+    return text.toLowerCase().includes(search.toLowerCase());
+}
+
 class Line {
     constructor(y) {
         this.y = y;
@@ -362,12 +366,21 @@ class Graph {
     findTriggerIndex(data) {
         const triggerWord = this.collector.getTriggerWord();
         if (!triggerWord)
-            return 0;
+            return undefined;
 
         const index = data.findLastIndex(event =>
             event.type === EventType.OPEN &&
             containsIgnoreCase(event.name, triggerWord));
 
+        return index >= 0 ? index : undefined;
+    }
+
+    findStartIndex(data, time) {
+        for (const event of data) {
+            console.log("D:", event.name, Math.floor(event.begin_time / 1e6), Math.floor(event.end_time / 1e6));
+        }
+        const index = data.findIndex(event =>
+            event.begin_time >= time || event.end_time > time);
         return index >= 0 ? index : 0;
     }
 
@@ -405,20 +418,28 @@ class Graph {
 
     render() {
         const ctx = this.canvas.getContext("2d");
-        const dpr = window.devicePixelRatio || 1;
+        if (!ctx) return
+
+        const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
         const graphWidth = this.canvas.width / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
         this.drawGrid(ctx);
 
+        const msPerGraph = this.collector.getMillisecondsPerGraphWidth();
         const bars = new BarStack(
             ctx,
             this.mouseX,
             this.mouseY,
-            graphWidth / this.collector.getMillisecondsPerGraphWidth()
+            graphWidth / msPerGraph
         );
-        const data = this.collector.data();
 
-        let startIndex = this.findTriggerIndex(data);
+        const preTriggerUs = 10 * 1e3; // 10 ms
+        const graphDurationUs = msPerGraph * 1e3;
+        const startPoint = this.collector.getLastTimepoint() - graphDurationUs - preTriggerUs;
+        const data = this.collector.data()
+
+        const findIndex = this.findTriggerIndex(data);
+        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, startPoint);
         for (let i = startIndex; i < data.length; ++i) {
             const event = data[i];
             const line = bars.getLine(event.groupId);

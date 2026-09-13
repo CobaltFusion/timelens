@@ -1,4 +1,4 @@
-// not using modules yet
+﻿// not using modules yet
 //import { Graph } from "./scope_controls.js";
 
 // [] array
