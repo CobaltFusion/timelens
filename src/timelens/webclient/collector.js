@@ -116,6 +116,7 @@ class Collector {
         this.cutoffTime = 0;  // event from before this time are dropped
         this.triggerWord = "";
         this.millisecondsPerGraphWidth = 1000;
+        this.millisecondOffset = -10;
         this.lastTimepoint = 0;
 
         this.setAudio();
@@ -130,8 +131,6 @@ class Collector {
             // notice that the variables MUST correspond with the actual JSON field names here!
             let te = 0;
             let { name, cat, ph, pid, tid, ts } = data;
-
-            console.log("message: ", name);
 
             const value = 0;
             let type = EventType.OPEN;
@@ -186,8 +185,16 @@ class Collector {
         }
     }
 
+    setOffset(milliseconds) {
+        this.millisecondOffset = milliseconds;
+    }
+
     getMillisecondsPerGraphWidth() {
         return this.millisecondsPerGraphWidth;
+    }
+
+    getOffset() {
+        return this.millisecondOffset;
     }
 
     getLastTimepoint() {

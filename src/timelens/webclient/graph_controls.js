@@ -376,9 +376,6 @@ class Graph {
     }
 
     findStartIndex(data, time) {
-        for (const event of data) {
-            console.log("D:", event.name, Math.floor(event.begin_time / 1e6), Math.floor(event.end_time / 1e6));
-        }
         const index = data.findIndex(event =>
             event.begin_time >= time || event.end_time > time);
         return index >= 0 ? index : 0;
