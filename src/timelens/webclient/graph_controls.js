@@ -138,7 +138,7 @@ class BarStack {
         this.mouseY = mouseY;
         this.scale = pixelsPerMillisecond;
         this.color = 1;
-        this.y = 20;
+        this.y = 0;
         this.height = 12;
         this.lines = new Map();
         this.beginTime = Infinity;
@@ -182,8 +182,7 @@ class BarStack {
     }
 
     layout() {
-        let y = 20;
-
+        let y = 0;
         for (const [, line] of this.lines) {
             line.y = y;
             this.layoutLine(line);
@@ -225,6 +224,8 @@ class BarStack {
     }
 
     drawTextOnBar(name, x, width, y, height) {
+
+        console.log(`draw: ${name}: ${x},${y} ${width}x${height}`)
         const horizontalPadding = 4;
         const availableWidth = width - horizontalPadding * 2;
 

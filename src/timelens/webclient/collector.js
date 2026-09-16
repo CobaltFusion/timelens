@@ -132,7 +132,7 @@ class Collector {
             let te = 0;
             let { name, cat, ph, pid, tid, ts } = data;
 
-            console.log("I: ", data);
+            //console.log("I: ", data);
 
             const value = 0;
             let type = EventType.OPEN;
