@@ -161,9 +161,10 @@ async def broadcast(message):
 
     for ws in clients:
         try:
-            logging.warning(f"broadcast: {message}")
+            # logging.warning(f"broadcast: {message}")
             await ws.send_text(data)
-        except:
+        except Exception:
+            logging.exception("Failed to broadcast to WebSocket")
             dead.append(ws)
 
     for ws in dead:

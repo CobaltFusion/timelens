@@ -225,7 +225,7 @@ class BarStack {
 
     drawTextOnBar(name, x, width, y, height) {
 
-        console.log(`draw: ${name}: ${x},${y} ${width}x${height}`)
+        // console.log(`draw: ${name}: ${x},${y} ${width}x${height}`)
         const horizontalPadding = 4;
         const availableWidth = width - horizontalPadding * 2;
 
