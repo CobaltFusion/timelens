@@ -110,6 +110,20 @@ function addControls() {
 
     controls.appendChild(audioButton);
     updateAudioButton();
+
+    // function renderOnce() {
+    //     function render() {
+    //         for (const widget of widgets) {
+    //             widget.component.render();
+    //         }
+    //     }
+    //     requestAnimationFrame(render);
+    // }
+
+    // const renderButton = document.createElement("button");
+    // renderButton.textContent = "Render";
+    // renderButton.addEventListener("click", () => renderOnce());
+    // controls.appendChild(renderButton);
 }
 
 function addScope(collector) {
