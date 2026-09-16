@@ -118,6 +118,7 @@ class Collector {
         this.millisecondsPerGraphWidth = 1000;
         this.millisecondOffset = -10;
         this.lastTimepoint = 0;
+        this.onConnectionLost = null;
 
         this.setAudio();
 
@@ -125,6 +126,11 @@ class Collector {
         const wsUrl = `ws://${window.location.host}/ws`;
         this.ws = new WebSocket(wsUrl);
         console.log("Collector connecting to", wsUrl);
+
+        this.ws.onclose = () => {
+            console.error("Connection to server closed!");
+            this.onConnectionLost?.();
+        };
 
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -215,6 +221,10 @@ class Collector {
 
     reset() {
         this.clear();
+
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            throw new Error("Cannot reset: WebSocket is not connected");
+        }
 
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ type: "control", action: "reset" }));

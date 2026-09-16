@@ -111,6 +111,11 @@ function addControls() {
     controls.appendChild(audioButton);
     updateAudioButton();
 
+    const connectionStatus = document.createElement("span");
+    connectionStatus.textContent = "Connected";
+    connectionStatus.id = "id_connection_status";
+    controls.appendChild(connectionStatus);
+
     // function renderOnce() {
     //     function render() {
     //         for (const widget of widgets) {
@@ -124,6 +129,8 @@ function addControls() {
     // renderButton.textContent = "Render";
     // renderButton.addEventListener("click", () => renderOnce());
     // controls.appendChild(renderButton);
+
+    return connectionStatus; // instead of returning the element, make a containing class
 }
 
 function addScope(collector) {
@@ -140,8 +147,13 @@ function addScope(collector) {
 }
 
 function init() {
-    addControls();
+    const connectionStatus = addControls();
     addScope(collector);
+
+    collector.onConnectionLost = () => {
+        console.error("Collector connection was closed"); // pass to
+        connectionStatus.textContent = "Disconnected";
+    };
 
     window.onresize = () => {
         resizeObjects();
