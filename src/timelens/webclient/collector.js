@@ -138,6 +138,12 @@ class Collector {
             let te = 0;
             let { name, cat, ph, pid, tid, ts } = data;
 
+            if (this.lastTimepoint > 0 && ts < this.lastTimepoint) {
+                console.warn(`Out of order event; ts: ${ts}: ${name} `)
+                return
+            }
+
+            this.lastTimepoint = Math.max(ts, this.lastTimepoint);
             //console.log("I: ", data);
 
             const value = 0;
@@ -159,15 +165,13 @@ class Collector {
             }
             const groupId = tid; // use tid as grouping for single line
             const minute = 60 * 1e6; // us
-            this.cutoffTime = ts - minute; // keep last minute
+            this.cutoffTime = this.lastTimepoint - minute; // keep last minute
             this.incoming.push(makeEvent(name, type, ts, te, groupId, value));
-            this.lastTimepoint = Math.max(ts, te, this.lastTimepoint);
             this.trimIncomingData(this.cutoffTime);
         };
     }
 
     clear() {
-        console.log("clear");
         // this clears the elements, incoming[0]  // undefined
         // but does not release the underlying storage, so its efficient and GC friendly
         this.incoming.length = 0;
@@ -220,6 +224,7 @@ class Collector {
     }
 
     reset() {
+        this.lastTimepoint = 0;
         this.clear();
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
