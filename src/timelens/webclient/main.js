@@ -98,7 +98,7 @@ class Main {
 
         new NumericControl({
             parent: controls,
-            value: this.collector.getOffset(),
+            value: this.collector.getGraphOffsetMs(),
             step: 10,
             inputStep: 1,
             min: -Infinity,
@@ -112,13 +112,13 @@ class Main {
 
         new NumericControl({
             parent: controls,
-            value: this.collector.getMillisecondsPerGraphWidth(),
+            value: this.collector.getGraphWidthMs(),
             step: 10,
             inputStep: 1,
             min: 0.1,
             unit: "ms",
             onChange: (value) => {
-                this.collector.setMillisecondsPerGraphWidth(value);
+                this.collector.setgraphWidthMs(value);
             }
         });
 

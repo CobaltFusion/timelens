@@ -364,9 +364,10 @@ class Graph {
         this.index = 0;
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("graph");
-
         this.mouseX = 0;
         this.mouseY = 0;
+        this.graphWidthUs = 0;
+        this.startPointUs = 0;
 
         this.canvas.addEventListener("mousemove", (e) => {
             const rect = this.canvas.getBoundingClientRect();
@@ -446,25 +447,26 @@ class Graph {
         if (!ctx) return
 
         const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
-        const graphWidth = this.canvas.width / dpr;
+        const graphWidthPx = this.canvas.width / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
         this.drawGrid(ctx);
 
-        const msPerGraph = this.collector.getMillisecondsPerGraphWidth();
+        const graphWidthMs = this.collector.getGraphWidthMs();
+        const graphOffsetMs = this.collector.getGraphOffsetMs();
         const bars = new BarStack(
             ctx,
             this.mouseX,
             this.mouseY,
-            graphWidth / msPerGraph
+            graphWidthPx / graphWidthMs
         );
 
-        const preTriggerUs = 10 * 1e3; // 10 ms
-        const graphDurationUs = msPerGraph * 1e3;
-        const startPoint = this.collector.getLastTimepoint() - graphDurationUs - preTriggerUs;
+        // graphOffsetMs < 0 will add to the width, while >= 0 will not affect the width
+        this.graphWidthUs = (graphWidthMs + Math.max(graphOffsetMs * -1, 0)) * 1e3;
+        this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         const data = this.collector.data();
 
         const findIndex = this.findTriggerIndex(data);
-        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, startPoint);
+        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, this.startPointUs);
 
         for (let i = startIndex; i < data.length; ++i) {
             const event = data[i];
