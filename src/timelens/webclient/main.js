@@ -1,165 +1,156 @@
 ﻿// not using modules yet
-//import { Graph } from "./scope_controls.js";
+// import { Graph } from "./scope_controls.js";
 
 // [] array
 // {} object
 // [{},{}] // array of two objects
 // console.log("Test");
 
-function resizeObjects() {
-    for (const widget of widgets) {
-        widget.resize();
+class Main {
+    constructor() {
+        this.widgets = new Set();
+        this.collector = new Collector();
+        this.connectionStatus = null;
     }
-}
 
-function renderObjects() {
+    init() {
+        this.connectionStatus = this.addControls();
+        this.addScope();
 
-    function render() {
-        for (const widget of widgets) {
-            widget.component.render();
+        this.collector.onConnectionLost = () => {
+            console.error("Collector connection was closed");
+            this.connectionStatus.textContent = "Disconnected";
+        };
+
+        window.onresize = () => {
+            this.resizeObjects();
+        };
+
+        window.onload = () => {
+            this.renderObjects();
+        };
+    }
+
+    resizeObjects() {
+        for (const widget of this.widgets) {
+            widget.resize();
         }
-        requestAnimationFrame(render);
-    }
-    render();
-}
-
-const widgets = new Set();
-const collector = new Collector();
-
-function addControls() {
-    const controls = document.getElementById("id_control_panel");
-
-    const triggerWordLabel = document.createElement("label");
-    triggerWordLabel.textContent = "Trigger word: ";
-    triggerWordLabel.htmlFor = "id_trigger_word";
-
-    const triggerWordInput = document.createElement("input");
-    triggerWordInput.id = "id_trigger_word";
-    triggerWordInput.type = "text";
-    triggerWordInput.value = collector.getTriggerWord();
-    triggerWordInput.addEventListener("input", () => {
-        collector.setTriggerWord(triggerWordInput.value);
-    });
-
-    triggerWordLabel.appendChild(triggerWordInput);
-    controls.appendChild(triggerWordLabel);
-
-    const offsetLabel = document.createElement("span");
-    offsetLabel.textContent = "Offset:";
-    controls.appendChild(offsetLabel);
-
-    new NumericControl({
-        parent: controls,
-        value: collector.getOffset(),
-        step: 10,
-        inputStep: 1,
-        min: -Infinity,
-        unit: "ms",
-        onChange: (value) => collector.setOffset(value)
-    });
-
-    const gridScaleLabel = document.createElement("span");
-    gridScaleLabel.textContent = "Graph width:";
-    controls.appendChild(gridScaleLabel);
-
-    new NumericControl({
-        parent: controls,
-        value: collector.getMillisecondsPerGraphWidth(),
-        step: 10,
-        inputStep: 1,
-        min: 0.1,
-        unit: "ms",
-        onChange: (value) => collector.setMillisecondsPerGraphWidth(value)
-    });
-
-    const addButton = document.createElement("button");
-    addButton.textContent = "Add Graph";
-    addButton.addEventListener("click", () => addScope(collector));
-    controls.appendChild(addButton);
-
-    // const stopButton = document.createElement("button");
-    // stopButton.textContent = "Stop";
-    // stopButton.addEventListener("click", () => collector.stop());
-    // controls.appendChild(stopButton);
-
-    // const startButton = document.createElement("button");
-    // startButton.textContent = "Start";
-    // startButton.addEventListener("click", () => collector.start());
-    // controls.appendChild(startButton);
-
-    const resetButton = document.createElement("button");
-    resetButton.textContent = "Reset";
-    resetButton.addEventListener("click", () => collector.reset());
-    controls.appendChild(resetButton);
-
-    const dummyButton = document.createElement("button");
-    dummyButton.textContent = "Add dummy data";
-    dummyButton.addEventListener("click", () => collector.dummy());
-    controls.appendChild(dummyButton);
-
-    async function updateAudioButton() {
-        const audioEnabled = await collector.isAudioEnabled();
-        audioButton.textContent = (audioEnabled) ? "Audio (On) " : "Audio (Muted)";
     }
 
-    const audioButton = document.createElement("button");
-    audioButton.addEventListener("click", async () => {
-        await collector.toggleAudio();
-        await updateAudioButton();
-    });
+    renderObjects() {
+        const render = () => {
+            for (const widget of this.widgets) {
+                widget.component.render();
+            }
 
-    controls.appendChild(audioButton);
-    updateAudioButton();
+            requestAnimationFrame(render);
+        };
 
-    const connectionStatus = document.createElement("span");
-    connectionStatus.textContent = "Connected";
-    connectionStatus.id = "id_connection_status";
-    controls.appendChild(connectionStatus);
+        render();
+    }
 
-    // function renderOnce() {
-    //     function render() {
-    //         for (const widget of widgets) {
-    //             widget.component.render();
-    //         }
-    //     }
-    //     requestAnimationFrame(render);
-    // }
+    addControls() {
+        const controls = document.getElementById("id_control_panel");
 
-    // const renderButton = document.createElement("button");
-    // renderButton.textContent = "Render";
-    // renderButton.addEventListener("click", () => renderOnce());
-    // controls.appendChild(renderButton);
+        const triggerWordLabel = document.createElement("label");
+        triggerWordLabel.textContent = "Trigger word: ";
+        triggerWordLabel.htmlFor = "id_trigger_word";
 
-    return connectionStatus; // instead of returning the element, make a containing class
+        const triggerWordInput = document.createElement("input");
+        triggerWordInput.id = "id_trigger_word";
+        triggerWordInput.type = "text";
+        triggerWordInput.value = this.collector.getTriggerWord();
+        triggerWordInput.addEventListener("input", () => {
+            this.collector.setTriggerWord(triggerWordInput.value);
+        });
+
+        triggerWordLabel.appendChild(triggerWordInput);
+        controls.appendChild(triggerWordLabel);
+
+        const offsetLabel = document.createElement("span");
+        offsetLabel.textContent = "Offset:";
+        controls.appendChild(offsetLabel);
+
+        new NumericControl({
+            parent: controls,
+            value: this.collector.getOffset(),
+            step: 10,
+            inputStep: 1,
+            min: -Infinity,
+            unit: "ms",
+            onChange: (value) => this.collector.setOffset(value)
+        });
+
+        const gridScaleLabel = document.createElement("span");
+        gridScaleLabel.textContent = "Graph width:";
+        controls.appendChild(gridScaleLabel);
+
+        new NumericControl({
+            parent: controls,
+            value: this.collector.getMillisecondsPerGraphWidth(),
+            step: 10,
+            inputStep: 1,
+            min: 0.1,
+            unit: "ms",
+            onChange: (value) => {
+                this.collector.setMillisecondsPerGraphWidth(value);
+            }
+        });
+
+        const addButton = document.createElement("button");
+        addButton.textContent = "Add Graph";
+        addButton.addEventListener("click", () => this.addScope());
+        controls.appendChild(addButton);
+
+        const resetButton = document.createElement("button");
+        resetButton.textContent = "Reset";
+        resetButton.addEventListener("click", () => this.collector.reset());
+        controls.appendChild(resetButton);
+
+        const dummyButton = document.createElement("button");
+        dummyButton.textContent = "Add dummy data";
+        dummyButton.addEventListener("click", () => this.collector.dummy());
+        controls.appendChild(dummyButton);
+
+        const audioButton = document.createElement("button");
+
+        const updateAudioButton = async () => {
+            const audioEnabled = await this.collector.isAudioEnabled();
+            audioButton.textContent =
+                audioEnabled ? "Audio (On) " : "Audio (Muted)";
+        };
+
+        audioButton.addEventListener("click", async () => {
+            await this.collector.toggleAudio();
+            await updateAudioButton();
+        });
+
+        controls.appendChild(audioButton);
+        updateAudioButton();
+
+        const connectionStatus = document.createElement("span");
+        connectionStatus.textContent = "Connected";
+        connectionStatus.id = "id_connection_status";
+        controls.appendChild(connectionStatus);
+
+        return connectionStatus;
+    }
+
+    addScope() {
+        const graphPanel = document.getElementById("id_graph_panel");
+        const graph = new Graph(this.collector);
+
+        const widget = new Widget({
+            parent: graphPanel,
+            component: graph,
+            onClose: () => {
+                this.widgets.delete(widget);
+            }
+        });
+
+        this.widgets.add(widget);
+    }
 }
 
-function addScope(collector) {
-    const graph_panel = document.getElementById("id_graph_panel");
-    const graph = new Graph(collector);
-    const widget = new Widget({
-        parent: graph_panel,
-        component: graph,
-        onClose: () => {
-            widgets.delete(widget);
-        }
-    });
-    widgets.add(widget)
-}
-
-function init() {
-    const connectionStatus = addControls();
-    addScope(collector);
-
-    collector.onConnectionLost = () => {
-        console.error("Collector connection was closed"); // pass to
-        connectionStatus.textContent = "Disconnected";
-    };
-
-    window.onresize = () => {
-        resizeObjects();
-    };
-}
-
-init();
-
-window.onload = () => renderObjects();
+const main = new Main();
+main.init();
