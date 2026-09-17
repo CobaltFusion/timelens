@@ -1,4 +1,4 @@
-﻿// not using modules yet
+// not using modules yet
 // import { Graph } from "./scope_controls.js";
 
 // [] array
@@ -14,12 +14,12 @@ class Main {
     }
 
     init() {
-        this.connectionStatus = this.addControls();
+        this.addControls();
         this.addScope();
 
         this.collector.onConnectionLost = () => {
             console.error("Collector connection was closed");
-            this.connectionStatus.textContent = "Disconnected";
+            this.setConnectionStatus(false)
         };
 
         window.onresize = () => {
@@ -47,6 +47,11 @@ class Main {
         };
 
         render();
+    }
+
+    setConnectionStatus(connected) {
+        this.connectionStatus.textContent = connected ? "Connected" : "Disconnected";
+        this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
     }
 
     addControls() {
@@ -128,12 +133,11 @@ class Main {
         controls.appendChild(audioButton);
         updateAudioButton();
 
-        const connectionStatus = document.createElement("span");
-        connectionStatus.textContent = "Connected";
+        const connectionStatus = document.createElement("button");
         connectionStatus.id = "id_connection_status";
         controls.appendChild(connectionStatus);
-
-        return connectionStatus;
+        this.connectionStatus = connectionStatus;
+        this.setConnectionStatus(true);
     }
 
     addScope() {
