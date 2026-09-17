@@ -1,6 +1,5 @@
 <img alt="image" src="art/timelens_logo.png" />
 
-# TimeLens
 TimeLens is a web-based oscilloscope-style telemetry visualizer for exploring and analyzing time-series logs as interactive signals.
 
 # Overview
