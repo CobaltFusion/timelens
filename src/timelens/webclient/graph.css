@@ -7,6 +7,8 @@
     --muted: #8ea1bd;
     --accent: #34e5bd;
     --accent-glow: rgba(52, 229, 189, .22);
+    --status-connected: #16ba6d;
+    --status-disconnected: #ff5577;
 }
 
 * { box-sizing: border-box; }
@@ -158,4 +160,14 @@ input:focus-visible, button:focus-visible { border-color: var(--accent); box-sha
     body { padding: 1rem; }
     #id_control_panel label { width: 100%; }
     input { flex: 1; min-width: 0; }
+}
+
+#id_connection_status.connected {
+    background: var(--status-connected);
+    color: #fff;
+}
+
+#id_connection_status.disconnected {
+    background: var(--status-disconnected);
+    color: #fff;
 }
