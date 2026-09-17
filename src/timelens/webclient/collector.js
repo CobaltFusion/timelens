@@ -67,9 +67,9 @@ class Collector {
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
         this.triggerWord = "";
-        this.millisecondsPerGraphWidth = 1000;
-        this.millisecondOffset = -10;
-        this.lastTimepoint = 0;
+        this.graphWidthMs = 1000;
+        this.graphOffsetMs = -10;
+        this.lastTimepointUs = 0;
         this.onConnectionLost = null;
         this.onIncomingEvent = null;
 
@@ -88,12 +88,12 @@ class Collector {
             // notice that the variables MUST correspond with the actual JSON field names here!
             const { name, cat, ph, pid, tid, ts } = data;
 
-            if (this.lastTimepoint > 0 && ts < this.lastTimepoint) {
+            if (this.lastTimepointUs > 0 && ts < this.lastTimepointUs) {
                 console.warn(`Out of order event; ts: ${ts}: ${name} `)
                 return
             }
 
-            this.lastTimepoint = Math.max(ts, this.lastTimepoint);
+            this.lastTimepointUs = Math.max(ts, this.lastTimepointUs);
             //console.log("I: ", data);
 
             const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
@@ -105,7 +105,7 @@ class Collector {
             this.incoming.push(newEvent);
 
             const minute = 60 * 1e6; // us
-            this.cutoffTime = this.lastTimepoint - minute; // keep last minute
+            this.cutoffTime = this.lastTimepointUs - minute; // keep last minute
             this.trimIncomingData(this.cutoffTime);
         };
     }
@@ -128,28 +128,28 @@ class Collector {
         return this.triggerWord;
     }
 
-    setMillisecondsPerGraphWidth(milliseconds) {
+    setgraphWidthMs(milliseconds) {
         const value = Number(milliseconds);
 
         if (Number.isFinite(value) && value > 0) {
-            this.millisecondsPerGraphWidth = value;
+            this.graphWidthMs = value;
         }
     }
 
     setOffset(milliseconds) {
-        this.millisecondOffset = milliseconds;
+        this.graphOffsetMs = milliseconds;
     }
 
-    getMillisecondsPerGraphWidth() {
-        return this.millisecondsPerGraphWidth;
+    getGraphWidthMs() {
+        return this.graphWidthMs;
     }
 
-    getOffset() {
-        return this.millisecondOffset;
+    getGraphOffsetMs() {
+        return this.graphOffsetMs;
     }
 
-    getLastTimepoint() {
-        return this.lastTimepoint;
+    getLastTimepointUs() {
+        return this.lastTimepointUs;
     }
 
     stop() {
@@ -163,7 +163,7 @@ class Collector {
     }
 
     reset() {
-        this.lastTimepoint = 0;
+        this.lastTimepointUs = 0;
         this.clear();
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
