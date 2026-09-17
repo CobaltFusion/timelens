@@ -144,7 +144,7 @@ class Main {
         const graphPanel = document.getElementById("id_graph_panel");
         const graph = new Graph(this.collector);
 
-        const widget = new Widget({
+        const widget = new ResizableContainer({
             parent: graphPanel,
             component: graph,
             onClose: () => {

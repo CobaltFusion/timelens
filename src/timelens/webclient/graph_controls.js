@@ -1,6 +1,10 @@
 //import { EventType } from "./collector.js";
 
-class Widget {
+/**
+ * A container that wraps a component and provides resize and close behavior.
+ * It can be styled in the css.
+ */
+class ResizableContainer {
     constructor({ parent, component, onClose }) {
         this.parent = parent;
         this.component = component;
@@ -190,9 +194,22 @@ class BarStack {
         }
     }
 
+    formatTimestamp(time) {
+        const seconds = Math.floor(time / 1_000_000);
+        const milliseconds = Math.floor((time % 1_000_000) / 1_000);
+        const microseconds = time % 1_000;
+
+        if (seconds > 0) {
+            return `${seconds}s ${milliseconds}ms ${microseconds}us:`;
+        }
+
+        return `${milliseconds}ms ${microseconds}us:`;
+    }
+
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
-        this.drawBar(line, event, event.name, y);
+        const hover = `${this.formatTimestamp(event.begin_time)} ${event.name}`
+        this.drawBar(line, event, hover, y);
     }
 
     drawEvents() {
@@ -271,19 +288,37 @@ class BarStack {
         // Position near the mouse, but keep the tooltip inside the graph.
         const dpr = window.devicePixelRatio || 1;
         const canvasWidth = this.ctx.canvas.width / dpr;
-        const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
-        const ty = this.mouseY - 24;
+        const canvasHeight = this.ctx.canvas.height / dpr;
+
+        const tx = Math.max(
+            0,
+            Math.min(this.mouseX + 12, canvasWidth - tooltipWidth)
+        );
+
+        const ty = Math.max(
+            0,
+            Math.min(this.mouseY - 24, canvasHeight - tooltipHeight)
+        );
 
         // Background
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
         this.ctx.fillRect(tx, ty, tooltipWidth, tooltipHeight);
+
+        // Border
         this.ctx.strokeStyle = "#00ff88";
         this.ctx.strokeRect(tx, ty, tooltipWidth, tooltipHeight);
+
+        // Text
         this.ctx.fillStyle = "#00ff88";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText(text, tx + padding, ty + tooltipHeight / 2);
+        this.ctx.fillText(
+            text,
+            tx + padding,
+            ty + tooltipHeight / 2
+        );
     }
+
 
     // Show the text by default, but show 'hover' if the mouse is over the bar.
     drawBar(line, event, hover, y) {
