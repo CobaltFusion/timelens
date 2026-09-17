@@ -115,9 +115,9 @@ class Line {
         this.lanes = [];
     }
 
-    getLane(beginTime) {
+    getLane(timestamp) {
         for (let i = 0; i < this.lanes.length; ++i) {
-            if (beginTime >= this.lanes[i]) {
+            if (timestamp >= this.lanes[i]) {
                 return i;
             }
         }
@@ -174,12 +174,12 @@ class BarStack {
             events.push({ ...event, end_time: line.lastEndTime });
         }
 
-        events.sort((a, b) => a.begin_time - b.begin_time);
+        events.sort((a, b) => a.timestamp - b.timestamp);
 
         line.lanes = [];
 
         for (const event of events) {
-            const lane = line.getLane(event.begin_time);
+            const lane = line.getLane(event.timestamp);
             line.occupyLane(lane, event.end_time);
             event.lane = lane;
         }
@@ -208,7 +208,7 @@ class BarStack {
 
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
-        const hover = `${this.formatTimestamp(event.begin_time)} ${event.name}`
+        const hover = `${this.formatTimestamp(event.timestamp)} ${event.name}`
         this.drawBar(line, event, hover, y);
     }
 
@@ -224,7 +224,7 @@ class BarStack {
                     end_time: line.lastEndTime
                 };
 
-                const lane = line.getLane(drawEvent.begin_time);
+                const lane = line.getLane(drawEvent.timestamp);
                 line.occupyLane(lane, drawEvent.end_time);
                 drawEvent.lane = lane;
                 this.drawEvent(line, drawEvent);
@@ -290,15 +290,8 @@ class BarStack {
         const canvasWidth = this.ctx.canvas.width / dpr;
         const canvasHeight = this.ctx.canvas.height / dpr;
 
-        const tx = Math.max(
-            0,
-            Math.min(this.mouseX + 12, canvasWidth - tooltipWidth)
-        );
-
-        const ty = Math.max(
-            0,
-            Math.min(this.mouseY - 24, canvasHeight - tooltipHeight)
-        );
+        const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
+        const ty = Math.max(0, Math.min(this.mouseY - 24, canvasHeight - tooltipHeight));
 
         // Background
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
@@ -327,7 +320,7 @@ class BarStack {
         const color = getColor(this.color);
         this.color += 1;
 
-        const bt = (event.begin_time - this.beginTime) / 1000;
+        const bt = (event.timestamp - this.beginTime) / 1000;
         const et = (event.end_time - this.beginTime) / 1000;
         const durationMs = et - bt;
 
@@ -412,8 +405,7 @@ class Graph {
     }
 
     findStartIndex(data, time) {
-        const index = data.findIndex(event =>
-            event.begin_time >= time || event.end_time > time);
+        const index = data.findIndex(event => event.timestamp >= time);
         return index >= 0 ? index : 0;
     }
 
@@ -469,34 +461,35 @@ class Graph {
         const preTriggerUs = 10 * 1e3; // 10 ms
         const graphDurationUs = msPerGraph * 1e3;
         const startPoint = this.collector.getLastTimepoint() - graphDurationUs - preTriggerUs;
-        const data = this.collector.data()
+        const data = this.collector.data();
 
         const findIndex = this.findTriggerIndex(data);
         const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, startPoint);
+
         for (let i = startIndex; i < data.length; ++i) {
             const event = data[i];
             const line = bars.getLine(event.groupId);
-            if (event.end_time > line.lastEndTime) {
-                line.lastEndTime = event.end_time;
+            if (event.timestamp > line.lastEndTime) {
+                line.lastEndTime = event.timestamp;
             }
 
             if (event.type === EventType.OPEN) {
                 line.openMap.set(event.name, event);
 
-                if (event.begin_time < bars.beginTime) {
-                    bars.beginTime = event.begin_time;
+                if (event.timestamp < bars.beginTime) {
+                    bars.beginTime = event.timestamp;
                 }
             }
 
             if (event.type === EventType.CLOSE) {
-                const entry = line.openMap.get(event.name);
-                if (!entry) continue;
-                const open = {
-                    ...entry,   // take a copy
-                    end_time: event.end_time,
+                const start_event = line.openMap.get(event.name);
+                if (!start_event) continue;
+                const closedEvent = {
+                    ...start_event,   // take a copy
+                    end_time: event.timestamp,          // closedEvent now has timestamp + end_time
                     type: EventType.CLOSE
                 };
-                line.closedEvents.push(open);
+                line.closedEvents.push(closedEvent);
                 line.openMap.delete(event.name);
             }
 

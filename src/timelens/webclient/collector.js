@@ -3,10 +3,10 @@
  */
 
 const EventType = {
-    OPEN: "open",           // only has a valid begin_time
-    CLOSE: "close",         // only has a valid end_time
-    DURATION: "duration",   // both begin_time + end_time are valid
-    VALUE: "value"          // has a valid begin_time + value
+    OPEN: "open",           // only has timestamp
+    CLOSE: "close",         // has both timestamp and end_time
+    DURATION: "duration",   // has both timestamp and end_time
+    VALUE: "value"          // has timestamp + value
 };
 
 const audio = new AudioContext();
@@ -54,8 +54,7 @@ function randomNote(startTime = 0) {
  * @typedef {Object} TSEvent
  * @property {string} name
  * @property {string} type
- * @property {number} begin_time
- * @property {number} end_time
+ * @property {number} timestamp
  * @property {number} groupId
  * @property {number} value
  */
@@ -63,20 +62,18 @@ function randomNote(startTime = 0) {
 /**
  * @param {string} name
  * @param {string} type
- * @param {number} begin_time
- * @param {number} end_time
+ * @param {number} timestamp
  * @param {number} groupId
  * @param {number} value
  * @returns {TSEvent}
  */
-function makeEvent(name, type, begin_time, end_time, groupId, value) {
-    //console.log("make: %s, type: %s, b: %s, e: %s ", name, type, begin_time, end_time);
+function makeEvent(name, type, timestamp, groupId, value) {
+    //console.log("make: %s, type: %s, ts: %s ", name, type, timestamp);
 
     return {
         name: name,
         type: type,
-        begin_time: begin_time,     // microseconds (us)
-        end_time: end_time,         // microseconds (us)
+        timestamp: timestamp,     // microseconds (us)
         groupId: groupId,
         value: value
     };
@@ -135,8 +132,7 @@ class Collector {
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // notice that the variables MUST correspond with the actual JSON field names here!
-            let te = 0;
-            let { name, cat, ph, pid, tid, ts } = data;
+            const { name, cat, ph, pid, tid, ts } = data;
 
             if (this.lastTimepoint > 0 && ts < this.lastTimepoint) {
                 console.warn(`Out of order event; ts: ${ts}: ${name} `)
@@ -146,14 +142,10 @@ class Collector {
             this.lastTimepoint = Math.max(ts, this.lastTimepoint);
             //console.log("I: ", data);
 
-            const value = 0;
-            let type = EventType.OPEN;
-            if (ph === 'E') {
-                type = EventType.CLOSE;
-                te = ts;
-                ts = 0;
-            }
-            else {
+            const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
+
+            // beeping
+            if (type === EventType.OPEN) {
                 if (containsIgnoreCase(name, "error")) {
                     console.log("Error beeping");
                     beep(1300, 0, 0.03, "square");
@@ -164,9 +156,11 @@ class Collector {
                 }
             }
             const groupId = tid; // use tid as grouping for single line
+            const value = 0;
+            this.incoming.push(makeEvent(name, type, ts, groupId, value));
+
             const minute = 60 * 1e6; // us
             this.cutoffTime = this.lastTimepoint - minute; // keep last minute
-            this.incoming.push(makeEvent(name, type, ts, te, groupId, value));
             this.trimIncomingData(this.cutoffTime);
         };
     }
@@ -277,7 +271,7 @@ class Collector {
 
     // this function is approximately O(n), still data is copied, so its not ideal.
     trimIncomingData(cutoffTime) {
-        const index = this.incoming.findIndex(event => event.begin_time >= cutoffTime);
+        const index = this.incoming.findIndex(event => event.timestamp >= cutoffTime);
 
         if (index < 0) {
             this.incoming.length = 0;
