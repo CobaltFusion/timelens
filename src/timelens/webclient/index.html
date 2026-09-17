@@ -89,7 +89,13 @@
             } catch (error) {
                 console.error(error);
                 container.replaceChildren();
-                showMessage(container, `Failed to discover servers: ${error.message}`, true);
+                showMessage(
+                    container,
+                    `Failed to discover servers: ${error.message}. Retrying in 5 seconds...`,
+                    true
+                );
+
+                setTimeout(discoverServers, 5000);
             }
         }
 
