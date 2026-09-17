@@ -1,0 +1,19 @@
+@startuml
+window -> Main: requestAnimationFrame()
+activate Main
+Main -> Graph: render()
+activate Graph
+Graph -> BarStack: new
+Graph -> BarStack: drawEvents()
+BarStack -> BarStack : layout()
+BarStack -> BarStack : drawEvent()
+activate BarStack
+BarStack -> BarStack : drawBar()
+activate BarStack
+BarStack -> BarStack : drawTextOnBar()
+deactivate BarStack
+deactivate BarStack
+BarStack -> BarStack : drawToolTip()
+deactivate Graph
+deactivate Main
+@enduml

@@ -43,8 +43,12 @@ def _event_name(counter: int, name: str) -> str:
     return f"{counter}_{name}"
 
 
-def write_event(counter: int, name: str, category: str, phase: str, tid: int) -> None:
-    event = {"name": _event_name(counter, name), "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": _timestamp_us()}
+def write_event(counter: int, name: str, category: str, phase: str, tid: int, fixed: bool, ts: int) -> None:
+
+    if not fixed:
+        ts = _timestamp_us()
+
+    event = {"name": _event_name(counter, name), "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": ts}
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -53,14 +57,16 @@ def write_event(counter: int, name: str, category: str, phase: str, tid: int) ->
         f.write((json.dumps(event) + ",\n").encode("utf-8"))
 
 
-def add_event(counter: int, name: str, category: str, duration_ms: float) -> None:
+def add_event(counter: int, name: str, category: str, duration_ms: float, fixed: bool = False) -> None:
     """Write a single event immediately."""
-    write_event(counter, name, category, "B", tid=345)
+
+    ts = _timestamp_us()
+    write_event(counter, name, category, "B", tid=345, fixed=fixed, ts=ts)
 
     try:
         time.sleep(duration_ms / 1000.0)
     finally:
-        write_event(counter, name, category, "E", tid=345)
+        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + (int(duration_ms * 1000)))
 
 
 @dataclass(frozen=True)
@@ -70,6 +76,7 @@ class ScheduledEvent:
     category: str
     start_ms: float
     duration_ms: float
+    fixed: bool
 
 
 class EventScheduler:
@@ -77,8 +84,8 @@ class EventScheduler:
         self.counter = counter
         self.events: list[ScheduledEvent] = []
 
-    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category: str = "sequence") -> None:
-        self.events.append(ScheduledEvent(tid=tid, name=name, category=category, start_ms=start, duration_ms=duration_ms))
+    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category, fixed) -> None:
+        self.events.append(ScheduledEvent(tid, name, category, start, duration_ms, fixed))
 
     @staticmethod
     def _wait_until(target_ns: int) -> None:
@@ -105,50 +112,39 @@ class EventScheduler:
         playback_start_ns = time.perf_counter_ns()
         for offset_ms, _, event, phase in actions:
             target_ns = playback_start_ns + int(offset_ms * 1000_000)
-
             self._wait_until(target_ns)
+            write_event(self.counter, event.name, event.category, phase, event.tid, event.fixed, int(target_ns / 1000))
 
-            write_event(self.counter, event.name, event.category, phase, tid=event.tid)
 
-
-def sequence_test(counter: int) -> None:
+def sequence_test(counter, fixed) -> None:
     """Generate a 300 ms event containing several timed events."""
     scheduler = EventScheduler(counter)
-
-    scheduler.schedule_event(tid=100, name="test", start=0, duration_ms=300)
-
-    scheduler.schedule_event(tid=100, name="prepare", start=0, duration_ms=20)
-
-    scheduler.schedule_event(tid=100, name="process", start=20, duration_ms=20)
-
-    scheduler.schedule_event(tid=100, name="stop", start=280, duration_ms=20)
-
+    category = "sequence"
+    scheduler.schedule_event(100, "test", 0, 300, category, fixed)
+    scheduler.schedule_event(100, "prepare", 0, 20, category, fixed)
+    scheduler.schedule_event(100, "process", 20, 20, category, fixed)
+    scheduler.schedule_event(100, "stop", 280, 20, category, fixed)
     scheduler.play()
 
 
-def sequence(counter: int, sequence_id: str) -> None:
+def sequence(counter, sequence_id) -> None:
     match sequence_id:
-        case "test":
-            sequence_test(counter)
+        case "real":
+            sequence_test(counter, False)
+        case "fixed":
+            sequence_test(counter, True)
         case _:
             raise ValueError(f"Unknown sequence: {sequence_id}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate telemetry events for testing.")
-
     mode = parser.add_mutually_exclusive_group(required=True)
-
     mode.add_argument("-n", "--name", help="Name of the telemetry event.")
-
     mode.add_argument("-s", "--sequence", metavar="SEQUENCE_ID", help="Generate a predefined event sequence.")
-
     parser.add_argument("-c", "--category", help="Telemetry category.")
-
     parser.add_argument("-d", "--duration-ms", type=float, metavar="MILLISECONDS", help="Duration of the event in milliseconds.")
-
     args = parser.parse_args()
-
     counter = _next_counter()
 
     if args.sequence is not None:
