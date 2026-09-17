@@ -6,11 +6,16 @@
 // [{},{}] // array of two objects
 // console.log("Test");
 
+function containsIgnoreCase(text, search) {
+    return text.toLowerCase().includes(search.toLowerCase());
+}
+
 class Main {
     constructor() {
         this.widgets = new Set();
         this.collector = new Collector();
         this.connectionStatus = null;
+        this.audioAlerts = new AudioAlerts();
     }
 
     init() {
@@ -20,6 +25,21 @@ class Main {
         this.collector.onConnectionLost = () => {
             console.error("Collector connection was closed");
             this.setConnectionStatus(false)
+        };
+
+        this.collector.onIncomingEvent = (event) => {
+
+            // beeping
+            if (event.type === EventType.OPEN) {
+                if (containsIgnoreCase(event.name, "error")) {
+                    console.log("Error beeping");
+                    this.audioAlerts.beep(1300, 0, 0.03, "square");
+                }
+                if (containsIgnoreCase(event.name, "message")) {
+                    console.log("Message beeping");
+                    this.audioAlerts.beep(800, 0, 0.05);
+                }
+            }
         };
 
         window.onresize = () => {
@@ -114,19 +134,22 @@ class Main {
 
         const dummyButton = document.createElement("button");
         dummyButton.textContent = "Add dummy data";
-        dummyButton.addEventListener("click", () => this.collector.dummy());
+        dummyButton.addEventListener("click", () => {
+            this.collector.dummy();
+            this.audioAlerts.beep(1300, 0.0, 0.05, "square");
+        });
         controls.appendChild(dummyButton);
 
         const audioButton = document.createElement("button");
 
         const updateAudioButton = async () => {
-            const audioEnabled = await this.collector.isAudioEnabled();
+            const audioEnabled = await this.audioAlerts.isAudioEnabled();
             audioButton.textContent =
                 audioEnabled ? "Audio (On) " : "Audio (Muted)";
         };
 
         audioButton.addEventListener("click", async () => {
-            await this.collector.toggleAudio();
+            await this.audioAlerts.toggleAudio();
             await updateAudioButton();
         });
 

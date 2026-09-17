@@ -9,47 +9,6 @@ const EventType = {
     VALUE: "value"          // has timestamp + value
 };
 
-const audio = new AudioContext();
-
-function beep(frequency, startTime, duration, type = "sine") {
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-
-    osc.type = type;
-    osc.frequency.value = frequency;
-
-    gain.gain.value = 0.2;
-
-    osc.connect(gain);
-    gain.connect(audio.destination);
-
-    osc.start(audio.currentTime + startTime);
-    osc.stop(audio.currentTime + startTime + duration);
-}
-
-function randomNote(startTime = 0) {
-    const types = ["sine", "square", "sawtooth", "triangle"];
-    const notes = [
-        261.63, 277.18, 293.66, 311.13,
-        329.63, 349.23, 369.99, 392.00,
-        415.30, 440.00, 466.16, 493.88,
-        523.25, 554.37, 587.33, 622.25,
-        659.25, 698.46, 739.99, 783.99,
-        830.61, 880.00, 932.33, 987.77
-    ];
-
-    const duration = 0.02 + Math.random() * 0.08;
-
-    beep(
-        notes[Math.floor(Math.random() * notes.length)],
-        startTime,
-        duration,
-        types[Math.floor(Math.random() * types.length)]
-    );
-
-    return duration;
-}
-
 /**
  * @typedef {Object} TSEvent
  * @property {string} name
@@ -77,10 +36,6 @@ function makeEvent(name, type, timestamp, groupId, value) {
         groupId: groupId,
         value: value
     };
-}
-
-function containsIgnoreCase(text, search) {
-    return text.toLowerCase().includes(search.toLowerCase());
 }
 
 /**
@@ -116,8 +71,7 @@ class Collector {
         this.millisecondOffset = -10;
         this.lastTimepoint = 0;
         this.onConnectionLost = null;
-
-        this.setAudio();
+        this.onIncomingEvent = null;
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -144,20 +98,11 @@ class Collector {
 
             const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
 
-            // beeping
-            if (type === EventType.OPEN) {
-                if (containsIgnoreCase(name, "error")) {
-                    console.log("Error beeping");
-                    beep(1300, 0, 0.03, "square");
-                }
-                if (containsIgnoreCase(name, "message")) {
-                    console.log("Message beeping");
-                    beep(800, 0, 0.05);
-                }
-            }
             const groupId = tid; // use tid as grouping for single line
             const value = 0;
-            this.incoming.push(makeEvent(name, type, ts, groupId, value));
+            const newEvent = makeEvent(name, type, ts, groupId, value);
+            this.onIncomingEvent?.(newEvent);
+            this.incoming.push(newEvent);
 
             const minute = 60 * 1e6; // us
             this.cutoffTime = this.lastTimepoint - minute; // keep last minute
@@ -230,37 +175,16 @@ class Collector {
         }
     }
 
-    setAudio() {
-        if (this.audioEnabled) {
-            audio.resume();
-        } else {
-            audio.suspend();
-        }
-    }
-
-    async toggleAudio() {
-        this.audioEnabled = !this.audioEnabled;
-        this.setAudio();
-        return this.audioEnabled;
-    }
-
-    isAudioEnabled() {
-        return this.audioEnabled;
-    }
-
     asTime(msTime) {
         return this.cutoffTime + (msTime * 1000);
     }
 
     dummy() {
-        this.setAudio();
         this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), this.asTime(100), 0, 0));
         this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, 0, 0));
         this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), 0, 0));
         this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), 0, 0)); // intentionally out-of-order
         //this.incoming.push(makeEvent("cycle", EventType.CLOSE, this.asTime(0), this.asTime(500), 0 ,0)); // intentionally omitted
-
-        beep(1300, 0.0, 0.05, "square");
 
         // let t = 0;
         // for (let i = 0; i < 20; ++i) {
