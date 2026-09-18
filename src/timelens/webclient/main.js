@@ -67,6 +67,8 @@ class Main {
         };
 
         render();
+
+        //setInterval(render, 500);
     }
 
     setConnectionStatus(connected) {
