@@ -366,6 +366,9 @@ class Graph {
         this.canvas.classList.add("graph");
         this.mouseX = 0;
         this.mouseY = 0;
+        this.graphWidthPx = 0;
+        this.graphHeightPx = 0;
+        this.zeroShiftUs = 0;
         this.graphWidthUs = 0;
         this.startPointUs = 0;
 
@@ -410,35 +413,76 @@ class Graph {
         return index >= 0 ? index : 0;
     }
 
-    drawGrid(ctx) {
-        const dpr = window.devicePixelRatio || 1;
-        const width = this.canvas.width / dpr;
-        const height = this.canvas.height / dpr;
+    toLocalX(timeUs) {
+        // A 1-pixel line drawn at an integer coordinate can land between physical pixels, causing the browser to anti-alias it and make it look blurry.
+        // Using +0.5 centers the 1px stroke on a physical pixel column, giving a sharper line.
+        const renderAdjustment = 0.5;
+        const t = timeUs - this.startPointUs;
+        return renderAdjustment + Math.round((this.graphWidthPx / this.graphWidthUs) * t);
+    }
 
+    // the grid divides the (graphWidth - zeroShift) into 20 segements
+    // the majorLine aligns with the zero-point
+    drawGrid(ctx) {
         ctx.save();
         ctx.lineWidth = 1;
 
         const minorGridLineCount = 20;
-        for (let index = 0; index <= minorGridLineCount; ++index) {
-            const x = width * index / minorGridLineCount;
+        const stepUs = (this.graphWidthUs - this.zeroShiftUs) / minorGridLineCount;
+        const endPoint = this.startPointUs + this.graphWidthUs;
+        const zeroPointUs = this.startPointUs + this.zeroShiftUs;
+
+        const drawVerticalLine = (t, index) => {
+            const x = this.toLocalX(t);
             const isMajorLine = index % 2 === 0;
+
             ctx.strokeStyle = isMajorLine
-                ? "rgba(52, 229, 189, 0.16)"
-                : "rgba(142, 161, 189, 0.08)";
+                ? "rgba(52, 229, 189, 0.26)"
+                : "rgba(142, 161, 189, 0.18)";
+
             ctx.beginPath();
-            ctx.moveTo(x + 0.5, 0);
-            ctx.lineTo(x + 0.5, height);
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, this.graphHeightPx);
             ctx.stroke();
+        };
+
+        // lines before zero
+        for (let index = 0, t = zeroPointUs; t > this.startPointUs; t -= stepUs, ++index) {
+            drawVerticalLine(t, index);
         }
 
-        for (let y = 0; y <= height; y += 20) {
+        // lines after zero
+        for (let index = 0, t = zeroPointUs; t < endPoint; t += stepUs, ++index) {
+            drawVerticalLine(t, index);
+        }
+
+        const renderAdjustment = 0.5;
+        for (let y = 0; y <= this.graphHeightPx; y += 20) {
             ctx.strokeStyle = "rgba(142, 161, 189, 0.08)";
             ctx.beginPath();
-            ctx.moveTo(0, y + 0.5);
-            ctx.lineTo(width, y + 0.5);
+            ctx.moveTo(0, y + renderAdjustment);
+            ctx.lineTo(this.graphWidthPx, y + renderAdjustment);
             ctx.stroke();
         }
 
+        const zeroX = this.toLocalX(zeroPointUs);
+        ctx.fillStyle = "white";
+
+        // Top marker
+        ctx.beginPath();
+        ctx.moveTo(zeroX - 5, 0);
+        ctx.lineTo(zeroX + 5, 0);
+        ctx.lineTo(zeroX, 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Bottom marker
+        ctx.beginPath();
+        ctx.moveTo(zeroX - 5, this.graphHeightPx);
+        ctx.lineTo(zeroX + 5, this.graphHeightPx);
+        ctx.lineTo(zeroX, this.graphHeightPx - 6);
+        ctx.closePath();
+        ctx.fill();
         ctx.restore();
     }
 
@@ -447,7 +491,8 @@ class Graph {
         if (!ctx) return
 
         const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
-        const graphWidthPx = this.canvas.width / dpr;
+        this.graphWidthPx = this.canvas.width / dpr;
+        this.graphHeightPx = this.canvas.height / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
         this.drawGrid(ctx);
 
@@ -457,11 +502,13 @@ class Graph {
             ctx,
             this.mouseX,
             this.mouseY,
-            graphWidthPx / graphWidthMs
+            this.graphWidthPx / graphWidthMs
         );
 
         // graphOffsetMs < 0 will add to the width, while >= 0 will not affect the width
-        this.graphWidthUs = (graphWidthMs + Math.max(graphOffsetMs * -1, 0)) * 1e3;
+        const extraWidth = Math.max(graphOffsetMs * -1, 0);
+        this.zeroShiftUs = extraWidth * 1e3;
+        this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         const data = this.collector.data();
 
