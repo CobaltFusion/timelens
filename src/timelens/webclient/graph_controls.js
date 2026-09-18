@@ -136,11 +136,14 @@ class Line {
 }
 
 class BarStack {
-    constructor(ctx, mouseX, mouseY, pixelsPerMillisecond) {
+    constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, graphWidthUs) {
         this.ctx = ctx;
         this.mouseX = mouseX;
         this.mouseY = mouseY;
-        this.scale = pixelsPerMillisecond;
+        this.scale = pixelsPerMicrosecond;
+        this.startPointUs = startPointUs;
+        this.endPointUs = startPointUs + graphWidthUs;
+
         this.color = 1;
         this.y = 0;
         this.height = 12;
@@ -320,14 +323,9 @@ class BarStack {
         const color = getColor(this.color);
         this.color += 1;
 
-        const bt = (event.timestamp - this.beginTime) / 1000;
-        const et = (event.end_time - this.beginTime) / 1000;
-        const durationMs = et - bt;
-
-        const scale = this.scale;
-        const x1 = Math.round(bt * scale);
-        const x2 = Math.round(et * scale);
-
+        const durationMs = (event.end_time - event.timestamp) / 1000;
+        const x1 = Math.round((event.timestamp - this.startPointUs) * this.scale);
+        const x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
         const width = x2 - x1;
 
         const isHovered =
@@ -494,22 +492,26 @@ class Graph {
         this.graphWidthPx = this.canvas.width / dpr;
         this.graphHeightPx = this.canvas.height / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
-        this.drawGrid(ctx);
 
         const graphWidthMs = this.collector.getGraphWidthMs();
         const graphOffsetMs = this.collector.getGraphOffsetMs();
-        const bars = new BarStack(
-            ctx,
-            this.mouseX,
-            this.mouseY,
-            this.graphWidthPx / graphWidthMs
-        );
 
         // graphOffsetMs < 0 will add to the width, while >= 0 will not affect the width
         const extraWidth = Math.max(graphOffsetMs * -1, 0);
         this.zeroShiftUs = extraWidth * 1e3;
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
+        this.drawGrid(ctx);
+
+        const bars = new BarStack(
+            ctx,
+            this.mouseX,
+            this.mouseY,
+            this.graphWidthPx / this.graphWidthUs,
+            this.startPointUs,
+            this.graphWidthUs
+        );
+
         const data = this.collector.data();
 
         const findIndex = this.findTriggerIndex(data);
