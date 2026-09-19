@@ -429,12 +429,7 @@ class Graph {
         this.canvas.style.visibility = "visible";
     }
 
-    findTriggerIndex(data) {
-        const triggerWord = this.collector.getTriggerWord();
-        if (!triggerWord) {
-            return undefined;
-        }
-
+    findTriggerIndex(data, triggerWord) {
         const index = data.findLastIndex(event =>
             event.type === EventType.OPEN &&
             containsIgnoreCaseWildcard(event.name, triggerWord));
@@ -543,10 +538,16 @@ class Graph {
             return;
         }
 
-        const findIndex = this.findTriggerIndex(data);
-        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, this.startPointUs);
-        this.startPointUs = data[startIndex].timestamp - this.zeroShiftUs // new startpoint
-
+        const triggerWord = this.collector.getTriggerWord();
+        if (triggerWord) {
+            const triggerIndex = this.findTriggerIndex(data, triggerWord);
+            if (triggerIndex === undefined) {
+                // trigger specified, but not found.
+                return;
+            }
+            this.startPointUs = data[triggerIndex].timestamp - this.zeroShiftUs // new startpoint
+        }
+        const startIndex = this.findStartIndex(data, this.startPointUs);
         const estimatedNow = this.collector.estimateNowUs();
         const maxEnd = this.startPointUs + this.graphWidthUs;
         const endPointUs = Math.min(estimatedNow, maxEnd);
