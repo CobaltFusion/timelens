@@ -62,6 +62,9 @@ class ResizableContainer {
             this.onClose();
         });
 
+        // reserve space for the close-button
+        this.container.style.paddingRight = this.closeButton.style.width;
+
         // Assemble
         this.container.appendChild(this.closeButton);
         this.component.mount(this.container);
