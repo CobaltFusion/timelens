@@ -87,6 +87,9 @@ class Main {
         triggerWordInput.id = "id_trigger_word";
         triggerWordInput.type = "text";
         triggerWordInput.value = this.collector.getTriggerWord();
+        triggerWordInput.classList.add("control-input");
+        triggerWordInput.classList.add("numeric-control-input");
+
         triggerWordInput.addEventListener("input", () => {
             this.collector.setTriggerWord(triggerWordInput.value);
         });
@@ -94,7 +97,7 @@ class Main {
         triggerWordLabel.appendChild(triggerWordInput);
         controls.appendChild(triggerWordLabel);
 
-        const preTriggerLabel = document.createElement("span");
+        const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";
         controls.appendChild(preTriggerLabel);
 
@@ -109,7 +112,7 @@ class Main {
             onChange: (value) => this.collector.setPreTrigger(value)
         });
 
-        const graphWidthLabel = document.createElement("span");
+        const graphWidthLabel = document.createElement("label");
         graphWidthLabel.textContent = "View:";
         controls.appendChild(graphWidthLabel);
 
@@ -127,15 +130,18 @@ class Main {
 
         const addButton = document.createElement("button");
         addButton.textContent = "Add Graph";
+        addButton.classList.add("control-button");
         addButton.addEventListener("click", () => this.addScope());
         controls.appendChild(addButton);
 
         const resetButton = document.createElement("button");
+        resetButton.classList.add("control-button");
         resetButton.textContent = "Reset";
         resetButton.addEventListener("click", () => this.collector.reset());
         controls.appendChild(resetButton);
 
         const dummyButton = document.createElement("button");
+        dummyButton.classList.add("control-button");
         dummyButton.textContent = "Add dummy data";
         dummyButton.addEventListener("click", () => {
             this.collector.dummy();
@@ -144,6 +150,7 @@ class Main {
         controls.appendChild(dummyButton);
 
         const audioButton = document.createElement("button");
+        audioButton.classList.add("control-button");
 
         const updateAudioButton = async () => {
             const audioEnabled = await this.audioAlerts.isAudioEnabled();
@@ -160,6 +167,7 @@ class Main {
         updateAudioButton();
 
         const connectionStatus = document.createElement("button");
+        connectionStatus.classList.add("control-button");
         connectionStatus.id = "id_connection_status";
         controls.appendChild(connectionStatus);
         this.connectionStatus = connectionStatus;

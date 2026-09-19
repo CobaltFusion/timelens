@@ -246,12 +246,15 @@ class NumericControl {
         this.div.style.gap = "5px";
 
         this.minusButton = document.createElement("button");
+        this.minusButton.classList.add("control-button");
         this.minusButton.textContent = "-";
 
         this.plusButton = document.createElement("button");
+        this.plusButton.classList.add("control-button");
         this.plusButton.textContent = "+";
 
         this.input = document.createElement("input");
+        this.input.classList.add("control-input");
         this.input.classList.add("numeric-control-input");
         this.input.type = "number";
         this.input.step = this.inputStep;
