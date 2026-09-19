@@ -228,7 +228,8 @@ class BarStack {
 
     layout() {
         let y = 0;
-        for (const [, line] of this.lines) {
+        const sortedLines = [...this.lines.entries()].sort(([a], [b]) => a - b);
+        for (const [, line] of sortedLines) {
             line.y = y;
             this.layoutLine(line);
             y += line.getHeight();
@@ -256,7 +257,9 @@ class BarStack {
     drawEvents() {
         this.layout();
 
-        for (const [, line] of this.lines) {
+        const sortedLines = [...this.lines.entries()].sort(([a], [b]) => a - b);
+
+        for (const [, line] of sortedLines) {
             const unclosedEvents = Array.from(line.openMap.values());
 
             for (const event of unclosedEvents) {
