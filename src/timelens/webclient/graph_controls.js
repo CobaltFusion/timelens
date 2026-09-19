@@ -95,8 +95,43 @@ function getColor(c) {
     return `hsl(${hue}, 100%, 50%)`;
 }
 
-function containsIgnoreCase(text, search) {
-    return text.toLowerCase().includes(search.toLowerCase());
+function containsIgnoreCaseWildcard(text, search) {
+    const lowerText = text.toLowerCase();
+    const lowerSearch = search.toLowerCase();
+
+    if (!lowerSearch.includes("*")) {
+        return lowerText.includes(lowerSearch);
+    }
+
+    const parts = lowerSearch.split("*");
+    const startsWithWildcard = lowerSearch.startsWith("*");
+    const endsWithWildcard = lowerSearch.endsWith("*");
+
+    let position = 0;
+
+    for (const part of parts) {
+        if (!part) {
+            continue;
+        }
+
+        const found = lowerText.indexOf(part, position);
+
+        if (found === -1) {
+            return false;
+        }
+
+        position = found + part.length;
+    }
+
+    if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
+        return false;
+    }
+
+    if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
+        return false;
+    }
+
+    return true;
 }
 
 class Line {
@@ -396,13 +431,13 @@ class Graph {
 
     findTriggerIndex(data) {
         const triggerWord = this.collector.getTriggerWord();
-        if (!triggerWord)
+        if (!triggerWord) {
             return undefined;
+        }
 
         const index = data.findLastIndex(event =>
             event.type === EventType.OPEN &&
-            containsIgnoreCase(event.name, triggerWord));
-
+            containsIgnoreCaseWildcard(event.name, triggerWord));
         return index >= 0 ? index : undefined;
     }
 
@@ -503,6 +538,16 @@ class Graph {
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
 
+        const data = this.collector.data();
+        if (data.length === 0) {
+            return;
+        }
+
+        console.clear();
+        const findIndex = this.findTriggerIndex(data);
+        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, this.startPointUs);
+        this.startPointUs = data[startIndex].timestamp - this.zeroShiftUs // new startpoint
+
         const bars = new BarStack(
             ctx,
             this.mouseX,
@@ -511,11 +556,6 @@ class Graph {
             this.startPointUs,
             this.graphWidthUs
         );
-
-        const data = this.collector.data();
-
-        const findIndex = this.findTriggerIndex(data);
-        const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, this.startPointUs);
 
         for (let i = startIndex; i < data.length; ++i) {
             const event = data[i];
