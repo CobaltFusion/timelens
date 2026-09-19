@@ -26,7 +26,7 @@ const EventType = {
  * @param {number} value
  * @returns {TSEvent}
  */
-function makeEvent(name, type, timestamp, groupId, value) {
+function makeEvent(name, type, timestamp, groupId, value, count) {
     //console.log("make: %s, type: %s, ts: %s ", name, type, timestamp);
 
     return {
@@ -34,7 +34,8 @@ function makeEvent(name, type, timestamp, groupId, value) {
         type: type,
         timestamp: timestamp,     // microseconds (us)
         groupId: groupId,
-        value: value
+        value: value,
+        count: count
     };
 }
 
@@ -87,7 +88,7 @@ class Collector {
         this.ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             // notice that the variables MUST correspond with the actual JSON field names here!
-            const { name, cat, ph, pid, tid, ts } = data;
+            const { name, cat, ph, pid, tid, ts, count } = data;
 
             // timestamp never go back in time _within one logfile_ or
             // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
@@ -97,7 +98,7 @@ class Collector {
             const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
             const groupId = tid; // use tid as grouping for single line
             const value = 0;
-            const newEvent = makeEvent(name, type, ts, groupId, value);
+            const newEvent = makeEvent(name, type, ts, groupId, value, count);
             this.onIncomingEvent?.(newEvent);
             this.incoming.push(newEvent);
 

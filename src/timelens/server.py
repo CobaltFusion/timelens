@@ -21,6 +21,7 @@ class Server:
         self.watcher = None
         self.peer_discovery = None
         self.startTimeUs = 0
+        self.count = 0
 
         self.app = FastAPI(lifespan=self.lifespan)
 
@@ -46,6 +47,9 @@ class Server:
             return
 
         evt["source"] = os.path.basename(path)
+
+        self.count = self.count + 1
+        evt["count"] = self.count
 
         ts = evt["ts"]
         if ts < self.startTimeUs:
