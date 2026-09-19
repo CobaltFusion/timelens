@@ -20,6 +20,7 @@ class Server:
         self.clients = set()
         self.watcher = None
         self.peer_discovery = None
+        self.startTimeUs = 0
 
         self.app = FastAPI(lifespan=self.lifespan)
 
@@ -45,6 +46,10 @@ class Server:
             return
 
         evt["source"] = os.path.basename(path)
+
+        ts = evt["ts"]
+        if ts < self.startTimeUs:
+            return
 
         await self.broadcast(evt)
 
@@ -86,10 +91,12 @@ class Server:
 
     async def handle_reset(self):
         logger.warning("handle_reset restart!")
+        self.startTimeUs = 0
         await self.watcher.restart()
 
     async def handle_request(self, timeUs):
-        logger.warning("handle_request restart!")
+        logger.warning(f"handle_request, timeUs: {timeUs}")
+        self.startTimeUs = timeUs
         await self.watcher.restart()
 
     async def websocket_endpoint(self, websocket: WebSocket):
