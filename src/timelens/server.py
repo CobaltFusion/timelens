@@ -1,241 +1,129 @@
 #!/usr/bin/env python3
 
-import asyncio
-import contextlib
 import json
 import logging
 import os
-from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
 
 logger = logging.getLogger(__name__)
 
 
-async def handle_line(line, path):
+class Server:
+    def __init__(self):
+        self.clients = set()
+        self.watcher = None
+        self.peer_discovery = None
 
-    if line.startswith("["):
-        line = line[1:]
+        self.app = FastAPI(lifespan=self.lifespan)
 
-    if line.endswith(",\n"):
-        line = line[:-2]
-    try:
-        evt = json.loads(line)
-    except json.JSONDecodeError:
-        logging.error("line error: %s", line)
-        return
+        # The order matters: mount must be last, otherwise it can shadow
+        # the other handlers.
+        self.app.websocket("/ws")(self.websocket_endpoint)
+        self.app.get("/.well-known/appspecific/com.chrome.devtools.json")(self.devtools)
+        self.app.get("/api/servers")(self.servers)
+        self.app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
 
-    evt["source"] = os.path.basename(path)
+    async def handle_line(self, line, path):
 
-    await broadcast(evt)
+        if line.startswith("["):
+            line = line[1:]
 
+        if line.endswith(",\n"):
+            line = line[:-2]
 
-class LogWatcher:
-    def __init__(self, path, callback):
-        self.path = path
-        self.callback = callback
-
-        self.watch_task = None
-        self.tail_tasks = set()
-
-        self._running = False
-
-    async def start(self):
-        if self._running:
+        try:
+            evt = json.loads(line)
+        except json.JSONDecodeError:
+            logger.error("line error: %s", line)
             return
 
-        logging.warning(f"Starting watcher on {self.path}")
-        self._running = True
-        self.watch_task = asyncio.create_task(self._watch_directory())
+        evt["source"] = os.path.basename(path)
 
-    async def stop(self):
-        if not self._running:
-            return
+        await self.broadcast(evt)
 
-        logging.warning("Stopping watcher")
-        self._running = False
+    async def broadcast(self, message):
 
-        # Stop directory watcher
-        if self.watch_task:
-            self.watch_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self.watch_task
-            self.watch_task = None
+        dead = []
+        data = json.dumps(message)
 
-        # Stop all tail tasks
-        tasks = list(self.tail_tasks)
-        for task in tasks:
-            task.cancel()
+        for ws in self.clients:
+            try:
+                await ws.send_text(data)
+            except Exception:
+                logger.exception("Failed to broadcast to WebSocket")
+                dead.append(ws)
 
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        for ws in dead:
+            self.clients.remove(ws)
 
-        self.tail_tasks.clear()
+    @asynccontextmanager
+    async def lifespan(self, app):
 
-    async def restart(self):
-        logging.warning("Restarting watcher")
-        await self.stop()
-        await self.start()
+        path = Path("/tmp/logs/telemetry")
+        if not path.is_dir():
+            logger.warning("Path missing: %s", path)
+            path = Path("c:/temp/logs/telemetry")
 
-    async def _watch_directory(self):
-        known = set()
+        logger.warning("Monitoring path: %s", path)
+
+        self.watcher = LogWatcher(path, self.handle_line)
+        await self.watcher.start()
+
+        self.peer_discovery = PeerDiscovery(http_port=8080)
+        await self.peer_discovery.start()
+
+        try:
+            yield
+        finally:
+            await self.watcher.stop()
+
+    async def handle_reset(self):
+        logger.warning("handle_reset restart!")
+        await self.watcher.restart()
+
+    async def handle_request(self, timeUs):
+        logger.warning("handle_request restart!")
+        await self.watcher.restart()
+
+    async def websocket_endpoint(self, websocket: WebSocket):
+
+        await websocket.accept()
+        self.clients.add(websocket)
 
         try:
             while True:
+                data = await websocket.receive_text()
+
                 try:
-                    current = {f for f in os.listdir(self.path) if f.endswith(".vson")}
-                except FileNotFoundError:
-                    # logging.error(f"Directory not found: {self.path}")
-                    await asyncio.sleep(1)
+                    msg = json.loads(data)
+                except json.JSONDecodeError:
                     continue
 
-                new_files = current - known
+                if msg.get("action") == "reset":
+                    await self.handle_reset()
 
-                for fname in new_files:
-                    full_path = os.path.join(self.path, fname)
-                    logging.warning(f"New file detected: {full_path}")
+                if msg.get("action") == "request":
+                    timeUs = msg.get("timeUs")
+                    await self.handle_request(timeUs)
 
-                    task = asyncio.create_task(self._tail_file(full_path))
-                    self.tail_tasks.add(task)
+        except WebSocketDisconnect:
+            self.clients.remove(websocket)
 
-                    # Remove from set when done
-                    task.add_done_callback(self.tail_tasks.discard)
+    async def devtools(self):
+        # Silence a harmless message from Chrome DevTools.
+        return JSONResponse({})
 
-                known = current
-                await asyncio.sleep(1)
-
-        except asyncio.CancelledError:
-            logging.warning("Directory watcher cancelled")
-            raise
-
-        finally:
-            tasks = list(self.tail_tasks)
-            # Ensure all tail tasks are cancelled
-            for task in tasks:
-                task.cancel()
-
-            for task in tasks:
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-
-            self.tail_tasks.clear()
-
-    async def _tail_file(self, path):
-        logging.warning(f"Start tailing: {path}")
-
-        try:
-            with open(path, encoding="utf-8") as f:
-                while True:
-                    line = f.readline()
-
-                    if not line:
-                        await asyncio.sleep(0.1)
-                        continue
-
-                    # logging.warning(f"{os.path.basename(path)}: {line.strip()}")
-
-                    # Ordered processing (important!)
-                    await self.callback(line, path)
-
-        except asyncio.CancelledError:
-            logging.warning(f"Stopped tailing: {path}")
-            raise
-
-        except Exception as e:
-            logging.error(f"Error in tail_file({path}): {e}")
+    async def servers(self):
+        peers = await self.peer_discovery.discover()
+        return JSONResponse({"servers": peers})
 
 
-clients = set()
-
-
-async def broadcast(message):
-
-    dead = []
-    data = json.dumps(message)
-
-    for ws in clients:
-        try:
-            # logging.warning(f"broadcast: {message}")
-            await ws.send_text(data)
-        except Exception:
-            logging.exception("Failed to broadcast to WebSocket")
-            dead.append(ws)
-
-    for ws in dead:
-        clients.remove(ws)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-
-    path = Path("/tmp/logs/telemetry")
-    if not path.is_dir():
-        logging.warning("Path missing: %s", path)
-        path = "c:/temp/logs/telemetry"
-    logging.warning("Monitoring path: %s", path)
-
-    watcher = LogWatcher(path, handle_line)
-    app.state.watcher = watcher
-    await watcher.start()
-
-    peer_discovery = PeerDiscovery(http_port=8080)
-    app.state.peer_discovery = peer_discovery
-    await peer_discovery.start()
-
-    try:
-        yield  # <-- REQUIRED
-    finally:
-        await watcher.stop()
-
-
-async def handle_reset(app: FastAPI):
-    logging.warning("RESET received")
-    await app.state.watcher.restart()
-
-
-app = FastAPI(lifespan=lifespan)
-
-# the order of the handlers below matters, the app.mount need to be last, otherwise it will shadow the other handlers
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    clients.add(websocket)
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-
-            try:
-                msg = json.loads(data)
-            except json.JSONDecodeError:
-                continue
-
-            if msg.get("action") == "reset":
-                await handle_reset(websocket.app)
-
-    except WebSocketDisconnect:
-        clients.remove(websocket)
-
-
-@app.get("/.well-known/appspecific/com.chrome.devtools.json")
-def devtools():
-    # this silences a harmless message that would otherwise appear when 'F12' it pressed in the browser
-    return JSONResponse({})
-
-
-@app.get("/api/servers")
-async def servers():
-    peer_discovery: PeerDiscovery = app.state.peer_discovery
-    peers = await peer_discovery.discover()
-    return JSONResponse({"servers": peers})
-
-
-app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
+server = Server()
+app = server.app
