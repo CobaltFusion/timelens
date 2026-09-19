@@ -94,30 +94,31 @@ class Main {
         triggerWordLabel.appendChild(triggerWordInput);
         controls.appendChild(triggerWordLabel);
 
-        const offsetLabel = document.createElement("span");
-        offsetLabel.textContent = "Offset:";
-        controls.appendChild(offsetLabel);
+        const preTriggerLabel = document.createElement("span");
+        preTriggerLabel.textContent = "PreTrigger:";
+        controls.appendChild(preTriggerLabel);
 
         new NumericControl({
             parent: controls,
-            value: this.collector.getGraphOffsetMs(),
+            value: this.collector.getPreTriggerMs(),
             step: 10,
             inputStep: 1,
             min: -Infinity,
+            max: -0,
             unit: "ms",
-            onChange: (value) => this.collector.setOffset(value)
+            onChange: (value) => this.collector.setPreTrigger(value)
         });
 
-        const gridScaleLabel = document.createElement("span");
-        gridScaleLabel.textContent = "Graph width:";
-        controls.appendChild(gridScaleLabel);
+        const graphWidthLabel = document.createElement("span");
+        graphWidthLabel.textContent = "View:";
+        controls.appendChild(graphWidthLabel);
 
         new NumericControl({
             parent: controls,
             value: this.collector.getGraphWidthMs(),
             step: 10,
             inputStep: 1,
-            min: 0.1,
+            min: 0.001,
             unit: "ms",
             onChange: (value) => {
                 this.collector.setgraphWidthMs(value);

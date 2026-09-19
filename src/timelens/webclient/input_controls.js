@@ -100,8 +100,8 @@ function add_demo_knobs() {
 }
 
 function addControlPair(parent, callback, getValue, setValue, unit = "") {
-    const minusBtn = document.createElement("button");
-    minusBtn.textContent = "-";
+    const minusButton = document.createElement("button");
+    minusButton.textContent = "-";
 
     const valueInput = document.createElement("input");
     valueInput.type = "text";
@@ -125,16 +125,16 @@ function addControlPair(parent, callback, getValue, setValue, unit = "") {
 
     syncDisplay();
 
-    const plusBtn = document.createElement("button");
-    plusBtn.textContent = "+";
+    const plusButton = document.createElement("button");
+    plusButton.textContent = "+";
 
     function update(dir) {
         callback(dir);
         syncDisplay();
     }
 
-    minusBtn.addEventListener("click", () => update(-1));
-    plusBtn.addEventListener("click", () => update(1));
+    minusButton.addEventListener("click", () => update(-1));
+    plusButton.addEventListener("click", () => update(1));
 
     valueInput.addEventListener("change", () => {
         const v = parse(valueInput.value);
@@ -146,17 +146,17 @@ function addControlPair(parent, callback, getValue, setValue, unit = "") {
         syncDisplay();
     });
 
-    parent.appendChild(minusBtn);
+    parent.appendChild(minusButton);
     parent.appendChild(valueInput);
-    parent.appendChild(plusBtn);
+    parent.appendChild(plusButton);
 }
 
 function addControlPairNumber(parent, callback, getValue, setValue, step = 1, unit = "") {
-    const minusBtn = document.createElement("button");
-    minusBtn.textContent = "-";
+    const minusButton = document.createElement("button");
+    minusButton.textContent = "-";
 
-    const plusBtn = document.createElement("button");
-    plusBtn.textContent = "+";
+    const plusButton = document.createElement("button");
+    plusButton.textContent = "+";
 
     const valueInput = document.createElement("input");
     valueInput.type = "number";
@@ -180,8 +180,8 @@ function addControlPairNumber(parent, callback, getValue, setValue, step = 1, un
         syncDisplay();
     }
 
-    minusBtn.addEventListener("click", () => update(-1));
-    plusBtn.addEventListener("click", () => update(1));
+    minusButton.addEventListener("click", () => update(-1));
+    plusButton.addEventListener("click", () => update(1));
 
     valueInput.addEventListener("change", () => {
         const v = Number(valueInput.value);
@@ -203,9 +203,9 @@ function addControlPairNumber(parent, callback, getValue, setValue, step = 1, un
         }
     });
 
-    parent.appendChild(minusBtn);
+    parent.appendChild(minusButton);
     parent.appendChild(valueInput);
-    parent.appendChild(plusBtn);
+    parent.appendChild(plusButton);
     parent.appendChild(unitSpan);
 }
 
@@ -245,11 +245,11 @@ class NumericControl {
         this.div.style.alignItems = "center";
         this.div.style.gap = "5px";
 
-        this.minusBtn = document.createElement("button");
-        this.minusBtn.textContent = "-";
+        this.minusButton = document.createElement("button");
+        this.minusButton.textContent = "-";
 
-        this.plusBtn = document.createElement("button");
-        this.plusBtn.textContent = "+";
+        this.plusButton = document.createElement("button");
+        this.plusButton.textContent = "+";
 
         this.input = document.createElement("input");
         this.input.classList.add("numeric-control-input");
@@ -259,15 +259,15 @@ class NumericControl {
         this.unitSpan = document.createElement("span");
         this.unitSpan.textContent = this.unit ? ` ${this.unit}` : "";
 
-        this.div.appendChild(this.minusBtn);
+        this.div.appendChild(this.minusButton);
         this.div.appendChild(this.input);
-        this.div.appendChild(this.plusBtn);
+        this.div.appendChild(this.plusButton);
         this.div.appendChild(this.unitSpan);
 
         this.parent.appendChild(this.div);
 
-        this.minusBtn.addEventListener("click", () => this.change(-1));
-        this.plusBtn.addEventListener("click", () => this.change(1));
+        this.minusButton.addEventListener("click", () => this.change(-1));
+        this.plusButton.addEventListener("click", () => this.change(1));
 
         this.input.addEventListener("change", () => {
             const v = Number(this.input.value);

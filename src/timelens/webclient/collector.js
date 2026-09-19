@@ -68,7 +68,7 @@ class Collector {
         this.cutoffTime = 0;  // event from before this time are dropped
         this.triggerWord = "";
         this.graphWidthMs = 1000;
-        this.graphOffsetMs = -10;
+        this.preTriggerMs = -10;
         this.lastTimepointUs = 0;
         this.lastSteadyTimepointUs = 0;
         this.onConnectionLost = null;
@@ -136,16 +136,16 @@ class Collector {
         }
     }
 
-    setOffset(milliseconds) {
-        this.graphOffsetMs = milliseconds;
-    }
-
     getGraphWidthMs() {
         return this.graphWidthMs;
     }
 
-    getGraphOffsetMs() {
-        return this.graphOffsetMs;
+    setPreTrigger(milliseconds) {
+        this.preTriggerMs = milliseconds;
+    }
+
+    getPreTriggerMs() {
+        return this.preTriggerMs;
     }
 
     getLastTimepointUs() {

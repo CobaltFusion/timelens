@@ -524,10 +524,10 @@ class Graph {
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
 
         const graphWidthMs = this.collector.getGraphWidthMs();
-        const graphOffsetMs = this.collector.getGraphOffsetMs();
+        const preTriggerMs = this.collector.getPreTriggerMs();
 
-        // graphOffsetMs < 0 will add to the width, while >= 0 will not affect the width
-        const extraWidth = Math.max(graphOffsetMs * -1, 0);
+        // preTriggerMs < 0 will add to the width, while >= 0 will not affect the width
+        const extraWidth = Math.max(preTriggerMs * -1, 0);
         this.zeroShiftUs = extraWidth * 1e3;
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
