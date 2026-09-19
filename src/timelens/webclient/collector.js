@@ -89,11 +89,8 @@ class Collector {
             // notice that the variables MUST correspond with the actual JSON field names here!
             const { name, cat, ph, pid, tid, ts } = data;
 
-            if (this.lastTimepointUs > 0 && ts < this.lastTimepointUs) {
-                console.warn(`Out of order event; ts: ${ts}: ${name} after ${this.lastTimepointUs}`)
-                return
-            }
-
+            // timestamp never go back in time _within one logfile_ or
+            // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
             this.lastTimepointUs = Math.max(ts, this.lastTimepointUs);
             this.lastSteadyTimepointUs = performance.now() * 1000;
 
