@@ -52,7 +52,6 @@ class LogWatcher:
 
     async def _run(self):
         async with asyncio.TaskGroup() as tg:
-
             #
             # Tail existing files first.
             #
@@ -63,7 +62,6 @@ class LogWatcher:
             # Watch for new/modified files.
             #
             async for changes in awatch(self.path, stop_event=self._stop):
-
                 for _, file in changes:
                     file = Path(file)
 
@@ -92,12 +90,10 @@ class LogWatcher:
     async def _tail_file(self, path):
         try:
             with path.open("r", encoding="utf8") as f:
-
                 # Uncomment if you only want new lines.
                 # f.seek(0, 2)
 
                 while not self._stop.is_set():
-
                     line = f.readline()
 
                     if not line:

@@ -168,13 +168,19 @@ class Collector {
             throw new Error("Cannot reset: WebSocket is not connected");
         }
 
+        // if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        //     this.ws.send(JSON.stringify({ type: "control", action: "reset" }));
+        // }
+
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: "control", action: "reset" }));
+            const minus10minutesUs = this.estimateNowUs() - (10 * 60 * 1e6)
+            this.ws.send(JSON.stringify({ type: "control", action: "request", timeUs: minus10minutesUs }));
         }
+
     }
 
     asTime(msTime) {
-        return this.cutoffTime + (msTime * 1000);
+        return this.estimateNowUs() + (msTime * 1000 * 1000);
     }
 
     estimateNowUs() {
@@ -183,7 +189,7 @@ class Collector {
     }
 
     dummy() {
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), this.asTime(100), 0, 0));
+        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), 0, 0));
         this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, 0, 0));
         this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), 0, 0));
         this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), 0, 0)); // intentionally out-of-order
