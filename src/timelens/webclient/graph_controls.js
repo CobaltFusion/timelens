@@ -389,7 +389,7 @@ class BarStack {
             this.ctx.fillRect(x1, y, width, line.height);
         }
 
-        this.drawTextOnBar(`${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+        this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
 
         if (isHovered) {
             this.hover = { name: hover, duration: durationMs };
