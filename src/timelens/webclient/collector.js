@@ -90,7 +90,7 @@ class Collector {
             const { name, cat, ph, pid, tid, ts } = data;
 
             if (this.lastTimepointUs > 0 && ts < this.lastTimepointUs) {
-                console.warn(`Out of order event; ts: ${ts}: ${name} `)
+                console.warn(`Out of order event; ts: ${ts}: ${name} after ${this.lastTimepointUs}`)
                 return
             }
 
