@@ -70,6 +70,7 @@ class Collector {
         this.graphWidthMs = 1000;
         this.graphOffsetMs = -10;
         this.lastTimepointUs = 0;
+        this.lastSteadyTimepointUs = 0;
         this.onConnectionLost = null;
         this.onIncomingEvent = null;
 
@@ -94,10 +95,9 @@ class Collector {
             }
 
             this.lastTimepointUs = Math.max(ts, this.lastTimepointUs);
-            //console.log("I: ", data);
+            this.lastSteadyTimepointUs = performance.now() * 1000;
 
             const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
-
             const groupId = tid; // use tid as grouping for single line
             const value = 0;
             const newEvent = makeEvent(name, type, ts, groupId, value);
@@ -164,6 +164,7 @@ class Collector {
 
     reset() {
         this.lastTimepointUs = 0;
+        this.lastSteadyTimepointUs = 0;
         this.clear();
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -177,6 +178,11 @@ class Collector {
 
     asTime(msTime) {
         return this.cutoffTime + (msTime * 1000);
+    }
+
+    estimateNowUs() {
+        const nowUs = performance.now() * 1000;
+        return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
     }
 
     dummy() {

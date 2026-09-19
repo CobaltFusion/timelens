@@ -171,13 +171,13 @@ class Line {
 }
 
 class BarStack {
-    constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, graphWidthUs) {
+    constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, endPointUs) {
         this.ctx = ctx;
         this.mouseX = mouseX;
         this.mouseY = mouseY;
         this.scale = pixelsPerMicrosecond;
         this.startPointUs = startPointUs;
-        this.endPointUs = startPointUs + graphWidthUs;
+        this.endPointUs = endPointUs;
 
         this.color = 1;
         this.y = 0;
@@ -543,10 +543,13 @@ class Graph {
             return;
         }
 
-        console.clear();
         const findIndex = this.findTriggerIndex(data);
         const startIndex = findIndex !== undefined ? findIndex : this.findStartIndex(data, this.startPointUs);
         this.startPointUs = data[startIndex].timestamp - this.zeroShiftUs // new startpoint
+
+        const estimatedNow = this.collector.estimateNowUs();
+        const maxEnd = this.startPointUs + this.graphWidthUs;
+        const endPointUs = Math.min(estimatedNow, maxEnd);
 
         const bars = new BarStack(
             ctx,
@@ -554,7 +557,7 @@ class Graph {
             this.mouseY,
             this.graphWidthPx / this.graphWidthUs,
             this.startPointUs,
-            this.graphWidthUs
+            endPointUs
         );
 
         for (let i = startIndex; i < data.length; ++i) {
