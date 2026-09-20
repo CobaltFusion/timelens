@@ -209,7 +209,7 @@ function addControlPairNumber(parent, callback, getValue, setValue, step = 1, un
     parent.appendChild(unitSpan);
 }
 
-class NumericControl {
+export class NumericControl {
     constructor({
         parent,
         value = 0,

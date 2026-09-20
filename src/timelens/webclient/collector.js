@@ -1,22 +1,4 @@
-/**
- * @typedef {"open" | "close" | "duration" | "value"} EventType
- */
-
-const EventType = {
-    OPEN: "open",           // only has timestamp
-    CLOSE: "close",         // has both timestamp and end_time
-    DURATION: "duration",   // has both timestamp and end_time
-    VALUE: "value"          // has timestamp + value
-};
-
-/**
- * @typedef {Object} TSEvent
- * @property {string} name
- * @property {string} type
- * @property {number} timestamp
- * @property {number} groupId
- * @property {number} value
- */
+import { EventType } from "./globals.js";
 
 /**
  * @param {string} name
@@ -60,7 +42,7 @@ function makeEvent(name, type, timestamp, groupId, value, count) {
  * The `tid` field is used as the group ID, so events from the same
  * thread are displayed on the same graph line.
  */
-class Collector {
+export class Collector {
     constructor() {
         /** @type {TSEvent[]} */
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation

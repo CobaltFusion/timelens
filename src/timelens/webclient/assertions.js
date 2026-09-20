@@ -1,6 +1,6 @@
 const ASSERTIONS_ENABLED = true
 
-function assert(condition, messageFn) {
+export function assert(condition, messageFn) {
     if (!ASSERTIONS_ENABLED) return;
 
     if (!condition) {

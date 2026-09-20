@@ -3,7 +3,7 @@
  * A container that wraps a component and provides resize and close behavior.
  * It can be styled in the css.
  */
-class ResizableContainer {
+export class ResizableContainer {
     constructor({ parent, component, onClose }) {
         this.parent = parent;
         this.component = component;
@@ -90,9 +90,4 @@ function isComponent(obj) {
         typeof obj.element === "function" &&
         typeof obj.mount === "function" &&
         typeof obj.resize === "function";
-}
-
-function getColor(c) {
-    const hue = (c * 137.508) % 360;
-    return `hsl(${hue}, 100%, 50%)`;
 }

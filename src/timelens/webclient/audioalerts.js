@@ -1,5 +1,5 @@
 
-class AudioAlerts {
+export class AudioAlerts {
     constructor() {
         this.audio = new AudioContext();
         this.audioEnabled = false;
