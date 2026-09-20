@@ -18,6 +18,7 @@ class Main {
         this.widgets = new Set();
         this.collector = new Collector();
         this.connectionStatus = null;
+        this.controls = document.getElementById("id_control_panel");
     }
 
     init() {
@@ -85,9 +86,89 @@ class Main {
         this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
     }
 
-    addControls() {
-        const controls = document.getElementById("id_control_panel");
+    addEdgeControlButton() {
+        const edgeButton = document.createElement("button");
+        edgeButton.classList.add("control-button");
+        edgeButton.setAttribute("aria-label", "Edge mode");
 
+        const edgeModes = [
+            {
+                value: "rising",
+                label: "Rising edge",
+                icon: `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 17 H8 V7 H22"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+                <path d="M6 10 L8 7 L10 10"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+            </svg>
+        `
+            },
+            {
+                value: "falling",
+                label: "Falling edge",
+                icon: `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 7 H8 V17 H22"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+                <path d="M6 14 L8 17 L10 14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+            </svg>
+        `
+            },
+            {
+                value: "duration",
+                label: "Pulse duration",
+                icon: `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 17 H7 V7 H17 V17 H22"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+            </svg>
+        `
+            }
+        ];
+
+        let edgeModeIndex = 0;
+
+        const updateEdgeButton = () => {
+            const mode = edgeModes[edgeModeIndex];
+
+            edgeButton.innerHTML = mode.icon;
+            edgeButton.title = mode.label;
+            edgeButton.setAttribute("aria-label", mode.label);
+        };
+
+        edgeButton.addEventListener("click", () => {
+            edgeModeIndex = (edgeModeIndex + 1) % edgeModes.length;
+            this.edgeMode = edgeModes[edgeModeIndex].value;
+            updateEdgeButton();
+        });
+
+        this.controls.appendChild(edgeButton);
+        updateEdgeButton();
+    }
+
+    addControls() {
         const triggerWordLabel = document.createElement("label");
         triggerWordLabel.textContent = "Trigger word: ";
         triggerWordLabel.htmlFor = "id_trigger_word";
@@ -104,14 +185,16 @@ class Main {
         });
 
         triggerWordLabel.appendChild(triggerWordInput);
-        controls.appendChild(triggerWordLabel);
+        this.controls.appendChild(triggerWordLabel);
+
+        //this.addEdgeControlButton()
 
         const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";
-        controls.appendChild(preTriggerLabel);
+        this.controls.appendChild(preTriggerLabel);
 
         new NumericControl({
-            parent: controls,
+            parent: this.controls,
             value: this.collector.getPreTriggerMs(),
             step: 10,
             inputStep: 1,
@@ -123,10 +206,10 @@ class Main {
 
         const graphWidthLabel = document.createElement("label");
         graphWidthLabel.textContent = "View:";
-        controls.appendChild(graphWidthLabel);
+        this.controls.appendChild(graphWidthLabel);
 
         new NumericControl({
-            parent: controls,
+            parent: this.controls,
             value: this.collector.getGraphWidthMs(),
             step: 10,
             inputStep: 1,
@@ -141,14 +224,14 @@ class Main {
         addButton.textContent = "Add Graph";
         addButton.classList.add("control-button");
         addButton.addEventListener("click", () => this.addScope());
-        controls.appendChild(addButton);
+        this.controls.appendChild(addButton);
 
         const resetButton = document.createElement("button");
         resetButton.classList.add("control-button");
         resetButton.textContent = "Reset";
         resetButton.title = "Replay the last 10 minutes of recorded data";
         resetButton.addEventListener("click", () => this.collector.reset());
-        controls.appendChild(resetButton);
+        this.controls.appendChild(resetButton);
 
         const audioButton = document.createElement("button");
         audioButton.id = "id_audio_button";
@@ -179,13 +262,13 @@ class Main {
             await updateAudioButton();
         });
 
-        controls.appendChild(audioButton);
+        this.controls.appendChild(audioButton);
         updateAudioButton();
 
         const connectionStatus = document.createElement("button");
         connectionStatus.classList.add("control-button");
         connectionStatus.id = "id_connection_status";
-        controls.appendChild(connectionStatus);
+        this.controls.appendChild(connectionStatus);
         this.connectionStatus = connectionStatus;
         this.setConnectionStatus(true);
     }
