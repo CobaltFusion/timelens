@@ -449,6 +449,7 @@ class Graph {
 
             if (this.selecting) {
                 this.selectionEndX = this.mouseX;
+                this.render();
             }
         });
 
@@ -461,6 +462,7 @@ class Graph {
                 const rect = this.canvas.getBoundingClientRect();
                 this.selectionEndX = e.clientX - rect.left;
                 this.selecting = false;
+                this.render();
             }
         });
 
@@ -605,16 +607,19 @@ class Graph {
 
         const x1 = Math.min(this.selectionStartX, this.selectionEndX);
         const x2 = Math.max(this.selectionStartX, this.selectionEndX);
+        const width = x2 - x1;
 
-        if (x1 === x2) {
+        if (width <= 0) {
             return;
         }
 
         ctx.save();
 
+        // Selection
         ctx.fillStyle = "rgba(100, 255, 160, 0.20)";
-        ctx.fillRect(x1, 0, x2 - x1, this.graphHeightPx);
+        ctx.fillRect(x1, 0, width, this.graphHeightPx);
 
+        // Selection boundaries
         ctx.strokeStyle = "rgba(100, 255, 160, 0.8)";
         ctx.lineWidth = 1;
 
@@ -625,7 +630,60 @@ class Graph {
         ctx.lineTo(x2 + 0.5, this.graphHeightPx);
         ctx.stroke();
 
+        // Duration
+        const durationMs = this.getSelectionDurationUs() / 1000;
+        const text = `${durationMs.toFixed(3)} ms`;
+
+        ctx.font = "12px monospace";
+
+        const paddingX = 8;
+        const paddingY = 4;
+        const metrics = ctx.measureText(text);
+
+        const boxWidth = metrics.width + paddingX * 2;
+        const boxHeight = 20;
+
+        // Center the box inside the selection.
+        const centerX = (x1 + x2) / 2;
+        const boxX = centerX - boxWidth / 2;
+        const boxY = (this.graphHeightPx - boxHeight) / 2;
+
+        // Background
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+
+        // Border
+        ctx.strokeStyle = "rgba(100, 255, 160, 0.9)";
+        ctx.strokeRect(
+            boxX + 0.5,
+            boxY + 0.5,
+            boxWidth - 1,
+            boxHeight - 1
+        );
+
+        // Text
+        ctx.fillStyle = "#9affbd";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.fillText(
+            text,
+            centerX,
+            boxY + boxHeight / 2
+        );
+
         ctx.restore();
+    }
+
+    getSelectionDurationUs() {
+        if (this.selectionStartX === null || this.selectionEndX === null) {
+            return 0;
+        }
+
+        const x1 = Math.min(this.selectionStartX, this.selectionEndX);
+        const x2 = Math.max(this.selectionStartX, this.selectionEndX);
+
+        return (x2 - x1) * this.graphWidthUs / this.graphWidthPx;
     }
 
     render() {
