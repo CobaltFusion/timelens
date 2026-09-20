@@ -1,6 +1,6 @@
-//import { EventType } from "./globals.js";
-//import { EventType } from "./collector.js";
-//import { EventType } from "./resizable_container.js";
+import { EventType } from "./globals.js";
+import { toggleDebuggingEnabled } from "./globals.js";
+import { BarStack } from "./barstack.js";
 
 function containsIgnoreCaseWildcard(text, search) {
     const lowerText = text.toLowerCase();
@@ -41,7 +41,7 @@ function containsIgnoreCaseWildcard(text, search) {
     return true;
 }
 
-class Graph {
+export class Graph {
     constructor(collector) {
         this.collector = collector;
         this.index = 0;
@@ -111,7 +111,7 @@ class Graph {
     keyHandler(e) {
         const key = e.key;
         if (key === "d") {
-            debugInfo = !debugInfo;
+            toggleDebuggingEnabled();
         }
     }
 

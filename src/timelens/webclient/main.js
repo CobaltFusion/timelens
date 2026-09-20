@@ -1,5 +1,9 @@
-// not using modules yet
-// import { Graph } from "./scope_controls.js";
+import { Collector } from "./collector.js";
+import { EventType } from "./globals.js";
+import { AudioAlerts } from "./audioalerts.js";
+import { NumericControl } from "./input_controls.js";
+import { ResizableContainer } from "./resizable_container.js";
+import { Graph } from "./graph_controls.js";
 
 // [] array
 // {} object

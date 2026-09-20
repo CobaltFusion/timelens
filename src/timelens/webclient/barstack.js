@@ -1,3 +1,6 @@
+import { assert } from "./assertions.js";
+import { EventType } from "./globals.js";
+import { getDebuggingEnabled } from "./globals.js";
 
 class Line {
     constructor(y) {
@@ -35,7 +38,12 @@ class Line {
     }
 }
 
-class BarStack {
+function getColor(c) {
+    const hue = (c * 137.508) % 360;
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
+export class BarStack {
     constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, endPointUs) {
         this.ctx = ctx;
         this.mouseX = mouseX;
@@ -218,7 +226,6 @@ class BarStack {
         );
     }
 
-
     // Show the text by default, but show 'hover' if the mouse is over the bar.
     drawBar(line, event, hover, y) {
         assert(typeof event.name === "string", "event.name must be string");
@@ -251,7 +258,7 @@ class BarStack {
             this.ctx.fillRect(x1, y, width, line.height);
         }
 
-        if (debugInfo) {
+        if (getDebuggingEnabled()) {
             this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
         }
         else {
