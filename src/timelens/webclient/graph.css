@@ -183,3 +183,9 @@ button, input { color: inherit; font: inherit; }
     stroke: currentColor;
     stroke-width: 2;
 }
+
+#id_control_panel .control-button svg {
+    width: 28px;
+    height: 24px;
+    display: block;
+}
