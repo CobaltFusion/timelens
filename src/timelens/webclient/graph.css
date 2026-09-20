@@ -114,7 +114,11 @@ button, input { color: inherit; font: inherit; }
     font-size: .8rem;
 }
 
-.control-input:focus-visible, button:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 .2rem var(--accent-glow); }
+.control-input:focus-visible, button:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 .2rem var(--accent-glow);
+    outline: none;
+}
 
 #id_control_panel .numeric-control-input {
     width: 4rem;
