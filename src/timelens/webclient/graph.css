@@ -175,3 +175,11 @@ button, input { color: inherit; font: inherit; }
     background: var(--status-disconnected);
     color: #fff;
 }
+
+#id_audio_button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2;
+}

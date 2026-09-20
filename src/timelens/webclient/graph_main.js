@@ -146,16 +146,32 @@ class Main {
         const resetButton = document.createElement("button");
         resetButton.classList.add("control-button");
         resetButton.textContent = "Reset";
+        resetButton.title = "Replay the last 10 minutes of recorded data";
         resetButton.addEventListener("click", () => this.collector.reset());
         controls.appendChild(resetButton);
 
         const audioButton = document.createElement("button");
+        audioButton.id = "id_audio_button";
         audioButton.classList.add("control-button");
 
         const updateAudioButton = async () => {
             const audioEnabled = await getAudioAlerts().isAudioEnabled();
-            audioButton.textContent =
-                audioEnabled ? "Audio (On) " : "Audio (Muted)";
+
+            // custom drawn Speaker/Muted icon
+            audioButton.innerHTML = audioEnabled
+                ? `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
+                    <path d="M16 8.5a5 5 0 0 1 0 7"/>
+                    <path d="M19 5.5a9 9 0 0 1 0 13"/>
+                </svg>`
+                : `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
+                    <path d="M16 9l5 6"/>
+                    <path d="M21 9l-5 6"/>
+                </svg>`;
+            audioButton.setAttribute("aria-label", audioEnabled ? "Mute audio" : "Enable audio");
         };
 
         audioButton.addEventListener("click", async () => {
