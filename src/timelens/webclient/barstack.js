@@ -38,9 +38,17 @@ class Line {
     }
 }
 
-function getColor(c) {
+function getColor(name) {
+    let c = 0;
+
+    for (let i = 0; i < name.length; ++i) {
+        c = ((c << 5) - c) + name.charCodeAt(i);
+        c |= 0;
+    }
+
+    c = Math.abs(c);
     const hue = (c * 137.508) % 360;
-    return `hsl(${hue}, 100%, 50%)`;
+    return `hsl(${hue}, 70%, 65%)`;
 }
 
 export class BarStack {
@@ -52,7 +60,6 @@ export class BarStack {
         this.startPointUs = startPointUs;
         this.endPointUs = endPointUs;
 
-        this.color = 1;
         this.y = 0;
         this.height = 12;
         this.lines = new Map();
@@ -230,9 +237,6 @@ export class BarStack {
     drawBar(line, event, hover, y) {
         assert(typeof event.name === "string", "event.name must be string");
 
-        const color = getColor(this.color);
-        this.color += 1;
-
         const durationMs = (event.end_time - event.timestamp) / 1000;
         const x1 = Math.round((event.timestamp - this.startPointUs) * this.scale);
         const x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
@@ -244,6 +248,7 @@ export class BarStack {
             this.mouseY >= y &&
             this.mouseY <= y + line.height;
 
+        const color = getColor(event.name);
         if (event.type === EventType.OPEN) {
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
             gradient.addColorStop(0, color);
