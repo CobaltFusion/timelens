@@ -417,6 +417,15 @@ class Graph {
         this.zeroShiftUs = 0;
         this.graphWidthUs = 0;
         this.startPointUs = 0;
+        this.mouseInside = false;
+
+        this.canvas.addEventListener("mouseenter", () => {
+            this.mouseInside = true;
+        });
+
+        this.canvas.addEventListener("mouseleave", () => {
+            this.mouseInside = false;
+        });
 
         this.canvas.addEventListener("mousemove", (e) => {
             const rect = this.canvas.getBoundingClientRect();
@@ -538,9 +547,36 @@ class Graph {
         ctx.restore();
     }
 
+    drawCursor(ctx) {
+        if (!this.mouseInside) {
+            return;
+        }
+
+        const x = Math.round(this.mouseX) + 0.5;
+
+        ctx.save();
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, this.graphHeightPx);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
     render() {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
+
+        this.renderGraph(ctx);
+        this.drawCursor(ctx);
+    }
+
+
+    renderGraph(ctx) {
 
         const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
         this.graphWidthPx = this.canvas.width / dpr;
