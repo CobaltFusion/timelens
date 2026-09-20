@@ -50,6 +50,23 @@ export class AudioAlerts {
         return duration;
     }
 
+    playPseudoRandomSound(name) {
+        let hash = 0;
+
+        for (let i = 0; i < name.length; ++i) {
+            hash = ((hash << 5) - hash) + name.charCodeAt(i);
+            hash |= 0;
+        }
+
+        hash = Math.abs(hash);
+
+        const note = this.notes[hash % this.notes.length];
+        const type = this.types[(hash >> 4) % this.types.length];
+        const duration = 0.02 + ((hash >> 8) % 80) / 1000;
+        const startTime = ((hash >> 16) % 30) / 1000;
+
+        this.beep(note, startTime, duration, type);
+    }
 
     async toggleAudio() {
         this.audioEnabled = !this.audioEnabled;

@@ -168,10 +168,6 @@ export class Collector {
         return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
     }
 
-    toggleRandomSounds() {
-
-    }
-
     dummy() {
         this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), 0, 0));
         this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, 0, 0));
