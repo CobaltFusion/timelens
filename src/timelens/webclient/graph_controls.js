@@ -418,6 +418,9 @@ class Graph {
         this.graphWidthUs = 0;
         this.startPointUs = 0;
         this.mouseInside = false;
+        this.selectionStartX = null;
+        this.selectionEndX = null;
+        this.selecting = false;
 
         this.canvas.addEventListener("mouseenter", () => {
             this.mouseInside = true;
@@ -427,10 +430,38 @@ class Graph {
             this.mouseInside = false;
         });
 
+        this.canvas.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) {
+                return;
+            }
+
+            const rect = this.canvas.getBoundingClientRect();
+            this.selectionStartX = e.clientX - rect.left;
+            this.selectionEndX = this.selectionStartX;
+            this.selecting = true;
+        });
+
         this.canvas.addEventListener("mousemove", (e) => {
             const rect = this.canvas.getBoundingClientRect();
+
             this.mouseX = e.clientX - rect.left;
             this.mouseY = e.clientY - rect.top;
+
+            if (this.selecting) {
+                this.selectionEndX = this.mouseX;
+            }
+        });
+
+        this.canvas.addEventListener("mouseup", (e) => {
+            if (e.button !== 0) {
+                return;
+            }
+
+            if (this.selecting) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.selectionEndX = e.clientX - rect.left;
+                this.selecting = false;
+            }
         });
 
         document.addEventListener("keydown", (e) => {
@@ -567,14 +598,44 @@ class Graph {
         ctx.restore();
     }
 
+    drawSelection(ctx) {
+        if (this.selectionStartX === null || this.selectionEndX === null) {
+            return;
+        }
+
+        const x1 = Math.min(this.selectionStartX, this.selectionEndX);
+        const x2 = Math.max(this.selectionStartX, this.selectionEndX);
+
+        if (x1 === x2) {
+            return;
+        }
+
+        ctx.save();
+
+        ctx.fillStyle = "rgba(100, 255, 160, 0.20)";
+        ctx.fillRect(x1, 0, x2 - x1, this.graphHeightPx);
+
+        ctx.strokeStyle = "rgba(100, 255, 160, 0.8)";
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(x1 + 0.5, 0);
+        ctx.lineTo(x1 + 0.5, this.graphHeightPx);
+        ctx.moveTo(x2 + 0.5, 0);
+        ctx.lineTo(x2 + 0.5, this.graphHeightPx);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
     render() {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
 
         this.renderGraph(ctx);
+        this.drawSelection(ctx);
         this.drawCursor(ctx);
     }
-
 
     renderGraph(ctx) {
 
