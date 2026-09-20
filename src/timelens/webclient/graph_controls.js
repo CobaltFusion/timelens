@@ -1,5 +1,7 @@
 //import { EventType } from "./collector.js";
 
+let debugInfo = false;
+
 /**
  * A container that wraps a component and provides resize and close behavior.
  * It can be styled in the css.
@@ -389,7 +391,12 @@ class BarStack {
             this.ctx.fillRect(x1, y, width, line.height);
         }
 
-        this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+        if (debugInfo) {
+            this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+        }
+        else {
+            this.drawTextOnBar(`${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+        }
 
         if (isHovered) {
             this.hover = { name: hover, duration: durationMs };
@@ -416,6 +423,17 @@ class Graph {
             this.mouseX = e.clientX - rect.left;
             this.mouseY = e.clientY - rect.top;
         });
+
+        document.addEventListener("keydown", (e) => {
+            this.keyHandler(e);
+        });
+    }
+
+    keyHandler(e) {
+        const key = e.key;
+        if (key === "d") {
+            debugInfo = !debugInfo;
+        }
     }
 
     element() {
