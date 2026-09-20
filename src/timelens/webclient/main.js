@@ -1,5 +1,5 @@
 import { Collector } from "./collector.js";
-import { EventType, getAudioAlerts } from "./globals.js";
+import { EventType, getAudioAlerts, getSettings } from "./globals.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph_controls.js";
@@ -36,10 +36,17 @@ class Main {
                 if (containsIgnoreCase(event.name, "error")) {
                     console.log("Error beeping");
                     getAudioAlerts().beep(1300, 0, 0.03, "square");
+                    return;
                 }
                 if (containsIgnoreCase(event.name, "message")) {
                     console.log("Message beeping");
                     getAudioAlerts().beep(800, 0, 0.05);
+                    return;
+                }
+
+                if (getSettings().isRandomSoundsEnabled()) {
+                    getAudioAlerts().playPseudoRandomSound(event.name)
+                    return
                 }
             }
         };

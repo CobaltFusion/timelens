@@ -1,6 +1,6 @@
 import { assert } from "./assertions.js";
 import { EventType } from "./globals.js";
-import { getDebuggingEnabled } from "./globals.js";
+import { getSettings } from "./globals.js";
 
 class Line {
     constructor(y) {
@@ -263,7 +263,7 @@ export class BarStack {
             this.ctx.fillRect(x1, y, width, line.height);
         }
 
-        if (getDebuggingEnabled()) {
+        if (getSettings().isDebuggingEnabled()) {
             this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
         }
         else {

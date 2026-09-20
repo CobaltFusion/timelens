@@ -1,20 +1,41 @@
 import { AudioAlerts } from "./audioalerts.js";
 
-let debugInfo = false;
-let audioAlerts = new AudioAlerts();
+export class Settings {
+    constructor() {
+        this.debugging = false;
+        this.randomSoundsEnabled = false;
+    }
 
-export function getDebuggingEnabled() {
-    return debugInfo;
+    isDebuggingEnabled() {
+        return this.debugging;
+    }
+
+    setDebuggingEnabled(value) {
+        this.debugging = value;
+    }
+
+    toggleDebuggingEnabled() {
+        this.debugging = !this.debugging;
+    }
+
+    isRandomSoundsEnabled() {
+        return this.randomSoundsEnabled;
+    }
+
+    setRandomSoundsEnabled(value) {
+        this.randomSoundsEnabled = value;
+    }
+    toggleRandomSoundsEnabled() {
+        this.randomSoundsEnabled = !this.randomSoundsEnabled;
+    }
 }
 
-export function setDebuggingEnabled(value) {
-    debugInfo = value;
+const settings = new Settings()
+export function getSettings() {
+    return settings;
 }
 
-export function toggleDebuggingEnabled() {
-    debugInfo = !debugInfo;
-}
-
+const audioAlerts = new AudioAlerts();
 export function getAudioAlerts() {
     return audioAlerts;
 }

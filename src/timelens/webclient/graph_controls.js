@@ -1,5 +1,5 @@
 import { EventType, getAudioAlerts } from "./globals.js";
-import { toggleDebuggingEnabled } from "./globals.js";
+import { getSettings } from "./globals.js";
 import { BarStack } from "./barstack.js";
 
 function containsIgnoreCaseWildcard(text, search) {
@@ -111,10 +111,10 @@ export class Graph {
     keyHandler(e) {
         const key = e.key;
         if (key === "d") {
-            toggleDebuggingEnabled();
+            getSettings().toggleDebuggingEnabled();
         }
         if (key === "r") {
-            this.collector.toggleRandomSounds();
+            getSettings().toggleRandomSoundsEnabled();
         }
         if (key === "b") {
             getAudioAlerts().alertBeep();
