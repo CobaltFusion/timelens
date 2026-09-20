@@ -1,4 +1,4 @@
-import { EventType } from "./globals.js";
+import { EventType, getAudioAlerts } from "./globals.js";
 import { toggleDebuggingEnabled } from "./globals.js";
 import { BarStack } from "./barstack.js";
 
@@ -112,6 +112,12 @@ export class Graph {
         const key = e.key;
         if (key === "d") {
             toggleDebuggingEnabled();
+        }
+        if (key === "r") {
+            this.collector.toggleRandomSounds();
+        }
+        if (key === "b") {
+            getAudioAlerts().alertBeep();
         }
     }
 
