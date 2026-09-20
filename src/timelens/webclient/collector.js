@@ -2,19 +2,17 @@ import { EventType } from "./globals.js";
 
 /**
  * @param {string} name
- * @param {string} type
+ * @param {EventTypeValue} type
  * @param {number} timestamp
  * @param {number} groupId
  * @param {number} value
  * @returns {TSEvent}
  */
 function makeEvent(name, type, timestamp, groupId, value, count) {
-    //console.log("make: %s, type: %s, ts: %s ", name, type, timestamp);
-
     return {
         name: name,
         type: type,
-        timestamp: timestamp,     // microseconds (us)
+        timestamp: timestamp,     // microseconds (µs)
         groupId: groupId,
         value: value,
         count: count
@@ -28,7 +26,7 @@ function makeEvent(name, type, timestamp, groupId, value, count) {
  * fields:
  *   name, cat, ph, pid, tid, ts
  *
- * All timestamps (`ts` and `te`) are in microseconds (�s).
+ * All timestamps (`ts` and `te`) are in microseconds (µs).
  * They represent time elapsed since the start of the source process.
  *
  * For complete events:
@@ -44,7 +42,6 @@ function makeEvent(name, type, timestamp, groupId, value, count) {
  */
 export class Collector {
     constructor() {
-        /** @type {TSEvent[]} */
         this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
         this.running = true;
         this.audioEnabled = false;
@@ -169,6 +166,10 @@ export class Collector {
     estimateNowUs() {
         const nowUs = performance.now() * 1000;
         return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
+    }
+
+    toggleRandomSounds() {
+
     }
 
     dummy() {

@@ -48,7 +48,7 @@ function getColor(name) {
 
     c = Math.abs(c);
     const hue = (c * 137.508) % 360;
-    return `hsl(${hue}, 70%, 65%)`;
+    return `hsl(${hue}, 80%, 65%)`;
 }
 
 export class BarStack {

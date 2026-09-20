@@ -1,4 +1,7 @@
+import { AudioAlerts } from "./audioalerts.js";
+
 let debugInfo = false;
+let audioAlerts = new AudioAlerts();
 
 export function getDebuggingEnabled() {
     return debugInfo;
@@ -10,6 +13,10 @@ export function setDebuggingEnabled(value) {
 
 export function toggleDebuggingEnabled() {
     debugInfo = !debugInfo;
+}
+
+export function getAudioAlerts() {
+    return audioAlerts;
 }
 
 /**

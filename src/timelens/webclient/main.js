@@ -1,6 +1,5 @@
 import { Collector } from "./collector.js";
-import { EventType } from "./globals.js";
-import { AudioAlerts } from "./audioalerts.js";
+import { EventType, getAudioAlerts } from "./globals.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph_controls.js";
@@ -19,7 +18,6 @@ class Main {
         this.widgets = new Set();
         this.collector = new Collector();
         this.connectionStatus = null;
-        this.audioAlerts = new AudioAlerts();
     }
 
     init() {
@@ -37,11 +35,11 @@ class Main {
             if (event.type === EventType.OPEN) {
                 if (containsIgnoreCase(event.name, "error")) {
                     console.log("Error beeping");
-                    this.audioAlerts.beep(1300, 0, 0.03, "square");
+                    getAudioAlerts().beep(1300, 0, 0.03, "square");
                 }
                 if (containsIgnoreCase(event.name, "message")) {
                     console.log("Message beeping");
-                    this.audioAlerts.beep(800, 0, 0.05);
+                    getAudioAlerts().beep(800, 0, 0.05);
                 }
             }
         };
@@ -144,26 +142,17 @@ class Main {
         resetButton.addEventListener("click", () => this.collector.reset());
         controls.appendChild(resetButton);
 
-        const dummyButton = document.createElement("button");
-        dummyButton.classList.add("control-button");
-        dummyButton.textContent = "Add dummy data";
-        dummyButton.addEventListener("click", () => {
-            this.collector.dummy();
-            this.audioAlerts.beep(1300, 0.0, 0.05, "square");
-        });
-        controls.appendChild(dummyButton);
-
         const audioButton = document.createElement("button");
         audioButton.classList.add("control-button");
 
         const updateAudioButton = async () => {
-            const audioEnabled = await this.audioAlerts.isAudioEnabled();
+            const audioEnabled = await getAudioAlerts().isAudioEnabled();
             audioButton.textContent =
                 audioEnabled ? "Audio (On) " : "Audio (Muted)";
         };
 
         audioButton.addEventListener("click", async () => {
-            await this.audioAlerts.toggleAudio();
+            await getAudioAlerts().toggleAudio();
             await updateAudioButton();
         });
 

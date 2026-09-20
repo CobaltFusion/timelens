@@ -17,6 +17,10 @@ export class AudioAlerts {
         ];
     }
 
+    alertBeep() {
+        this.beep(1300, 0.0, 0.05, "square");
+    }
+
     beep(frequency, startTime, duration, type = "sine") {
         const osc = this.audio.createOscillator();
         const gain = this.audio.createGain();
