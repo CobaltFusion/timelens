@@ -18,17 +18,14 @@ class Main {
         this.widgets = new Set();
         this.collector = new Collector();
         this.connectionStatus = null;
-        this.controls = document.createElement("div");
-        this.controls.classList.add("control-panel");
     }
 
     init() {
-        this.addControls();
         this.addScope();
 
         this.collector.onConnectionLost = () => {
             console.error("Collector connection was closed");
-            this.setConnectionStatus(false)
+            this.setConnectionStatus(false);
         };
 
         this.collector.onIncomingEvent = (event) => {
@@ -47,8 +44,8 @@ class Main {
                 }
 
                 if (getSettings().isRandomSoundsEnabled()) {
-                    getAudioAlerts().playPseudoRandomSound(event.name)
-                    return
+                    getAudioAlerts().playPseudoRandomSound(event.name);
+                    return;
                 }
             }
         };
@@ -79,7 +76,7 @@ class Main {
 
         render();
 
-        //setInterval(render, 500);
+        // setInterval(render, 500);
     }
 
     setConnectionStatus(connected) {
@@ -87,7 +84,7 @@ class Main {
         this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
     }
 
-    addEdgeControlButton() {
+    addEdgeControlButton(controls) {
         const edgeButton = document.createElement("button");
         edgeButton.classList.add("control-button");
         edgeButton.setAttribute("aria-label", "Edge mode");
@@ -165,11 +162,11 @@ class Main {
             updateEdgeButton();
         });
 
-        this.controls.appendChild(edgeButton);
+        controls.appendChild(edgeButton);
         updateEdgeButton();
     }
 
-    addControls() {
+    addControls(controls) {
         const triggerWordLabel = document.createElement("label");
         triggerWordLabel.textContent = "Trigger word: ";
         triggerWordLabel.htmlFor = "id_trigger_word";
@@ -186,16 +183,16 @@ class Main {
         });
 
         triggerWordLabel.appendChild(triggerWordInput);
-        this.controls.appendChild(triggerWordLabel);
+        controls.appendChild(triggerWordLabel);
 
-        //this.addEdgeControlButton()
+        // this.addEdgeControlButton(controls);
 
         const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";
-        this.controls.appendChild(preTriggerLabel);
+        controls.appendChild(preTriggerLabel);
 
         new NumericControl({
-            parent: this.controls,
+            parent: controls,
             value: this.collector.getPreTriggerMs(),
             step: 10,
             inputStep: 1,
@@ -207,10 +204,10 @@ class Main {
 
         const graphWidthLabel = document.createElement("label");
         graphWidthLabel.textContent = "View:";
-        this.controls.appendChild(graphWidthLabel);
+        controls.appendChild(graphWidthLabel);
 
         new NumericControl({
-            parent: this.controls,
+            parent: controls,
             value: this.collector.getGraphWidthMs(),
             step: 10,
             inputStep: 1,
@@ -225,14 +222,14 @@ class Main {
         addButton.textContent = "Add Graph";
         addButton.classList.add("control-button");
         addButton.addEventListener("click", () => this.addScope());
-        this.controls.appendChild(addButton);
+        controls.appendChild(addButton);
 
         const resetButton = document.createElement("button");
         resetButton.classList.add("control-button");
         resetButton.textContent = "Reset";
         resetButton.title = "Replay the last 10 minutes of recorded data";
         resetButton.addEventListener("click", () => this.collector.reset());
-        this.controls.appendChild(resetButton);
+        controls.appendChild(resetButton);
 
         const audioButton = document.createElement("button");
         audioButton.id = "id_audio_button";
@@ -263,14 +260,15 @@ class Main {
             await updateAudioButton();
         });
 
-        this.controls.appendChild(audioButton);
+        controls.appendChild(audioButton);
         updateAudioButton();
 
         const connectionStatus = document.createElement("button");
         connectionStatus.classList.add("connection-status", "control-button");
         connectionStatus.id = "id_connection_status";
 
-        this.controls.appendChild(connectionStatus);
+        controls.appendChild(connectionStatus);
+
         this.connectionStatus = connectionStatus;
         this.setConnectionStatus(true);
     }
@@ -278,6 +276,11 @@ class Main {
     addScope() {
         const graphPanel = document.getElementById("id_graph_panel");
         const graph = new Graph(this.collector);
+
+        const controls = document.createElement("div");
+        controls.classList.add("control-panel");
+
+        this.addControls(controls);
 
         const widget = new ResizableContainer({
             parent: graphPanel,
@@ -287,7 +290,7 @@ class Main {
             }
         });
 
-        widget.prepend(this.controls);
+        widget.prepend(controls);
         this.widgets.add(widget);
     }
 }
