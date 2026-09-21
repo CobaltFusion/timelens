@@ -70,7 +70,7 @@ body {
     transform: translateY(-1px);
 }
 
-#id_control_panel {
+.control-panel {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -84,8 +84,19 @@ body {
     backdrop-filter: blur(14px);
 }
 
-#id_control_panel label { display: flex; align-items: center; gap: .5rem; margin-right: .3rem; color: var(--muted); font-size: .78rem; }
-button, input { color: inherit; font: inherit; }
+.control-panel label {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-right: .3rem;
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+button, input {
+    color: inherit;
+    font: inherit;
+}
 
 .control-button {
     min-height: 2.2rem;
@@ -100,8 +111,16 @@ button, input { color: inherit; font: inherit; }
     transition: border-color .16s, box-shadow .16s, transform .16s;
 }
 
-.control-button:hover { border-color: var(--accent); box-shadow: 0 0 0 .18rem var(--accent-glow); color: #fff; transform: translateY(-1px); }
-.control-button:active { transform: translateY(0); }
+.control-button:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 .18rem var(--accent-glow);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.control-button:active {
+    transform: translateY(0);
+}
 
 .control-input {
     min-width: 12rem;
@@ -120,7 +139,7 @@ button, input { color: inherit; font: inherit; }
     outline: none;
 }
 
-#id_control_panel .numeric-control-input {
+.control-panel .numeric-control-input {
     width: 4rem;
     min-width: 4rem;
     margin: 0 .25rem;
@@ -128,7 +147,11 @@ button, input { color: inherit; font: inherit; }
     text-align: center;
 }
 
-#id_graph_panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+#id_graph_panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
 
 #id_graph_panel > div {
     width: 100%;
@@ -161,9 +184,18 @@ button, input { color: inherit; font: inherit; }
 }
 
 @media (max-width: 600px) {
-    body { padding: 1rem; }
-    #id_control_panel label { width: 100%; }
-    input { flex: 1; min-width: 0; }
+    body {
+        padding: 1rem;
+    }
+
+    .control-panel label {
+        width: 100%;
+    }
+
+    input {
+        flex: 1;
+        min-width: 0;
+    }
 }
 
 #id_connection_status.connected {
@@ -184,7 +216,7 @@ button, input { color: inherit; font: inherit; }
     stroke-width: 2;
 }
 
-#id_control_panel .control-button svg {
+.control-panel .control-button svg {
     width: 28px;
     height: 24px;
     display: block;
