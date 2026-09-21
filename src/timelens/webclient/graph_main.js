@@ -18,7 +18,8 @@ class Main {
         this.widgets = new Set();
         this.collector = new Collector();
         this.connectionStatus = null;
-        this.controls = document.getElementById("id_control_panel");
+        this.controls = document.createElement("div");
+        this.controls.classList.add("control-panel");
     }
 
     init() {
@@ -286,6 +287,7 @@ class Main {
             }
         });
 
+        widget.prepend(this.controls);
         this.widgets.add(widget);
     }
 }
