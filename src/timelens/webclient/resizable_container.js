@@ -1,4 +1,3 @@
-
 /**
  * A container that wraps a component and provides resize and close behavior.
  * It can be styled in the css.
@@ -8,6 +7,7 @@ export class ResizableContainer {
         this.parent = parent;
         this.component = component;
         this.onClose = onClose;
+        this.prependedElements = []
 
         if (!(this.parent instanceof HTMLElement)) {
             throw new TypeError("parent must be an HTMLElement");
@@ -73,13 +73,20 @@ export class ResizableContainer {
         this.resize();
     }
 
+    prepend(element) {
+        this.prependedElements.push(element);
+        this.container.prepend(element);
+    }
+
     resize() {
         const styles = window.getComputedStyle(this.container);
+
         const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
         const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
-        const width = Math.max(0, this.container.clientWidth - horizontalPadding);
-        const height = Math.max(0, this.container.clientHeight - verticalPadding);
+        const preAddedHeight = this.prependedElements.reduce((height, element) => height + element.offsetHeight, 0);
 
+        const width = Math.max(0, this.container.clientWidth - horizontalPadding);
+        const height = Math.max(0, this.container.clientHeight - verticalPadding - preAddedHeight);
         this.component.resize(width, height);
     }
 }
@@ -91,3 +98,4 @@ function isComponent(obj) {
         typeof obj.mount === "function" &&
         typeof obj.resize === "function";
 }
+
