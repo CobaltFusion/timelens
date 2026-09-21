@@ -58,6 +58,9 @@ export class Graph {
         this.selectionStartX = null;
         this.selectionEndX = null;
         this.selecting = false;
+        this.triggerWord = "";
+        this.graphWidthMs = 1000;
+        this.preTriggerMs = -10;
 
         this.canvas.addEventListener("mouseenter", () => {
             this.mouseInside = true;
@@ -327,6 +330,35 @@ export class Graph {
         return (x2 - x1) * this.graphWidthUs / this.graphWidthPx;
     }
 
+    setTriggerWord(triggerWord) {
+        this.triggerWord = String(triggerWord);
+    }
+
+    getTriggerWord() {
+        return this.triggerWord;
+    }
+
+    setgraphWidthMs(milliseconds) {
+        const value = Number(milliseconds);
+
+        if (Number.isFinite(value) && value > 0) {
+            this.graphWidthMs = value;
+        }
+    }
+
+    getGraphWidthMs() {
+        return this.graphWidthMs;
+    }
+
+    setPreTrigger(milliseconds) {
+        this.preTriggerMs = milliseconds;
+    }
+
+    getPreTriggerMs() {
+        return this.preTriggerMs;
+    }
+
+
     render() {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
@@ -343,8 +375,8 @@ export class Graph {
         this.graphHeightPx = this.canvas.height / dpr;
         ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
 
-        const graphWidthMs = this.collector.getGraphWidthMs();
-        const preTriggerMs = this.collector.getPreTriggerMs();
+        const graphWidthMs = this.getGraphWidthMs();
+        const preTriggerMs = this.getPreTriggerMs();
 
         // preTriggerMs < 0 will add to the width, while >= 0 will not affect the width
         const extraWidth = Math.max(preTriggerMs * -1, 0);
@@ -358,7 +390,7 @@ export class Graph {
             return;
         }
 
-        const triggerWord = this.collector.getTriggerWord();
+        const triggerWord = this.getTriggerWord();
         if (triggerWord) {
             const triggerIndex = this.findTriggerIndex(data, triggerWord);
             if (triggerIndex === undefined) {
