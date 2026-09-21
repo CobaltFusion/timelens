@@ -225,7 +225,7 @@ class Main {
         updateEdgeButton();
     }
 
-    addControls(controls) {
+    addControls(controls, graph) {
         const triggerWordLabel = document.createElement("label");
         triggerWordLabel.textContent = "Trigger word: ";
         triggerWordLabel.htmlFor = "id_trigger_word";
@@ -233,12 +233,12 @@ class Main {
         const triggerWordInput = document.createElement("input");
         triggerWordInput.id = "id_trigger_word";
         triggerWordInput.type = "text";
-        triggerWordInput.value = this.collector.getTriggerWord();
+        triggerWordInput.value = graph.getTriggerWord();
         triggerWordInput.classList.add("control-input");
         triggerWordInput.classList.add("numeric-control-input");
 
         triggerWordInput.addEventListener("input", () => {
-            this.collector.setTriggerWord(triggerWordInput.value);
+            graph.setTriggerWord(triggerWordInput.value);
         });
 
         triggerWordLabel.appendChild(triggerWordInput);
@@ -252,13 +252,13 @@ class Main {
 
         new NumericControl({
             parent: controls,
-            value: this.collector.getPreTriggerMs(),
+            value: graph.getPreTriggerMs(),
             step: 10,
             inputStep: 1,
             min: -Infinity,
             max: -0,
             unit: "ms",
-            onChange: (value) => this.collector.setPreTrigger(value)
+            onChange: (value) => graph.setPreTrigger(value)
         });
 
         const graphWidthLabel = document.createElement("label");
@@ -267,13 +267,13 @@ class Main {
 
         new NumericControl({
             parent: controls,
-            value: this.collector.getGraphWidthMs(),
+            value: graph.getGraphWidthMs(),
             step: 10,
             inputStep: 1,
             min: 0.001,
             unit: "ms",
             onChange: (value) => {
-                this.collector.setgraphWidthMs(value);
+                graph.setgraphWidthMs(value);
             }
         });
     }
@@ -285,7 +285,7 @@ class Main {
         const controls = document.createElement("div");
         controls.classList.add("control-panel");
 
-        this.addControls(controls);
+        this.addControls(controls, graph);
 
         const widget = new ResizableContainer({
             parent: graphPanel,

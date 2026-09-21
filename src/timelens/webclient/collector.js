@@ -46,9 +46,6 @@ export class Collector {
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
-        this.triggerWord = "";
-        this.graphWidthMs = 1000;
-        this.preTriggerMs = -10;
         this.lastTimepointUs = 0;
         this.lastSteadyTimepointUs = 0;
         this.onConnectionLost = null;
@@ -95,34 +92,6 @@ export class Collector {
 
     data() {
         return this.incoming; // returns a reference, not a copy
-    }
-
-    setTriggerWord(triggerWord) {
-        this.triggerWord = String(triggerWord);
-    }
-
-    getTriggerWord() {
-        return this.triggerWord;
-    }
-
-    setgraphWidthMs(milliseconds) {
-        const value = Number(milliseconds);
-
-        if (Number.isFinite(value) && value > 0) {
-            this.graphWidthMs = value;
-        }
-    }
-
-    getGraphWidthMs() {
-        return this.graphWidthMs;
-    }
-
-    setPreTrigger(milliseconds) {
-        this.preTriggerMs = milliseconds;
-    }
-
-    getPreTriggerMs() {
-        return this.preTriggerMs;
     }
 
     getLastTimepointUs() {
