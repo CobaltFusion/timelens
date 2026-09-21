@@ -276,6 +276,51 @@ class Main {
                 graph.setgraphWidthMs(value);
             }
         });
+
+        const clearButton = document.createElement("button");
+        clearButton.textContent = "CLEAR";
+        clearButton.classList.add("control-button");
+        clearButton.addEventListener("click", () => {
+            graph.clear();
+        });
+        controls.appendChild(clearButton);
+
+        const autoButton = document.createElement("button");
+        autoButton.textContent = "AUTO";
+        autoButton.classList.add("control-button");
+        autoButton.addEventListener("click", () => {
+            graph.auto();
+        });
+        controls.appendChild(autoButton);
+
+        const stopRunButton = document.createElement("button");
+        stopRunButton.classList.add("control-button", "stop-run-button");
+
+        const stopSpan = document.createElement("span");
+        stopSpan.textContent = "STOP";
+
+        const divider = document.createElement("span");
+        divider.classList.add("stop-run-divider");
+
+        const runSpan = document.createElement("span");
+        runSpan.textContent = "RUN";
+
+        stopRunButton.append(stopSpan, divider, runSpan);
+
+        stopRunButton.addEventListener("click", () => {
+            stopRunButton.classList.toggle("running");
+            graph.toggleRunning();
+        });
+
+        controls.appendChild(stopRunButton);
+
+        const singleButton = document.createElement("button");
+        singleButton.textContent = "SINGLE";
+        singleButton.classList.add("control-button");
+        singleButton.addEventListener("click", () => {
+            graph.single();
+        });
+        controls.appendChild(singleButton);
     }
 
     addScope() {
