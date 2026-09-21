@@ -17,23 +17,68 @@ class Main {
     constructor() {
         this.widgets = new Set();
         this.collector = new Collector();
-        this.connectionStatus = document.createElement("button");
-
-        this.connectionStatus.classList.add("connection-status", "control-button");
-        this.setConnectionStatus(true);
 
         const topPanel = document.getElementById("id_top_panel");
-        topPanel.appendChild(this.connectionStatus)
 
+        this.addButton = document.createElement("button");
+        this.addButton.textContent = "Add Graph";
+        this.addButton.classList.add("control-button");
+        this.addButton.addEventListener("click", () => this.addScope());
+        topPanel.appendChild(this.addButton);
+
+        this.resetButton = document.createElement("button");
+        this.resetButton.classList.add("control-button");
+        this.resetButton.textContent = "Reset";
+        this.resetButton.title = "Replay the last 10 minutes of recorded data";
+        this.resetButton.addEventListener("click", () => this.collector.reset());
+        topPanel.appendChild(this.resetButton);
+
+        this.audioButton = document.createElement("button");
+        this.audioButton.id = "id_audio_button";
+        this.audioButton.classList.add("audio-button", "control-button");
+        topPanel.appendChild(this.audioButton);
+
+        this.updateAudioButton();
+
+        this.connectionStatus = document.createElement("button");
+        this.connectionStatus.classList.add("connection-status", "control-button");
+        this.connectionStatus.id = "id_connection_status";
+        topPanel.appendChild(this.connectionStatus);
+
+        this.setConnectionStatus(true);
     }
 
-    setConnectionStatus(connected) {
-        this.connectionStatus.textContent = connected ? "Connected" : "Disconnected";
-        this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
+    async updateAudioButton() {
+        const audioEnabled = await getAudioAlerts().isAudioEnabled();
+
+        // custom drawn Speaker/Muted icon
+        this.audioButton.innerHTML = audioEnabled
+            ? `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
+                    <path d="M16 8.5a5 5 0 0 1 0 7"/>
+                    <path d="M19 5.5a9 9 0 0 1 0 13"/>
+                </svg>`
+            : `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
+                    <path d="M16 9l5 6"/>
+                    <path d="M21 9l-5 6"/>
+                </svg>`;
+
+        this.audioButton.setAttribute(
+            "aria-label",
+            audioEnabled ? "Mute audio" : "Enable audio"
+        );
     }
 
     init() {
         this.addScope();
+
+        this.audioButton.addEventListener("click", async () => {
+            await getAudioAlerts().toggleAudio();
+            await this.updateAudioButton();
+        });
 
         this.collector.onConnectionLost = () => {
             console.error("Collector connection was closed");
@@ -41,7 +86,6 @@ class Main {
         };
 
         this.collector.onIncomingEvent = (event) => {
-
             // beeping
             if (event.type === EventType.OPEN) {
                 if (containsIgnoreCase(event.name, "error")) {
@@ -49,6 +93,7 @@ class Main {
                     getAudioAlerts().beep(1300, 0, 0.03, "square");
                     return;
                 }
+
                 if (containsIgnoreCase(event.name, "message")) {
                     console.log("Message beeping");
                     getAudioAlerts().beep(800, 0, 0.05);
@@ -91,6 +136,13 @@ class Main {
         // setInterval(render, 500);
     }
 
+    setConnectionStatus(connected) {
+        this.connectionStatus.textContent = connected ? "Connected" : "Disconnected";
+        this.connectionStatus.style.background = connected
+            ? "var(--status-connected)"
+            : "var(--status-disconnected)";
+    }
+
     addEdgeControlButton(controls) {
         const edgeButton = document.createElement("button");
         edgeButton.classList.add("control-button");
@@ -101,55 +153,55 @@ class Main {
                 value: "rising",
                 label: "Rising edge",
                 icon: `
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2 17 H8 V7 H22"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"/>
-                <path d="M6 10 L8 7 L10 10"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"/>
-            </svg>
-        `
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 17 H8 V7 H22"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                        <path d="M6 10 L8 7 L10 10"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                    </svg>
+                `
             },
             {
                 value: "falling",
                 label: "Falling edge",
                 icon: `
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2 7 H8 V17 H22"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"/>
-                <path d="M6 14 L8 17 L10 14"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"/>
-            </svg>
-        `
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 7 H8 V17 H22"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                        <path d="M6 14 L8 17 L10 14"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                    </svg>
+                `
             },
             {
                 value: "duration",
                 label: "Pulse duration",
                 icon: `
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M2 17 H7 V7 H17 V17 H22"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"/>
-            </svg>
-        `
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 17 H7 V7 H17 V17 H22"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"/>
+                    </svg>
+                `
             }
         ];
 
@@ -224,52 +276,6 @@ class Main {
                 this.collector.setgraphWidthMs(value);
             }
         });
-
-        const addButton = document.createElement("button");
-        addButton.textContent = "Add Graph";
-        addButton.classList.add("control-button");
-        addButton.addEventListener("click", () => this.addScope());
-        controls.appendChild(addButton);
-
-        const resetButton = document.createElement("button");
-        resetButton.classList.add("control-button");
-        resetButton.textContent = "Reset";
-        resetButton.title = "Replay the last 10 minutes of recorded data";
-        resetButton.addEventListener("click", () => this.collector.reset());
-        controls.appendChild(resetButton);
-
-        const audioButton = document.createElement("button");
-        audioButton.id = "id_audio_button";
-        audioButton.classList.add("audio-button", "control-button");
-
-        const updateAudioButton = async () => {
-            const audioEnabled = await getAudioAlerts().isAudioEnabled();
-
-            // custom drawn Speaker/Muted icon
-            audioButton.innerHTML = audioEnabled
-                ? `
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
-                    <path d="M16 8.5a5 5 0 0 1 0 7"/>
-                    <path d="M19 5.5a9 9 0 0 1 0 13"/>
-                </svg>`
-                : `
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 9v6h4l5 4V5L7 9H3z"/>
-                    <path d="M16 9l5 6"/>
-                    <path d="M21 9l-5 6"/>
-                </svg>`;
-            audioButton.setAttribute("aria-label", audioEnabled ? "Mute audio" : "Enable audio");
-        };
-
-        audioButton.addEventListener("click", async () => {
-            await getAudioAlerts().toggleAudio();
-            await updateAudioButton();
-        });
-
-        controls.appendChild(audioButton);
-        updateAudioButton();
-
     }
 
     addScope() {
