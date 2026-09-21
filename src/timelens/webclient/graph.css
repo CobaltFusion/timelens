@@ -227,3 +227,22 @@ button, input {
     height: 24px;
     display: block;
 }
+
+.stop-run-button {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    color: #ff5577;
+}
+
+.stop-run-divider {
+    width: 1px;
+    height: 1.2em;
+    background: currentColor;
+    opacity: .5;
+}
+
+.stop-run-button.running {
+    color: #16ba6d;
+}
+
