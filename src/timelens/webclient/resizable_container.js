@@ -61,9 +61,6 @@ export class ResizableContainer {
             this.onClose();
         });
 
-        // reserve space for the close-button
-        this.container.style.paddingRight = this.closeButton.style.width;
-
         // Assemble
         this.container.appendChild(this.closeButton);
         this.component.mount(this.container);
@@ -83,7 +80,11 @@ export class ResizableContainer {
 
         const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
         const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
-        const preAddedHeight = this.prependedElements.reduce((height, element) => height + element.offsetHeight, 0);
+
+        const preAddedHeight = this.prependedElements.reduce((height, element) => {
+            const styles = window.getComputedStyle(element);
+            return height + element.offsetHeight + parseFloat(styles.marginTop) + parseFloat(styles.marginBottom);
+        }, 0);
 
         const width = Math.max(0, this.container.clientWidth - horizontalPadding);
         const height = Math.max(0, this.container.clientHeight - verticalPadding - preAddedHeight);
