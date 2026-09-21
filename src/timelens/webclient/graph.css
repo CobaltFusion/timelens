@@ -16,7 +16,7 @@
 body {
     min-height: 100vh;
     margin: 0;
-    padding: clamp(1rem, 3vw, 3rem);
+    padding: clamp(1rem, 3vw, 1rem);
     background: radial-gradient(circle at 12% 0%, rgba(42, 116, 184, .22), transparent 32rem),
         radial-gradient(circle at 95% 10%, rgba(24, 190, 157, .13), transparent 25rem), var(--background);
     color: var(--text);
@@ -26,9 +26,13 @@ body {
 }
 
 .top-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     position: relative;
     margin: 0 0 1.25rem;
     padding-left: 1rem;
+    gap: .65rem;
     color: var(--muted);
     font-size: .72rem;
     font-weight: 700;
@@ -36,7 +40,12 @@ body {
     text-transform: uppercase;
 }
 
-.top-panel::before {
+.top-panel > span {
+    position: relative;
+    padding-left: .75rem;
+}
+
+.top-panel > span::before {
     position: absolute;
     top: .1rem;
     bottom: .1rem;
@@ -49,9 +58,8 @@ body {
 
 .home-link {
     position: absolute;
-    top: -.5rem;
     right: 0;
-    padding: .45rem .7rem;
+    padding: .7rem;
     border: 1px solid rgba(119, 160, 218, .38);
     border-radius: .4rem;
     background: rgba(16, 27, 45, .85);
