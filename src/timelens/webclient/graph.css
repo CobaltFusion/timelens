@@ -25,7 +25,7 @@ body {
     scrollbar-gutter: stable;
 }
 
-.above-panel {
+.top-panel {
     position: relative;
     margin: 0 0 1.25rem;
     padding-left: 1rem;
@@ -36,7 +36,7 @@ body {
     text-transform: uppercase;
 }
 
-.above-panel::before {
+.top-panel::before {
     position: absolute;
     top: .1rem;
     bottom: .1rem;

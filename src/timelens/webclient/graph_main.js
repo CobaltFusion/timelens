@@ -17,7 +17,19 @@ class Main {
     constructor() {
         this.widgets = new Set();
         this.collector = new Collector();
-        this.connectionStatus = null;
+        this.connectionStatus = document.createElement("button");
+
+        this.connectionStatus.classList.add("connection-status", "control-button");
+        this.setConnectionStatus(true);
+
+        const topPanel = document.getElementById("id_top_panel");
+        topPanel.appendChild(this.connectionStatus)
+
+    }
+
+    setConnectionStatus(connected) {
+        this.connectionStatus.textContent = connected ? "Connected" : "Disconnected";
+        this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
     }
 
     init() {
@@ -77,11 +89,6 @@ class Main {
         render();
 
         // setInterval(render, 500);
-    }
-
-    setConnectionStatus(connected) {
-        this.connectionStatus.textContent = connected ? "Connected" : "Disconnected";
-        this.connectionStatus.style.background = connected ? "var(--status-connected)" : "var(--status-disconnected)";
     }
 
     addEdgeControlButton(controls) {
@@ -263,14 +270,6 @@ class Main {
         controls.appendChild(audioButton);
         updateAudioButton();
 
-        const connectionStatus = document.createElement("button");
-        connectionStatus.classList.add("connection-status", "control-button");
-        connectionStatus.id = "id_connection_status";
-
-        controls.appendChild(connectionStatus);
-
-        this.connectionStatus = connectionStatus;
-        this.setConnectionStatus(true);
     }
 
     addScope() {
