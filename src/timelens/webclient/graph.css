@@ -198,17 +198,17 @@ button, input {
     }
 }
 
-#id_connection_status.connected {
+.connection-status.connected {
     background: var(--status-connected);
     color: #fff;
 }
 
-#id_connection_status.disconnected {
+.connection-status.disconnected {
     background: var(--status-disconnected);
     color: #fff;
 }
 
-#id_audio_button svg {
+.audio-button svg {
     width: 18px;
     height: 18px;
     fill: currentColor;
