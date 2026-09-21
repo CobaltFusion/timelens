@@ -235,7 +235,7 @@ class Main {
 
         const audioButton = document.createElement("button");
         audioButton.id = "id_audio_button";
-        audioButton.classList.add("control-button");
+        audioButton.classList.add("audio-button", "control-button");
 
         const updateAudioButton = async () => {
             const audioEnabled = await getAudioAlerts().isAudioEnabled();
@@ -266,8 +266,9 @@ class Main {
         updateAudioButton();
 
         const connectionStatus = document.createElement("button");
-        connectionStatus.classList.add("control-button");
+        connectionStatus.classList.add("connection-status", "control-button");
         connectionStatus.id = "id_connection_status";
+
         this.controls.appendChild(connectionStatus);
         this.connectionStatus = connectionStatus;
         this.setConnectionStatus(true);
