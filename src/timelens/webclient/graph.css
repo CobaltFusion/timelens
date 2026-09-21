@@ -25,7 +25,7 @@ body {
     scrollbar-gutter: stable;
 }
 
-#id_above_panel {
+.above-panel {
     position: relative;
     margin: 0 0 1.25rem;
     padding-left: 1rem;
@@ -36,7 +36,7 @@ body {
     text-transform: uppercase;
 }
 
-#id_above_panel::before {
+.above-panel::before {
     position: absolute;
     top: .1rem;
     bottom: .1rem;
