@@ -230,19 +230,31 @@ button, input {
 
 .stop-run-button {
     display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    color: #ff5577;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    padding: .15rem .6rem;
+    font-size: .7rem;
+    line-height: .85;
 }
 
-.stop-run-divider {
-    width: 1px;
-    height: 1.2em;
-    background: currentColor;
-    opacity: .5;
+.stop-run-button {
+    --stop-run-color: #16ba6d;
+    color: var(--stop-run-color);
 }
 
 .stop-run-button.running {
-    color: #16ba6d;
+    --stop-run-color: #ff5577;
 }
 
+.stop-run-button:hover {
+    color: var(--stop-run-color);
+}
+
+.stop-run-divider {
+    width: 100%;
+    height: 1px;
+    margin: .15rem 0;
+    background: currentColor;
+    opacity: .6;
+}
