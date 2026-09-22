@@ -5,7 +5,7 @@ async function discoverServers() {
         const response = await fetch("/api/servers");
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status} `);
         }
 
         const data = await response.json();
@@ -16,58 +16,23 @@ async function discoverServers() {
             return;
         }
 
-        // Filter out duplicate detection of servers (including localhost).
-        // This happens for localhost if it has multiple interfaces and happens
-        // for other servers if multiple interfaces are connected to those servers
-        // (i.e. via an internal network and an external network).
         const localAddress = window.location.hostname;
-
-        console.log(data.servers);
-        console.log(`localAddress: ${localAddress}`);
-
-        // Group servers by instance_id.
         const grouped = new Map();
 
         for (const server of data.servers) {
-            const servers = grouped.get(server.instance_id) ?? [];
-            servers.push(server);
-            grouped.set(server.instance_id, servers);
+            const candidates = grouped.get(server.instance_id) ?? [];
+            candidates.push(server);
+            grouped.set(server.instance_id, candidates);
         }
-
-        // Select one server for each instance_id.
-        const servers = [];
 
         for (const candidates of grouped.values()) {
-            console.log(`candidates: ${candidates}`);
+            const server = selectServer(candidates, localAddress);
 
-            if (candidates.length === 1) {
-                servers.push(candidates[0]);
-                continue;
+            if (server) {
+                addServer(container, server);
+            } else {
+                retryServer(candidates[0].instance_id);
             }
-
-            const preferred = candidates.filter(server =>
-                isAddressInSubnet(localAddress, server.subnet)
-            );
-
-            servers.push(preferred[0] ?? candidates[0]);
-        }
-
-        for (const server of servers) {
-            const link = document.createElement("a");
-
-            console.log(`server: ${server}`);
-
-            link.className = "server";
-            link.href = `http://${server.address}:${server.port}/graph.html`;
-
-            link.innerHTML = `
-                <span class="name">${server.name}</span>
-                <span class="value">${server.address}:${server.port}</span>
-                <span class="value">${server.subnet}</span>
-                <span class="value">${server.instance_id}</span>
-            `;
-
-            container.appendChild(link);
         }
     } catch (error) {
         console.error(error);
@@ -75,12 +40,68 @@ async function discoverServers() {
 
         showMessage(
             container,
-            `Failed to discover servers: ${error.message}. Retrying in 5 seconds...`,
+            `Failed to discover servers: ${error.message}.Retrying in 5 seconds...`,
             true
         );
 
         setTimeout(discoverServers, 5000);
     }
+}
+
+function selectServer(candidates, localAddress) {
+    if (candidates.length === 1) {
+        return candidates[0];
+    }
+
+    return candidates.find(server =>
+        isAddressInSubnet(localAddress, server.subnet)
+    );
+}
+
+async function retryServer(instanceId) {
+    const container = document.getElementById("servers");
+
+    try {
+        const response = await fetch("/api/servers");
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status} `);
+        }
+
+        const data = await response.json();
+
+        const candidates = data.servers?.filter(
+            server => server.instance_id === instanceId
+        ) ?? [];
+
+        const server = selectServer(candidates, window.location.hostname);
+
+        if (!server) {
+            setTimeout(() => retryServer(instanceId), 1000);
+            return;
+        }
+
+        addServer(container, server);
+    } catch (error) {
+        console.error(error);
+        setTimeout(() => retryServer(instanceId), 5000);
+    }
+}
+
+function addServer(container, server) {
+    const link = document.createElement("a");
+
+    link.className = "server";
+    link.href = `http://${server.address}:${server.port}/graph.html`;
+
+    link.innerHTML = `
+        <span class="name">${server.name}</span>
+        <span class="value">${server.address}:${server.port}</span>
+        <span class="value">${server.subnet}</span>
+        <span class="value">${server.instance_id}</span>
+    `;
+
+    container.appendChild(link);
 }
 
 function isAddressInSubnet(address, subnet) {
