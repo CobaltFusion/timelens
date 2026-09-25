@@ -70,7 +70,30 @@ def add_event(counter: int, name: str, category: str, duration_ms: float, fixed:
     try:
         time.sleep(duration_ms / 1000.0)
     finally:
-        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + (int(duration_ms * 1000)), prefix=True)
+        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + int(duration_ms * 1000), prefix=True)
+
+
+def loop_event(counter: int) -> None:
+    """Write a 100 ms event every 1 second until interrupted."""
+    name = "error"
+    category = "loop"
+    duration_ms = 100
+    print("Sending a 100 ms 'loop' event every 1 second. Press Ctrl+C to stop.")
+    next_event = time.perf_counter()
+    try:
+        while True:
+            next_event += 1.0
+            ts = _timestamp_us()
+            write_event(counter, name, category, "B", tid=345, fixed=False, ts=ts, prefix=True)
+            time.sleep(duration_ms / 1000.0)
+            write_event(counter, name, category, "E", tid=345, fixed=False, ts=ts + duration_ms * 1000, prefix=True)
+            remaining = next_event - time.perf_counter()
+            if remaining > 0:
+                time.sleep(remaining)
+            else:
+                next_event = time.perf_counter()
+    except KeyboardInterrupt:
+        print("\nStopped.")
 
 
 @dataclass(frozen=True)
@@ -149,10 +172,17 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("-n", "--name", help="Name of the telemetry event.")
     mode.add_argument("-s", "--sequence", metavar="SEQUENCE_ID", help="Generate a predefined event sequence.")
+    mode.add_argument("-l", "--loop", action="store_true", help="Send a 100 ms event every 1 second until interrupted.")
     parser.add_argument("-c", "--category", help="Telemetry category.")
     parser.add_argument("-d", "--duration-ms", type=float, metavar="MILLISECONDS", help="Duration of the event in milliseconds.")
     args = parser.parse_args()
     counter = _next_counter()
+
+    if args.loop:
+        if args.category is not None or args.duration_ms is not None:
+            parser.error("-c/--category and -d/--duration-ms cannot be used with -l")
+        loop_event(counter)
+        return
 
     if args.sequence is not None:
         if args.category is not None or args.duration_ms is not None:

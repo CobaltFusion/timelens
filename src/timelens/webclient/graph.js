@@ -61,6 +61,8 @@ export class Graph {
         this.triggerWord = "";
         this.graphWidthMs = 1000;
         this.preTriggerMs = -10;
+        this.running = true; // while running we collect live data, while not running, we keep the buffer for analysis.
+        this.data = null;   // data is only used when running == false
 
         // timepoint from where we are requesting information
         // after 'clear()' this will be non-zero because even through there is information in the
@@ -351,6 +353,18 @@ export class Graph {
         this.render();
     }
 
+    toggleRunning() {
+        if (this.running) {
+            // take a deep copy of the current data buffer
+            this.data = this.collector.data().map(event => ({ ...event }));
+            this.running = false;
+        }
+        else {
+            this.running = true;
+            this.data = null
+        }
+    }
+
     render() {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
@@ -358,6 +372,15 @@ export class Graph {
         this.renderGraph(ctx);
         this.drawSelection(ctx);
         this.drawCursor(ctx);
+    }
+
+    getData() {
+        if (this.running) {
+            return this.collector.data();
+        }
+        else {
+            return this.data;
+        }
     }
 
     renderGraph(ctx) {
@@ -377,7 +400,7 @@ export class Graph {
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
 
-        const data = this.collector.data().filter(
+        const data = this.getData().filter(
             message => message.timestamp >= this.RequestStartPointUs
         );
 
