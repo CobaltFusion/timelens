@@ -239,17 +239,13 @@ export class BarStack {
 
         const durationMs = (event.end_time - event.timestamp) / 1000;
         const x1 = Math.round((event.timestamp - this.startPointUs) * this.scale);
-        const x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
-        const width = x2 - x1;
-
-        const isHovered =
-            this.mouseX >= x1 &&
-            this.mouseX <= x2 &&
-            this.mouseY >= y &&
-            this.mouseY <= y + line.height;
+        let x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
+        let width = x2 - x1;
 
         const color = getColor(event.name);
         if (event.type === EventType.OPEN) {
+            x2 = Math.round((this.endPointUs - this.startPointUs) * this.scale);
+            width = x2 - x1;
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
             gradient.addColorStop(0, color);
             gradient.addColorStop(0.75, color);
@@ -269,6 +265,12 @@ export class BarStack {
         else {
             this.drawTextOnBar(`${event.name} of ${durationMs} ms`, x1, width, y, line.height);
         }
+
+        const isHovered =
+            this.mouseX >= x1 &&
+            this.mouseX <= x2 &&
+            this.mouseY >= y &&
+            this.mouseY <= y + line.height;
 
         if (isHovered) {
             this.hover = { name: hover, duration: durationMs };

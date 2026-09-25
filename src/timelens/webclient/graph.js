@@ -384,7 +384,6 @@ export class Graph {
         if (data.length === 0) {
             return;
         }
-        this.RequestStartPointUs
 
         const triggerWord = this.getTriggerWord();
         if (triggerWord) {
@@ -395,7 +394,6 @@ export class Graph {
             }
             this.startPointUs = data[triggerIndex].timestamp - this.zeroShiftUs // new startpoint
         }
-        const startIndex = this.findStartIndex(data, this.startPointUs);
         const estimatedNow = this.collector.estimateNowUs();
         const maxEnd = this.startPointUs + this.graphWidthUs;
         const endPointUs = Math.min(estimatedNow, maxEnd);
@@ -409,6 +407,7 @@ export class Graph {
             endPointUs
         );
 
+        const startIndex = this.findStartIndex(data, this.startPointUs);
         for (let i = startIndex; i < data.length; ++i) {
             const event = data[i];
             const line = bars.getLine(event.groupId);
