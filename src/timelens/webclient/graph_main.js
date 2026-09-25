@@ -46,6 +46,23 @@ class Main {
         topPanel.appendChild(this.connectionStatus);
 
         this.setConnectionStatus(true);
+
+        document.addEventListener("keydown", (e) => {
+            this.keyHandler(e);
+        });
+    }
+
+    keyHandler(e) {
+        const key = e.key;
+        if (key === "d") {
+            getSettings().toggleDebuggingEnabled();
+        }
+        if (key === "r") {
+            getSettings().toggleRandomSoundsEnabled();
+        }
+        if (key === "b") {
+            getAudioAlerts().alertBeep();
+        }
     }
 
     async updateAudioButton() {
