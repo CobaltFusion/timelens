@@ -26,13 +26,20 @@ async function discoverServers() {
         }
 
         for (const candidates of grouped.values()) {
-            const server = selectServer(candidates, localAddress);
-
-            if (server) {
-                addServer(container, server);
-            } else {
+            if (candidates.length < 1) {
                 retryServer(candidates[0].instance_id);
+                continue;
             }
+
+            const server = selectServer(candidates, localAddress);
+            if (server === undefined) {
+                for (const candidate of candidates) {
+                    console.log(candidate);
+                    addServer(container, candidate);
+                }
+                continue;
+            }
+            addServer(container, server);
         }
     } catch (error) {
         console.error(error);
@@ -74,13 +81,18 @@ async function retryServer(instanceId) {
             server => server.instance_id === instanceId
         ) ?? [];
 
-        const server = selectServer(candidates, window.location.hostname);
-
-        if (!server) {
+        if (candidates.length < 1) {
             setTimeout(() => retryServer(instanceId), 1000);
             return;
         }
 
+        const server = selectServer(candidates, window.location.hostname);
+        if (server === undefined) {
+            for (const candidate of candidates) {
+                addServer(container, candidate);
+            }
+            return;
+        }
         addServer(container, server);
     } catch (error) {
         console.error(error);
