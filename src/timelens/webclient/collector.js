@@ -46,7 +46,7 @@ export class Collector {
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
-        this.lastTimepointUs = 0;
+        this.lastTimepointUs = 0; // timepoint from the last received message
         this.lastSteadyTimepointUs = 0;
         this.onConnectionLost = null;
         this.onIncomingEvent = null;
