@@ -43,12 +43,16 @@ def _event_name(counter: int, name: str) -> str:
     return f"{counter}_{name}"
 
 
-def write_event(counter: int, name: str, category: str, phase: str, tid: int, fixed: bool, ts: int) -> None:
+def write_event(counter: int, name: str, category: str, phase: str, tid: int, fixed: bool, ts: int, prefix: bool) -> None:
 
     if not fixed:
         ts = _timestamp_us()
 
-    event = {"name": _event_name(counter, name), "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": ts}
+    event = ""
+    if prefix:
+        event = {"name": _event_name(counter, name), "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": ts}
+    else:
+        event = {"name": name, "cat": category, "ph": phase, "pid": PID, "tid": tid, "ts": ts}
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -61,12 +65,12 @@ def add_event(counter: int, name: str, category: str, duration_ms: float, fixed:
     """Write a single event immediately."""
 
     ts = _timestamp_us()
-    write_event(counter, name, category, "B", tid=345, fixed=fixed, ts=ts)
+    write_event(counter, name, category, "B", tid=345, fixed=fixed, ts=ts, prefix=True)
 
     try:
         time.sleep(duration_ms / 1000.0)
     finally:
-        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + (int(duration_ms * 1000)))
+        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + (int(duration_ms * 1000)), prefix=True)
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,7 @@ class ScheduledEvent:
     start_ms: float
     duration_ms: float
     fixed: bool
+    prefix: bool
 
 
 class EventScheduler:
@@ -84,8 +89,8 @@ class EventScheduler:
         self.counter = counter
         self.events: list[ScheduledEvent] = []
 
-    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category, fixed) -> None:
-        self.events.append(ScheduledEvent(tid, name, category, start, duration_ms, fixed))
+    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category, fixed, prefix) -> None:
+        self.events.append(ScheduledEvent(tid, name, category, start, duration_ms, fixed, prefix))
 
     @staticmethod
     def _wait_until(target_ns: int) -> None:
@@ -113,22 +118,24 @@ class EventScheduler:
         for offset_ms, _, event, phase in actions:
             target_ns = playback_start_ns + int(offset_ms * 1000_000)
             self._wait_until(target_ns)
-            write_event(self.counter, event.name, event.category, phase, event.tid, event.fixed, int(target_ns / 1000))
+            write_event(self.counter, event.name, event.category, phase, event.tid, event.fixed, int(target_ns / 1000), event.prefix)
 
 
-def sequence_test(counter, fixed) -> None:
+def sequence_test(counter, fixed, prefix=True) -> None:
     """Generate a 300 ms event containing several timed events."""
     scheduler = EventScheduler(counter)
     category = "sequence"
-    scheduler.schedule_event(100, "test", 0, 300, category, fixed)
-    scheduler.schedule_event(100, "prepare", 0, 20, category, fixed)
-    scheduler.schedule_event(100, "process", 20, 20, category, fixed)
-    scheduler.schedule_event(100, "stop", 280, 20, category, fixed)
+    scheduler.schedule_event(100, "test", 0, 3000, category, fixed, prefix)
+    scheduler.schedule_event(101, "prepare", 0, 20, category, fixed, prefix)
+    scheduler.schedule_event(101, "process", 20, 20, category, fixed, prefix)
+    scheduler.schedule_event(101, "stop", 280, 20, category, fixed, prefix)
     scheduler.play()
 
 
 def sequence(counter, sequence_id) -> None:
     match sequence_id:
+        case "normal":
+            sequence_test(counter, False, False)
         case "real":
             sequence_test(counter, False)
         case "fixed":

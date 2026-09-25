@@ -2,7 +2,7 @@ import { Collector } from "./collector.js";
 import { EventType, getAudioAlerts, getSettings } from "./globals.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
-import { Graph } from "./graph_controls.js";
+import { Graph } from "./graph.js";
 
 // [] array
 // {} object

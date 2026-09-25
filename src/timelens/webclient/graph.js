@@ -53,7 +53,7 @@ export class Graph {
         this.graphHeightPx = 0;
         this.zeroShiftUs = 0;
         this.graphWidthUs = 0;
-        this.startPointUs = 0;
+        this.startPointUs = 0;      // timepoint where we start rendering the actual graph
         this.mouseInside = false;
         this.selectionStartX = null;
         this.selectionEndX = null;
@@ -61,6 +61,11 @@ export class Graph {
         this.triggerWord = "";
         this.graphWidthMs = 1000;
         this.preTriggerMs = -10;
+
+        // timepoint from where we are requesting information
+        // after 'clear()' this will be non-zero because even through there is information in the
+        // collector's data-buffer, we are only interested in the data after 'RequestStartPointUs'
+        this.RequestStartPointUs = 0;
 
         this.canvas.addEventListener("mouseenter", () => {
             this.mouseInside = true;
@@ -358,6 +363,10 @@ export class Graph {
         return this.preTriggerMs;
     }
 
+    clear() {
+        this.RequestStartPointUs = this.collector.getLastTimepointUs();
+        this.render();
+    }
 
     render() {
         const ctx = this.canvas.getContext("2d");
@@ -385,10 +394,14 @@ export class Graph {
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
 
-        const data = this.collector.data();
+        const data = this.collector.data().filter(
+            message => message.timestamp >= this.RequestStartPointUs
+        );
+
         if (data.length === 0) {
             return;
         }
+        this.RequestStartPointUs
 
         const triggerWord = this.getTriggerWord();
         if (triggerWord) {
