@@ -6,7 +6,16 @@ export class TriggerSource {
         this.triggerMode = TriggerMode.AUTO;
         this.running = true;
         this.data = null;
-        this.startPointUs = 0;
+        this.startPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
+        this.preTriggerUs = -10000; // default to -10ms
+    }
+
+    setPreTriggerUs(value) {
+        this.preTriggerUs = value;
+    }
+
+    getPreTriggerUs() {
+        return this.preTriggerUs;
     }
 
     clear() {
