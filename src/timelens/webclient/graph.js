@@ -1,5 +1,4 @@
-import { EventType, getAudioAlerts } from "./globals.js";
-import { getSettings } from "./globals.js";
+import { EventType, TriggerMode } from "./globals.js";
 import { BarStack } from "./barstack.js";
 
 function containsIgnoreCaseWildcard(text, search) {
@@ -63,6 +62,7 @@ export class Graph {
         this.preTriggerMs = -10;
         this.running = true; // while running we collect live data, while not running, we keep the buffer for analysis.
         this.data = null;   // data is only used when running == false
+        this.triggerMode = TriggerMode.AUTO; // when Single, we automatically stop collecting data after a get a trigger _and_ T + graphWidthUs is reached
 
         // timepoint from where we are requesting information
         // after 'clear()' this will be non-zero because even through there is information in the
@@ -353,16 +353,23 @@ export class Graph {
         this.render();
     }
 
+    stop() {
+        // take a deep copy of the current data buffer
+        this.data = this.collector.data().map(event => ({ ...event }));
+        this.running = false;
+    }
+
     toggleRunning() {
         if (this.running) {
-            // take a deep copy of the current data buffer
-            this.data = this.collector.data().map(event => ({ ...event }));
-            this.running = false;
+            this.stop();
         }
         else {
             this.running = true;
             this.data = null
         }
+    }
+
+    single() {
     }
 
     render() {
