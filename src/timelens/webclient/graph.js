@@ -365,11 +365,7 @@ export class Graph {
 
     renderGraph(ctx) {
 
-        const data = this.triggerSource.getData()
-        if (data.length === 0) {
-            return;
-        }
-
+        // We always draw the grid and pre-trigger cursor
         const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
         this.graphWidthPx = this.canvas.width / dpr;
         this.graphHeightPx = this.canvas.height / dpr;
@@ -384,6 +380,11 @@ export class Graph {
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
+
+        const data = this.triggerSource.getData()
+        if (data.length === 0) {
+            return;
+        }
 
         const triggerWord = this.getTriggerWord();
         if (triggerWord) {
