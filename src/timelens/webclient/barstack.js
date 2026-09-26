@@ -161,9 +161,8 @@ export class BarStack {
         }
     }
 
-    drawTextOnBar(name, x, width, y, height) {
+    drawTextOnBar(name, x, width, y, height, durationMs) {
 
-        // console.log(`draw: ${name}: ${x},${y} ${width}x${height}`)
         const horizontalPadding = 4;
         const availableWidth = width - horizontalPadding * 2;
 
@@ -172,14 +171,19 @@ export class BarStack {
         }
 
         this.ctx.font = "14px monospace";
-        let text = name;
 
-        if (this.ctx.measureText(text).width > availableWidth) {
-            text = `${name.slice(0, 3)}...`;
+        const texts = [
+            `${name} of ${durationMs} ms`,
+            `${name}`,
+            `${name.slice(0, 3)}...`
+        ];
 
-            if (this.ctx.measureText(text).width > availableWidth) {
-                return;
-            }
+        const text = texts.find(
+            text => this.ctx.measureText(text).width <= availableWidth
+        );
+
+        if (!text) {
+            return;
         }
 
         this.ctx.fillStyle = "#07131f";
@@ -261,10 +265,10 @@ export class BarStack {
         }
 
         if (getSettings().isDebuggingEnabled()) {
-            this.drawTextOnBar(`${event.count} = ${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+            this.drawTextOnBar(`${event.count} = ${event.name}`, x1, width, y, line.height, durationMs);
         }
         else {
-            this.drawTextOnBar(`${event.name} of ${durationMs} ms`, x1, width, y, line.height);
+            this.drawTextOnBar(`${event.name}`, x1, width, y, line.height, durationMs);
         }
 
         const isHovered =
