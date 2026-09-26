@@ -61,12 +61,6 @@ export class Graph {
         this.selecting = false;
         this.triggerWord = "";
         this.graphWidthMs = 1000;
-        this.preTriggerMs = -10;
-
-        // timepoint from where we are requesting information
-        // after 'clear()' this will be non-zero because even through there is information in the
-        // collector's data-buffer, we are only interested in the data after 'RequestStartPointUs'
-        this.RequestStartPointUs = 0;
 
         this.canvas.addEventListener("mouseenter", () => {
             this.mouseInside = true;
@@ -340,15 +334,15 @@ export class Graph {
     }
 
     setPreTrigger(milliseconds) {
-        this.preTriggerMs = milliseconds;
+        this.triggerSource.setPreTriggerUs(milliseconds * 1000);
     }
 
     getPreTriggerMs() {
-        return this.preTriggerMs;
+        return this.triggerSource.getPreTriggerUs() / 1000;
     }
 
     clear() {
-        this.RequestStartPointUs = this.collector.getLastTimepointUs();
+        this.triggerSource.clear();
         this.render();
     }
 
