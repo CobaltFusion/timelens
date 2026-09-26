@@ -127,7 +127,7 @@ export class BarStack {
 
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
-        const hover = `${this.formatTimestamp(event.timestamp)} ${event.name}`
+        const hover = `${this.formatTimestamp(event.timestamp - this.startPointUs)} ${event.name}`
         this.drawBar(line, event, hover, y);
     }
 
@@ -173,7 +173,7 @@ export class BarStack {
         this.ctx.font = "14px monospace";
 
         const texts = [
-            `${name} of ${durationMs} ms`,
+            `${name} (${durationMs} ms)`,
             `${name}`,
             `${name.slice(0, 3)}...`
         ];
