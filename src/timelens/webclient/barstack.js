@@ -237,7 +237,7 @@ export class BarStack {
     drawBar(line, event, hover, y) {
         assert(typeof event.name === "string", "event.name must be string");
 
-        const durationMs = (event.end_time - event.timestamp) / 1000;
+        let durationMs = (event.end_time - event.timestamp) / 1000;
         const x1 = Math.round((event.timestamp - this.startPointUs) * this.scale);
         let x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
         let width = x2 - x1;
@@ -246,6 +246,7 @@ export class BarStack {
         if (event.type === EventType.OPEN) {
             x2 = Math.round((this.endPointUs - this.startPointUs) * this.scale);
             width = x2 - x1;
+            durationMs = (this.endPointUs - event.timestamp) / 1000;
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
             gradient.addColorStop(0, color);
             gradient.addColorStop(0.75, color);
