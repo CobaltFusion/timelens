@@ -44,12 +44,18 @@ export function getAudioAlerts() {
  * @typedef {"open" | "close" | "duration" | "value"} EventTypeValue
  */
 
-export const EventType = {
+export const EventType = Object.freeze({
     OPEN: "open",           // only has timestamp
     CLOSE: "close",         // has both timestamp and end_time
     DURATION: "duration",   // has both timestamp and end_time
     VALUE: "value"          // has timestamp + value
-};
+});
+
+export const TriggerMode = Object.freeze({
+    AUTO: "Auto",
+    SINGLE: "Single",
+    TRIGGERED: "Triggered"
+});
 
 /**
  * @typedef {Object} TSEvent
