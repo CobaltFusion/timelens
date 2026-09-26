@@ -61,6 +61,11 @@ export class Graph {
         this.selecting = false;
         this.triggerWord = "";
         this.graphWidthMs = 1000;
+        this.onStatusChanged = null;
+
+        this.triggerSource.onStatusChanged = () => {
+            this.onStatusChanged?.();
+        };
 
         this.canvas.addEventListener("mouseenter", () => {
             this.mouseInside = true;
@@ -314,11 +319,11 @@ export class Graph {
     }
 
     setTriggerWord(triggerWord) {
-        this.triggerWord = String(triggerWord);
+        this.triggerSource.setTriggerWord(String(triggerWord));
     }
 
     getTriggerWord() {
-        return this.triggerWord;
+        return this.triggerSource.getTriggerWord();
     }
 
     setgraphWidthMs(milliseconds) {
@@ -344,6 +349,10 @@ export class Graph {
     clear() {
         this.triggerSource.clear();
         this.render();
+    }
+
+    auto() {
+        this.triggerSource.auto();
     }
 
     toggleRunning() {
@@ -381,7 +390,7 @@ export class Graph {
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
 
-        const data = this.triggerSource.getData()
+        const data = this.triggerSource.getGraphData()
         if (data.length === 0) {
             return;
         }
