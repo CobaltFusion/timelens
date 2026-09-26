@@ -1,5 +1,6 @@
-import { EventType, TriggerMode } from "./globals.js";
+import { EventType } from "./globals.js";
 import { BarStack } from "./barstack.js";
+import { TriggerSource } from "./triggersource.js";
 
 function containsIgnoreCaseWildcard(text, search) {
     const lowerText = text.toLowerCase();
@@ -43,6 +44,7 @@ function containsIgnoreCaseWildcard(text, search) {
 export class Graph {
     constructor(collector) {
         this.collector = collector;
+        this.triggerSource = new TriggerSource(collector);
         this.index = 0;
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("graph");
@@ -60,9 +62,6 @@ export class Graph {
         this.triggerWord = "";
         this.graphWidthMs = 1000;
         this.preTriggerMs = -10;
-        this.running = true; // while running we collect live data, while not running, we keep the buffer for analysis.
-        this.data = null;   // data is only used when running == false
-        this.triggerMode = TriggerMode.AUTO; // when Single, we automatically stop collecting data after a get a trigger _and_ T + graphWidthUs is reached
 
         // timepoint from where we are requesting information
         // after 'clear()' this will be non-zero because even through there is information in the
@@ -353,23 +352,12 @@ export class Graph {
         this.render();
     }
 
-    stop() {
-        // take a deep copy of the current data buffer
-        this.data = this.collector.data().map(event => ({ ...event }));
-        this.running = false;
-    }
-
     toggleRunning() {
-        if (this.running) {
-            this.stop();
-        }
-        else {
-            this.running = true;
-            this.data = null
-        }
+        this.triggerSource.toggleRunning();
     }
 
     single() {
+        this.triggerSource.single();
     }
 
     render() {
@@ -381,16 +369,12 @@ export class Graph {
         this.drawCursor(ctx);
     }
 
-    getData() {
-        if (this.running) {
-            return this.collector.data();
-        }
-        else {
-            return this.data;
-        }
-    }
-
     renderGraph(ctx) {
+
+        const data = this.triggerSource.getData()
+        if (data.length === 0) {
+            return;
+        }
 
         const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
         this.graphWidthPx = this.canvas.width / dpr;
@@ -406,14 +390,6 @@ export class Graph {
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
         this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);
-
-        const data = this.getData().filter(
-            message => message.timestamp >= this.RequestStartPointUs
-        );
-
-        if (data.length === 0) {
-            return;
-        }
 
         const triggerWord = this.getTriggerWord();
         if (triggerWord) {
