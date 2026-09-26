@@ -325,10 +325,14 @@ class Main {
         stopRunButton.append(stopSpan, divider, runSpan);
 
         stopRunButton.addEventListener("click", () => {
-            stopRunButton.classList.toggle("running");
             graph.toggleRunning();
         });
 
+        graph.onStatusChanged = () => {
+            const isRunning = graph.triggerSource.isRunning();
+            stopRunButton.classList.toggle("running", isRunning);
+        };
+        stopRunButton.classList.toggle("running", graph.triggerSource.isRunning());
         controls.appendChild(stopRunButton);
 
         const singleButton = document.createElement("button");

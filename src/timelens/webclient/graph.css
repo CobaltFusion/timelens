@@ -239,12 +239,12 @@ button, input {
 }
 
 .stop-run-button {
-    --stop-run-color: #16ba6d;
+    --stop-run-color: #ff5577;
     color: var(--stop-run-color);
 }
 
 .stop-run-button.running {
-    --stop-run-color: #ff5577;
+    --stop-run-color: #16ba6d;
 }
 
 .stop-run-button:hover {

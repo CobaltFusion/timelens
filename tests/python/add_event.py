@@ -148,7 +148,7 @@ def sequence_test(counter, fixed, prefix=True) -> None:
     """Generate a 300 ms event containing several timed events."""
     scheduler = EventScheduler(counter)
     category = "sequence"
-    scheduler.schedule_event(100, "test", 0, 3000, category, fixed, prefix)
+    scheduler.schedule_event(100, "test", 0, 300, category, fixed, prefix)
     scheduler.schedule_event(101, "prepare", 0, 20, category, fixed, prefix)
     scheduler.schedule_event(101, "process", 20, 20, category, fixed, prefix)
     scheduler.schedule_event(101, "stop", 280, 20, category, fixed, prefix)

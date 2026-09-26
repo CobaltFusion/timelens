@@ -52,10 +52,17 @@ export const EventType = Object.freeze({
 });
 
 export const TriggerMode = Object.freeze({
-    AUTO: "Auto",
-    SINGLE: "Single",
-    TRIGGERED: "Triggered"
+    AUTO: "Auto",           // every trigger is automatically re-triggers
+    SINGLE: "Single",       // the first next trigger will stop data-collection after graphWidthMs
+    FREE: "Free"            // set when no 'trigger word' is set, will keep collecting data and show the last graphWidthMs
 });
+
+export const TriggerState = Object.freeze({
+    Idle: "Idle",
+    Waiting: "Waiting",
+    Found: "Found"
+});
+
 
 /**
  * @typedef {Object} TSEvent
