@@ -4,6 +4,8 @@ import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph.js";
 import { TrafficIndication } from "./traffic_indication.js";
+import { HealthIndication } from "./health_indication.js";
+
 
 // [] array
 // {} object
@@ -19,6 +21,7 @@ class Main {
         this.widgets = new Set();
         this.collector = new Collector();
         this.trafficIndication = null;
+        this.healthIndication = null;
 
         const topPanel = document.getElementById("id_top_panel");
 
@@ -59,7 +62,7 @@ class Main {
         topPanel.appendChild(this.incomingTraffic);
 
         this.trafficIndication = new TrafficIndication(topPanel);
-
+        this.healthIndication = new HealthIndication(topPanel);
     }
 
     keyHandler(e) {
@@ -114,6 +117,7 @@ class Main {
 
         this.collector.onIncomingEvent = (event) => {
             this.trafficIndication.onIncomingEvent();
+            this.healthIndication.onIncomingEvent(event);
 
             this.incomingTraffic.classList.add("active");
             clearTimeout(this.incomingTrafficTimer);
