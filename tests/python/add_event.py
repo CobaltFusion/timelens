@@ -73,8 +73,9 @@ def add_event(counter: int, name: str, category: str, duration_ms: float, fixed:
         write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + int(duration_ms * 1000), prefix=True)
 
 
-def loop_event(counter: int) -> None:
+def loop_event() -> None:
     """Write a 100 ms event every 1 second until interrupted."""
+
     name = "error"
     category = "loop"
     duration_ms = 100
@@ -82,11 +83,18 @@ def loop_event(counter: int) -> None:
     next_event = time.perf_counter()
     try:
         while True:
+            counter = _next_counter()
             next_event += 1.0
             ts = _timestamp_us()
             write_event(counter, name, category, "B", tid=345, fixed=False, ts=ts, prefix=True)
             time.sleep(duration_ms / 1000.0)
-            write_event(counter, name, category, "E", tid=345, fixed=False, ts=ts + duration_ms * 1000, prefix=True)
+            end = ts = ts + duration_ms * 1000
+            write_event(counter, name, category, "E", tid=345, fixed=False, ts=end * 1000, prefix=True)
+
+            write_event(counter, "post", category, "B", tid=345, fixed=False, ts=end, prefix=True)
+            time.sleep(1 / 100.0)
+            write_event(counter, "post", category, "E", tid=345, fixed=False, ts=end + 1000, prefix=True)
+
             remaining = next_event - time.perf_counter()
             if remaining > 0:
                 time.sleep(remaining)
@@ -176,14 +184,14 @@ def main() -> None:
     parser.add_argument("-c", "--category", help="Telemetry category.")
     parser.add_argument("-d", "--duration-ms", type=float, metavar="MILLISECONDS", help="Duration of the event in milliseconds.")
     args = parser.parse_args()
-    counter = _next_counter()
 
     if args.loop:
         if args.category is not None or args.duration_ms is not None:
             parser.error("-c/--category and -d/--duration-ms cannot be used with -l")
-        loop_event(counter)
+        loop_event()
         return
 
+    counter = _next_counter()
     if args.sequence is not None:
         if args.category is not None or args.duration_ms is not None:
             parser.error("-c/--category and -d/--duration-ms cannot be used with -s")

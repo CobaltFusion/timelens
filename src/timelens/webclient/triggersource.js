@@ -1,4 +1,43 @@
-import { TriggerMode, TriggerState } from "./globals.js";
+import { EventType, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
+
+function containsIgnoreCaseWildcard(text, search) {
+    const lowerText = text.toLowerCase();
+    const lowerSearch = search.toLowerCase();
+
+    if (!lowerSearch.includes("*")) {
+        return lowerText.includes(lowerSearch);
+    }
+
+    const parts = lowerSearch.split("*");
+    const startsWithWildcard = lowerSearch.startsWith("*");
+    const endsWithWildcard = lowerSearch.endsWith("*");
+
+    let position = 0;
+
+    for (const part of parts) {
+        if (!part) {
+            continue;
+        }
+
+        const found = lowerText.indexOf(part, position);
+
+        if (found === -1) {
+            return false;
+        }
+
+        position = found + part.length;
+    }
+
+    if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
+        return false;
+    }
+
+    if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
+        return false;
+    }
+
+    return true;
+}
 
 export class TriggerSource {
     constructor(collector) {
@@ -17,6 +56,7 @@ export class TriggerSource {
 
     setPreTriggerUs(value) {
         this.preTriggerUs = value;
+        this.#determineTriggerMode(TriggerMode.AUTO);
     }
 
     getPreTriggerUs() {
@@ -25,14 +65,19 @@ export class TriggerSource {
 
     setTriggerWord(value) {
         this.triggerWord = value;
-        if (this.triggerWord === "") {
+        this.#determineTriggerMode(TriggerMode.AUTO);
+    }
+
+    #determineTriggerMode(triggerMode) {
+        if (this.triggerWord) {
+            this.triggerMode = triggerMode;
+            this.triggerState = TriggerState.Waiting;
+        }
+        else {
             this.triggerMode = TriggerMode.FREE;
             this.triggerState = TriggerState.Idle;
         }
-        else {
-            this.triggerMode = TriggerMode.AUTO;
-            this.triggerState = TriggerState.Waiting;
-        }
+        this.triggerResult = TriggerResult.None;
     }
 
     getTriggerWord() {
@@ -48,7 +93,7 @@ export class TriggerSource {
         return this.running;
     }
 
-    stop() {
+    #stop() {
         // take a deep copy of the current data buffer
         this.data = this.collector.data().map(event => ({ ...event }));
         this.#setRunning(false);
@@ -59,12 +104,12 @@ export class TriggerSource {
     }
 
     auto() {
-
+        this.#determineTriggerMode(TriggerMode.AUTO);
     }
 
     toggleRunning() {
         if (this.running) {
-            this.stop();
+            this.#stop();
         }
         else {
             this.#setRunning(true);
@@ -73,55 +118,60 @@ export class TriggerSource {
 
     single() {
         this.clear();
-        this.triggerMode = TriggerMode.SINGLE;
-        this.#setRunning(true);
+        this.#determineTriggerMode(TriggerMode.SINGLE);
     }
 
-    update(graphWidthUs) {
+    findLastTriggerIndex(data, triggerWord) {
+        const index = data.findLastIndex(event =>
+            event.type === EventType.OPEN &&
+            containsIgnoreCaseWildcard(event.name, triggerWord));
+        return index >= 0 ? index : undefined;
+    }
+
+    // set this.startPointUs to where we want to start the display of data
+    updateStartPoint(freeStartPointUs) {
 
         if (this.triggerMode === TriggerMode.FREE) {
-            this.startPointUs = this.collector.getLastTimepointUs() - graphWidthUs;
-            return;
+            this.startPointUs = freeStartPointUs;
+            return this.startPointUs;
         }
 
-        const data = this.#getBufferData();
+        const data = this.#getBufferDataFrom(0);
         this.dataLength = data.length;
-        if (this.dataLength !== 0) {
-            return;
+        if (this.dataLength === 0) {
+            return 0;
         }
 
         if (this.triggerState === TriggerState.Waiting) {
-            const triggerIndex = this.findTriggerIndex(data, this.triggerWord);
+            const triggerIndex = this.findLastTriggerIndex(data, this.triggerWord);
             if (triggerIndex === undefined) {
                 // trigger specified, but not found.
                 this.triggerFoundTimeUs = 0;
+                return 0;
             }
+            this.triggerResult = TriggerResult.Found;
             this.triggerFoundTimeUs = data[triggerIndex].timestamp;
+            this.startPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
             if (this.triggerMode === TriggerMode.SINGLE) {
-                this.stop();
-                this.triggerState = TriggerState.Found;
+                this.#stop();
             }
         }
+        return this.startPointUs;
     }
 
     getGraphData() {
-        if (this.triggerMode === TriggerMode.FREE) {
-            return this.#getBufferData();
-        }
 
-        if (this.waitingForTrigger) {
+        // this makes the display empty during 'waiting' state
+        if (this.triggerResult === TriggerState.Waiting && this.triggerResult === TriggerResult.None) {
             return [];
         }
-
-        const t = this.triggerFoundTimeUs - this.preTriggerUs;
-        return this.#getInternalDataBuffer().filter(
-            message => message.timestamp >= t
-        );
+        return this.#getBufferDataFrom(this.startPointUs);
     }
 
-    #getBufferData() {
+    // return all data from 'timePoint' and after
+    #getBufferDataFrom(timePoint) {
         return this.#getInternalDataBuffer().filter(
-            message => message.timestamp >= this.startPointUs
+            message => message.timestamp >= timePoint
         );
     }
 
