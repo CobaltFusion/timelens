@@ -1,6 +1,6 @@
 import { EventType } from "./globals.js";
 import { BarStack } from "./barstack.js";
-import { TriggerSource } from "./triggersource.js";
+import { TriggerSource } from "./trigger_source.js";
 
 export class Graph {
     constructor(collector) {
