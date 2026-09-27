@@ -342,7 +342,6 @@ export class Graph {
         this.zeroShiftUs = extraWidth * 1e3; // how far is the zero-point from the beginning of display in microseconds
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
 
-        this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
         this.drawGrid(ctx);  // uses 'this.startPointUs', maybe it should not, this.zeroShiftUs + this.graphWidthUs, should be enough
 
         this.startPointUs = this.triggerSource.updateStartPoint(this.startPointUs);

@@ -50,6 +50,11 @@ class Main {
         document.addEventListener("keydown", (e) => {
             this.keyHandler(e);
         });
+
+        this.incomingTraffic = document.createElement("span");
+        this.incomingTraffic.classList.add("incoming-traffic");
+        this.incomingTraffic.title = "Incoming traffic";
+        topPanel.appendChild(this.incomingTraffic);
     }
 
     keyHandler(e) {
@@ -103,6 +108,13 @@ class Main {
         };
 
         this.collector.onIncomingEvent = (event) => {
+
+            this.incomingTraffic.classList.add("active");
+            clearTimeout(this.incomingTrafficTimer);
+            this.incomingTrafficTimer = setTimeout(() => {
+                this.incomingTraffic.classList.remove("active");
+            }, 100);
+
             // beeping
             if (event.type === EventType.OPEN) {
                 if (containsIgnoreCase(event.name, "error")) {
