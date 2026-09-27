@@ -122,17 +122,17 @@ export class Collector {
         // }
 
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const minus10minutesUs = this.estimateNowUs() - (10 * 60 * 1e6)
+            const minus10minutesUs = this.estimatedNowUs() - (10 * 60 * 1e6)
             this.ws.send(JSON.stringify({ type: "control", action: "request", timeUs: minus10minutesUs }));
         }
 
     }
 
     asTime(msTime) {
-        return this.estimateNowUs() + (msTime * 1000 * 1000);
+        return this.estimatedNowUs() + (msTime * 1000 * 1000);
     }
 
-    estimateNowUs() {
+    estimatedNowUs() {
         const nowUs = performance.now() * 1000;
         return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
     }

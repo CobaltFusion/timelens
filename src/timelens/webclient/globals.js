@@ -59,7 +59,11 @@ export const TriggerMode = Object.freeze({
 
 export const TriggerState = Object.freeze({
     Idle: "Idle",
-    Waiting: "Waiting",
+    Waiting: "Waiting",  // looking for trigger
+});
+
+export const TriggerResult = Object.freeze({
+    None: "None",
     Found: "Found"
 });
 

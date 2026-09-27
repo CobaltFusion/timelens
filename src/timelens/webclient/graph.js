@@ -2,45 +2,6 @@ import { EventType } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./triggersource.js";
 
-function containsIgnoreCaseWildcard(text, search) {
-    const lowerText = text.toLowerCase();
-    const lowerSearch = search.toLowerCase();
-
-    if (!lowerSearch.includes("*")) {
-        return lowerText.includes(lowerSearch);
-    }
-
-    const parts = lowerSearch.split("*");
-    const startsWithWildcard = lowerSearch.startsWith("*");
-    const endsWithWildcard = lowerSearch.endsWith("*");
-
-    let position = 0;
-
-    for (const part of parts) {
-        if (!part) {
-            continue;
-        }
-
-        const found = lowerText.indexOf(part, position);
-
-        if (found === -1) {
-            return false;
-        }
-
-        position = found + part.length;
-    }
-
-    if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
-        return false;
-    }
-
-    if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
-        return false;
-    }
-
-    return true;
-}
-
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -127,13 +88,6 @@ export class Graph {
     _build() {
         this.parent.appendChild(this.canvas);
         this.canvas.style.visibility = "visible";
-    }
-
-    findTriggerIndex(data, triggerWord) {
-        const index = data.findLastIndex(event =>
-            event.type === EventType.OPEN &&
-            containsIgnoreCaseWildcard(event.name, triggerWord));
-        return index >= 0 ? index : undefined;
     }
 
     findStartIndex(data, time) {
@@ -319,7 +273,7 @@ export class Graph {
     }
 
     setTriggerWord(triggerWord) {
-        this.triggerSource.setTriggerWord(String(triggerWord));
+        this.triggerSource.setTriggerWord(triggerWord);
     }
 
     getTriggerWord() {
@@ -385,28 +339,22 @@ export class Graph {
 
         // preTriggerMs < 0 will add to the width, while >= 0 will not affect the width
         const extraWidth = Math.max(preTriggerMs * -1, 0);
-        this.zeroShiftUs = extraWidth * 1e3;
+        this.zeroShiftUs = extraWidth * 1e3; // how far is the zero-point from the beginning of display in microseconds
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
-        this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
-        this.drawGrid(ctx);
 
-        const data = this.triggerSource.getGraphData()
+        this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
+        this.drawGrid(ctx);  // uses 'this.startPointUs', maybe it should not, this.zeroShiftUs + this.graphWidthUs, should be enough
+
+        this.startPointUs = this.triggerSource.updateStartPoint(this.startPointUs);
+
+        const data = this.triggerSource.getGraphData();
         if (data.length === 0) {
             return;
         }
 
-        const triggerWord = this.getTriggerWord();
-        if (triggerWord) {
-            const triggerIndex = this.findTriggerIndex(data, triggerWord);
-            if (triggerIndex === undefined) {
-                // trigger specified, but not found.
-                return;
-            }
-            this.startPointUs = data[triggerIndex].timestamp - this.zeroShiftUs // new startpoint
-        }
-        const estimatedNow = this.collector.estimateNowUs();
-        const maxEnd = this.startPointUs + this.graphWidthUs;
-        const endPointUs = Math.min(estimatedNow, maxEnd);
+        const estimatedNowUs = this.collector.estimatedNowUs();
+        const graphEndUs = this.startPointUs + this.graphWidthUs;
+        const endPointUs = Math.min(estimatedNowUs, graphEndUs);
 
         const bars = new BarStack(
             ctx,
@@ -417,8 +365,7 @@ export class Graph {
             endPointUs
         );
 
-        const startIndex = this.findStartIndex(data, this.startPointUs);
-        for (let i = startIndex; i < data.length; ++i) {
+        for (let i = 0; i < data.length; ++i) {
             const event = data[i];
             const line = bars.getLine(event.groupId);
             if (event.timestamp > line.lastEndTime) {

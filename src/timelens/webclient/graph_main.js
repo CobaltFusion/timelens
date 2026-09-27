@@ -255,7 +255,7 @@ class Main {
         triggerWordInput.classList.add("numeric-control-input");
 
         triggerWordInput.addEventListener("input", () => {
-            graph.setTriggerWord(triggerWordInput.value);
+            graph.setTriggerWord(String(triggerWordInput.value));
         });
 
         triggerWordLabel.appendChild(triggerWordInput);
