@@ -3,6 +3,7 @@ import { EventType, getAudioAlerts, getSettings } from "./globals.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph.js";
+import { TrafficIndication } from "./traffic_indication.js";
 
 // [] array
 // {} object
@@ -17,6 +18,7 @@ class Main {
     constructor() {
         this.widgets = new Set();
         this.collector = new Collector();
+        this.trafficIndication = null;
 
         const topPanel = document.getElementById("id_top_panel");
 
@@ -55,6 +57,9 @@ class Main {
         this.incomingTraffic.classList.add("incoming-traffic");
         this.incomingTraffic.title = "Incoming traffic";
         topPanel.appendChild(this.incomingTraffic);
+
+        this.trafficIndication = new TrafficIndication(topPanel);
+
     }
 
     keyHandler(e) {
@@ -108,6 +113,7 @@ class Main {
         };
 
         this.collector.onIncomingEvent = (event) => {
+            this.trafficIndication.onIncomingEvent();
 
             this.incomingTraffic.classList.add("active");
             clearTimeout(this.incomingTrafficTimer);
