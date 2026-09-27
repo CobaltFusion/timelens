@@ -131,6 +131,7 @@ export class TriggerSource {
     // set this.startPointUs to where we want to start the display of data
     updateStartPoint(freeStartPointUs) {
 
+        
         if (this.triggerMode === TriggerMode.FREE) {
             this.startPointUs = freeStartPointUs;
             return this.startPointUs;
