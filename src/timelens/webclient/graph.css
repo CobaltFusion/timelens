@@ -40,12 +40,14 @@ body {
     text-transform: uppercase;
 }
 
-.top-panel > span {
+.top-panel > .title {
     position: relative;
     padding-left: .75rem;
 }
 
-.top-panel > span::before {
+/* a decorative green bar */
+
+.top-panel > .title::before {
     position: absolute;
     top: .1rem;
     bottom: .1rem;
@@ -257,4 +259,17 @@ button, input {
     margin: .15rem 0;
     background: currentColor;
     opacity: .6;
+}
+
+.incoming-traffic {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #14532d;
+    opacity: 0.5;
+}
+
+.incoming-traffic.active {
+    background: #4ade80;
+    opacity: 1;
 }
