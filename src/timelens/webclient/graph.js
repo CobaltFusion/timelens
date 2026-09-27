@@ -103,19 +103,16 @@ export class Graph {
         return renderAdjustment + Math.round((this.graphWidthPx / this.graphWidthUs) * t);
     }
 
-    // the grid divides the (graphWidth - zeroShift) into 20 segements
-    // the majorLine aligns with the zero-point
-    drawGrid(ctx) {
+    // The grid divides the area from zero to the right edge into 20 segments.
+    // The major line aligns with the zero point.
+    drawGrid(ctx, graphWidthUs, graphWidthPx, graphHeightPx, zeroShiftUs) {
         ctx.save();
         ctx.lineWidth = 1;
 
         const minorGridLineCount = 20;
-        const stepUs = (this.graphWidthUs - this.zeroShiftUs) / minorGridLineCount;
-        const endPoint = this.startPointUs + this.graphWidthUs;
-        const zeroPointUs = this.startPointUs + this.zeroShiftUs;
+        const stepUs = (graphWidthUs - zeroShiftUs) / minorGridLineCount;
 
-        const drawVerticalLine = (t, index) => {
-            const x = this.toLocalX(t);
+        const drawVerticalLine = (x, index) => {
             const isMajorLine = index % 2 === 0;
 
             ctx.strokeStyle = isMajorLine
@@ -124,30 +121,32 @@ export class Graph {
 
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, this.graphHeightPx);
+            ctx.lineTo(x, graphHeightPx);
             ctx.stroke();
         };
 
-        // lines before zero
-        for (let index = 0, t = zeroPointUs; t > this.startPointUs; t -= stepUs, ++index) {
-            drawVerticalLine(t, index);
+        const zeroX = zeroShiftUs / graphWidthUs * graphWidthPx;
+        const stepPx = stepUs / graphWidthUs * graphWidthPx;
+
+        // Lines before zero
+        for (let index = 0, x = zeroX; x > 0; x -= stepPx, ++index) {
+            drawVerticalLine(x, index);
         }
 
-        // lines after zero
-        for (let index = 0, t = zeroPointUs; t < endPoint; t += stepUs, ++index) {
-            drawVerticalLine(t, index);
+        // Lines after zero
+        for (let index = 0, x = zeroX; x < graphWidthPx; x += stepPx, ++index) {
+            drawVerticalLine(x, index);
         }
 
         const renderAdjustment = 0.5;
-        for (let y = 0; y <= this.graphHeightPx; y += 20) {
+        for (let y = 0; y <= graphHeightPx; y += 20) {
             ctx.strokeStyle = "rgba(142, 161, 189, 0.08)";
             ctx.beginPath();
             ctx.moveTo(0, y + renderAdjustment);
-            ctx.lineTo(this.graphWidthPx, y + renderAdjustment);
+            ctx.lineTo(graphWidthPx, y + renderAdjustment);
             ctx.stroke();
         }
 
-        const zeroX = this.toLocalX(zeroPointUs);
         ctx.fillStyle = "white";
 
         // Top marker
@@ -160,11 +159,12 @@ export class Graph {
 
         // Bottom marker
         ctx.beginPath();
-        ctx.moveTo(zeroX - 5, this.graphHeightPx);
-        ctx.lineTo(zeroX + 5, this.graphHeightPx);
-        ctx.lineTo(zeroX, this.graphHeightPx - 6);
+        ctx.moveTo(zeroX - 5, graphHeightPx);
+        ctx.lineTo(zeroX + 5, graphHeightPx);
+        ctx.lineTo(zeroX, graphHeightPx - 6);
         ctx.closePath();
         ctx.fill();
+
         ctx.restore();
     }
 
@@ -341,10 +341,10 @@ export class Graph {
         const extraWidth = Math.max(preTriggerMs * -1, 0);
         this.zeroShiftUs = extraWidth * 1e3; // how far is the zero-point from the beginning of display in microseconds
         this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
-        this.startPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
-        this.drawGrid(ctx);  // uses 'this.startPointUs', maybe it should not, this.zeroShiftUs + this.graphWidthUs, should be enough
+        this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs);
 
-        this.startPointUs = this.triggerSource.updateStartPoint(this.startPointUs);
+        const freeStartPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
+        this.startPointUs = this.triggerSource.updateStartPoint(freeStartPointUs);
 
         const data = this.triggerSource.getGraphData();
         if (data.length === 0) {
