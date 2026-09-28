@@ -63,6 +63,9 @@ class Main {
 
         this.trafficIndication = new TrafficIndication(topPanel);
         this.healthIndication = new HealthIndication(topPanel);
+
+        this.preTriggerControl = null;
+        this.graphWidthControl = null;
     }
 
     keyHandler(e) {
@@ -289,7 +292,7 @@ class Main {
         preTriggerLabel.textContent = "PreTrigger:";
         controls.appendChild(preTriggerLabel);
 
-        new NumericControl({
+        this.preTriggerControl = new NumericControl({
             parent: controls,
             value: graph.getPreTriggerMs(),
             step: 10,
@@ -304,7 +307,7 @@ class Main {
         graphWidthLabel.textContent = "View:";
         controls.appendChild(graphWidthLabel);
 
-        new NumericControl({
+        this.graphWidthControl = new NumericControl({
             parent: controls,
             value: graph.getGraphWidthMs(),
             step: 10,
@@ -315,6 +318,18 @@ class Main {
                 graph.setgraphWidthMs(value);
             }
         });
+
+        const autoSet = document.createElement("button");
+        autoSet.textContent = "AutoSet";
+        autoSet.classList.add("control-button");
+        autoSet.addEventListener("click", () => {
+            graph.autoSet();
+        });
+        controls.appendChild(autoSet);
+
+        const separator = document.createElement("span");
+        separator.classList.add("control-separator");
+        controls.appendChild(separator);
 
         const clearButton = document.createElement("button");
         clearButton.textContent = "CLEAR";
@@ -337,7 +352,6 @@ class Main {
 
         const stopSpan = document.createElement("span");
         stopSpan.textContent = "STOP";
-
         const divider = document.createElement("span");
         divider.classList.add("stop-run-divider");
 
@@ -353,6 +367,8 @@ class Main {
         graph.onStatusChanged = () => {
             const isRunning = graph.triggerSource.isRunning();
             stopRunButton.classList.toggle("running", isRunning);
+            this.preTriggerControl?.setValue(graph.getPreTriggerMs());
+            this.graphWidthControl?.setValue(graph.getGraphWidthMs());
         };
         stopRunButton.classList.toggle("running", graph.triggerSource.isRunning());
         controls.appendChild(stopRunButton);

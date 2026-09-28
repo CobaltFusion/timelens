@@ -230,6 +230,14 @@ button, input {
     display: block;
 }
 
+.control-separator {
+    width: 1px;
+    height: 24px;
+    margin: 0 8px;
+    background: currentColor;
+    opacity: 0.25;
+}
+
 .stop-run-button {
     display: inline-flex;
     flex-direction: column;

@@ -77,3 +77,25 @@ export const TriggerResult = Object.freeze({
  * @property {number} [groupId]
  * @property {number} [value]
  */
+
+export function roundUpNice(value) {
+    if (value <= 0) {
+        return 0;
+    }
+
+    const magnitude = 10 ** Math.floor(Math.log10(value));
+    const normalized = value / magnitude;
+
+    let nice;
+    if (normalized <= 1) {
+        nice = 1;
+    } else if (normalized <= 2) {
+        nice = 2;
+    } else if (normalized <= 5) {
+        nice = 5;
+    } else {
+        nice = 10;
+    }
+
+    return nice * magnitude;
+}
