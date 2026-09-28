@@ -1,4 +1,4 @@
-import { EventType } from "./globals.js";
+import { EventType, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
@@ -298,6 +298,35 @@ export class Graph {
 
     getPreTriggerMs() {
         return this.triggerSource.getPreTriggerUs() / 1000;
+    }
+
+    autoSet() {
+        const data = this.collector.data();
+        const openEvents = new Map();
+        let longestEventUs = 0;
+
+        for (const event of data) {
+            if (event.type === EventType.OPEN) {
+                openEvents.set(event.name, event);
+            } else if (event.type === EventType.CLOSE) {
+                const openEvent = openEvents.get(event.name);
+                if (!openEvent) {
+                    continue;
+                }
+
+                longestEventUs = Math.max(
+                    longestEventUs,
+                    event.timestamp - openEvent.timestamp
+                );
+
+                openEvents.delete(event.name);
+            }
+        }
+
+        if (longestEventUs > 0) {
+            this.setgraphWidthMs(roundUpNice(longestEventUs) * 1.2 / 1000);
+            this.onStatusChanged?.();
+        }
     }
 
     clear() {

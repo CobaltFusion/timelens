@@ -296,11 +296,11 @@ export class NumericControl {
         return Math.min(this.max, Math.max(this.min, v));
     }
 
-    setValue(v) {
+    setValue(v, notify = true) {
         this.value = this._clamp(v);
         this._sync();
 
-        if (this.onChange) {
+        if (this.onChange && notify) {
             this.onChange(this.value);
         }
     }
