@@ -46,7 +46,8 @@ export class TriggerSource {
         this.triggerState = TriggerState.Idle;
         this.running = true;
         this.data = null;
-        this.startPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
+        this.displayStartPointUs = 0;
+        this.searchStartPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
         this.triggerFoundTimeUs = 0;
         this.preTriggerUs = -10000; // default to -10ms
         this.triggerWord = "";
@@ -100,7 +101,7 @@ export class TriggerSource {
     }
 
     clear() {
-        this.startPointUs = this.collector.getLastTimepointUs();
+        this.searchStartPointUs = this.collector.getLastTimepointUs();
     }
 
     auto() {
@@ -128,13 +129,13 @@ export class TriggerSource {
         return index >= 0 ? index : undefined;
     }
 
-    // set this.startPointUs to where we want to start the display of data
-    updateStartPoint(freeStartPointUs) {
+    // set this.displayStartPointUs to where we want to start the display of data
+    updateStartPoint(freedisplayStartPointUs) {
 
-        
+
         if (this.triggerMode === TriggerMode.FREE) {
-            this.startPointUs = freeStartPointUs;
-            return this.startPointUs;
+            this.displayStartPointUs = freedisplayStartPointUs;
+            return this.displayStartPointUs;
         }
 
         const data = this.#getBufferDataFrom(0);
@@ -152,12 +153,12 @@ export class TriggerSource {
             }
             this.triggerResult = TriggerResult.Found;
             this.triggerFoundTimeUs = data[triggerIndex].timestamp;
-            this.startPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
+            this.displayStartPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
             if (this.triggerMode === TriggerMode.SINGLE) {
                 this.#stop();
             }
         }
-        return this.startPointUs;
+        return this.displayStartPointUs;
     }
 
     getGraphData() {
@@ -166,7 +167,7 @@ export class TriggerSource {
         if (this.triggerResult === TriggerState.Waiting && this.triggerResult === TriggerResult.None) {
             return [];
         }
-        return this.#getBufferDataFrom(this.startPointUs);
+        return this.#getBufferDataFrom(this.displayStartPointUs);
     }
 
     // return all data from 'timePoint' and after
@@ -178,9 +179,14 @@ export class TriggerSource {
 
     #getInternalDataBuffer() {
         if (this.running) {
-            return this.collector.data();
+            return this.collector.data().filter(
+                message => message.timestamp >= this.searchStartPointUs
+            );
         }
         // if not running, return the last copy in the internal data buffer
         return this.data;
     }
 }
+
+
+
