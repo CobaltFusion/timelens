@@ -10,7 +10,9 @@
     --error: #ff5577;
 }
 
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
@@ -21,10 +23,26 @@ body {
     font-family: system-ui, sans-serif;
 }
 
-main { width: min(1100px, 100%); margin: auto; }
-h1 { margin: 0 0 .4rem; font-size: 2rem; letter-spacing: -.04em; }
-p { margin: 0 0 1.5rem; color: var(--muted); }
-#servers { display: grid; gap: .5rem; }
+main {
+    width: min(1100px, 100%);
+    margin: auto;
+}
+
+h1 {
+    margin: 0 0 .4rem;
+    font-size: 2rem;
+    letter-spacing: -.04em;
+}
+
+p {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+}
+
+#servers {
+    display: grid;
+    gap: .5rem;
+}
 
 .server {
     display: grid;
@@ -40,13 +58,35 @@ p { margin: 0 0 1.5rem; color: var(--muted); }
     transition: .15s;
 }
 
-.server:hover { background: var(--hover); border-color: var(--accent); transform: translateX(2px); }
-.name { font-weight: 650; }
-.value { overflow: hidden; color: var(--muted); font: .8rem monospace; text-overflow: ellipsis; white-space: nowrap; }
-.ip { color: var(--accent); }
-.arrow { color: var(--muted); font-size: 1.1rem; }
+.server:hover {
+    background: var(--hover);
+    border-color: var(--accent);
+    transform: translateX(2px);
+}
 
-.empty, .error {
+.name {
+    font-weight: 650;
+}
+
+.value {
+    overflow: hidden;
+    color: var(--muted);
+    font: .8rem monospace;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ip {
+    color: var(--accent);
+}
+
+.arrow {
+    color: var(--muted);
+    font-size: 1.1rem;
+}
+
+.empty,
+.error {
     padding: 1.5rem;
     border: 1px dashed var(--border);
     border-radius: .6rem;
@@ -54,12 +94,24 @@ p { margin: 0 0 1.5rem; color: var(--muted); }
     text-align: center;
 }
 
-.error { color: var(--error); }
+.error {
+    color: var(--error);
+}
 
 @media (max-width: 700px) {
-    .server { grid-template-columns: 1fr auto; gap: .4rem 1rem; }
-    .server .value { grid-column: 1; }
-    .server .arrow { grid-column: 2; grid-row: 1 / span 2; }
+    .server {
+        grid-template-columns: 1fr auto;
+        gap: .4rem 1rem;
+    }
+
+    .server .value {
+        grid-column: 1;
+    }
+
+    .server .arrow {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+    }
 }
 
 #id_timelens {
