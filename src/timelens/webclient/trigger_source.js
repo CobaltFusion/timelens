@@ -58,7 +58,6 @@ export class TriggerSource {
 
     setPreTriggerUs(value) {
         this.preTriggerUs = value;
-        this.#determineTriggerMode(TriggerMode.AUTO);
     }
 
     getPreTriggerUs() {
@@ -184,7 +183,6 @@ export class TriggerSource {
             }
             this.triggerResult = TriggerResult.Found;
             this.triggerFoundTimeUs = data[triggerIndex].timestamp;
-            this.displayStartPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
             if (this.triggerMode === TriggerMode.SINGLE) {
                 this.triggerState = TriggerState.Recording;     // stop looking for triggers
             }
@@ -193,6 +191,8 @@ export class TriggerSource {
         if (this.triggerState === TriggerState.Recording) {
             this.#updateSingleRecording();
         }
+        // derived on every update, so changing the pre-trigger also applies to a trigger that was already found
+        this.displayStartPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
         return this.displayStartPointUs;
     }
 
