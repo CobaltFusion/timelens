@@ -1,4 +1,5 @@
 import { EventType } from "./globals.js";
+import { performanceMonitor } from "./globals.js"
 
 /**
  * @param {string} name
@@ -62,6 +63,7 @@ export class Collector {
         };
 
         this.ws.onmessage = (event) => {
+            performanceMonitor.countWebSocketMessage();
             const data = JSON.parse(event.data);
             // notice that the variables MUST correspond with the actual JSON field names here!
             const { name, cat, ph, pid, tid, ts, count } = data;

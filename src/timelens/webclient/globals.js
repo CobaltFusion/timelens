@@ -1,4 +1,5 @@
 import { AudioAlerts } from "./audioalerts.js";
+import { PerformanceMonitor } from "./performancemonitor.js"
 
 export class Settings {
     constructor() {
@@ -99,3 +100,6 @@ export function roundUpNice(value) {
 
     return nice * magnitude;
 }
+
+export const performanceMonitor = new PerformanceMonitor();
+

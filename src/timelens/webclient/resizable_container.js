@@ -1,3 +1,5 @@
+﻿import { performanceMonitor } from "./globals.js"
+
 /**
  * A container that wraps a component and provides resize and close behavior.
  * It can be styled in the css.
@@ -76,6 +78,7 @@ export class ResizableContainer {
     }
 
     resize() {
+        performanceMonitor.countResize();
         const styles = window.getComputedStyle(this.container);
 
         const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
