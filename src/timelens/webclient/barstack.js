@@ -293,7 +293,7 @@ export class BarStack {
             this.mouseY <= y + line.height;
 
         if (isHovered) {
-            this.hover = { event, durationUs };
+            this.hover = { event, durationUs, x1, x2 };
         }
     }
 }
