@@ -50,6 +50,7 @@ export class TriggerSource {
         this.searchStartPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
         this.triggerFoundTimeUs = 0;
         this.preTriggerUs = -10000; // default to -10ms
+        this.singleRecordUs = 10 * 1e6;  // a single trigger records up to 10s after the trigger
         this.triggerWord = "";
         this.dataLength = 0;
         this.onStatusChanged = null;
@@ -94,9 +95,12 @@ export class TriggerSource {
         return this.running;
     }
 
-    #stop() {
+    // stops collecting, events after 'endUs' are not included
+    #stop(endUs = Infinity) {
         // take a deep copy of the current data buffer
-        this.data = this.collector.data().map(event => ({ ...event }));
+        this.data = this.collector.data()
+            .filter(event => event.timestamp <= endUs)
+            .map(event => ({ ...event }));
         this.#setRunning(false);
     }
 
@@ -113,6 +117,10 @@ export class TriggerSource {
             this.#stop();
         }
         else {
+            // a finished single capture continues as auto, otherwise it would just show the old trigger
+            if (this.triggerMode === TriggerMode.SINGLE) {
+                this.auto();
+            }
             this.#setRunning(true);
         }
     }
@@ -120,12 +128,32 @@ export class TriggerSource {
     single() {
         this.clear();
         this.#determineTriggerMode(TriggerMode.SINGLE);
+        if (!this.running) {
+            this.#setRunning(true);
+        }
+    }
+
+    // In single mode the trigger stays fixed after it is found, recording continues until
+    // 'singleRecordUs' after the trigger, then data collection stops.
+    #updateSingleRecording() {
+        const recordEndUs = this.triggerFoundTimeUs + this.singleRecordUs;
+        if (this.collector.estimatedNowUs() >= recordEndUs) {
+            this.triggerState = TriggerState.Idle;
+            this.#stop(recordEndUs);
+        }
+    }
+
+    #isTrigger(event, triggerWord) {
+        return event.type === EventType.OPEN && containsIgnoreCaseWildcard(event.name, triggerWord);
     }
 
     findLastTriggerIndex(data, triggerWord) {
-        const index = data.findLastIndex(event =>
-            event.type === EventType.OPEN &&
-            containsIgnoreCaseWildcard(event.name, triggerWord));
+        const index = data.findLastIndex(event => this.#isTrigger(event, triggerWord));
+        return index >= 0 ? index : undefined;
+    }
+
+    findFirstTriggerIndex(data, triggerWord) {
+        const index = data.findIndex(event => this.#isTrigger(event, triggerWord));
         return index >= 0 ? index : undefined;
     }
 
@@ -145,7 +173,10 @@ export class TriggerSource {
         }
 
         if (this.triggerState === TriggerState.Waiting) {
-            const triggerIndex = this.findLastTriggerIndex(data, this.triggerWord);
+            // single waits for the _next_ trigger, auto follows the latest one
+            const triggerIndex = this.triggerMode === TriggerMode.SINGLE
+                ? this.findFirstTriggerIndex(data, this.triggerWord)
+                : this.findLastTriggerIndex(data, this.triggerWord);
             if (triggerIndex === undefined) {
                 // trigger specified, but not found.
                 this.triggerFoundTimeUs = 0;
@@ -155,8 +186,12 @@ export class TriggerSource {
             this.triggerFoundTimeUs = data[triggerIndex].timestamp;
             this.displayStartPointUs = this.triggerFoundTimeUs + this.preTriggerUs;
             if (this.triggerMode === TriggerMode.SINGLE) {
-                this.#stop();
+                this.triggerState = TriggerState.Recording;     // stop looking for triggers
             }
+        }
+
+        if (this.triggerState === TriggerState.Recording) {
+            this.#updateSingleRecording();
         }
         return this.displayStartPointUs;
     }

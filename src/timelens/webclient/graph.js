@@ -352,7 +352,9 @@ export class Graph {
     }
 
     single() {
+        this.manualView = null;
         this.triggerSource.single();
+        this.onStatusChanged?.();
     }
 
     // Normal grid: 20 segments from the zero point to the right edge.
