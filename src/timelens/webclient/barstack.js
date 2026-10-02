@@ -226,8 +226,8 @@ export class BarStack {
 
         // Position near the mouse, but keep the tooltip inside the graph.
         const dpr = window.devicePixelRatio || 1;
-        const canvasWidth = this.ctx.canvas.width / dpr;
-        const canvasHeight = this.ctx.canvas.height / dpr;
+        const canvasWidth = this.areaWidthPx ?? this.ctx.canvas.width / dpr;
+        const canvasHeight = this.areaHeightPx ?? this.ctx.canvas.height / dpr;
 
         const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
         const ty = Math.max(0, Math.min(this.mouseY - 24, canvasHeight - tooltipHeight));

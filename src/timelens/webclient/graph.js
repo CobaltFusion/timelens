@@ -11,7 +11,8 @@ export class Graph {
         this.canvas.classList.add("graph");
         this.mouseX = 0;
         this.mouseY = 0;
-        this.graphWidthPx = 0;
+        this.marginPx = 8;          // invisible margin around the graph area, holds the zero-point markers
+        this.graphWidthPx = 0;      // size of the graph area, excluding the margin
         this.graphHeightPx = 0;
         this.zeroShiftUs = 0;
         this.graphWidthUs = 0;
@@ -45,17 +46,14 @@ export class Graph {
                 return;
             }
 
-            const rect = this.canvas.getBoundingClientRect();
-            this.selectionStartX = e.clientX - rect.left;
+            this.selectionStartX = this.#toGraphX(e);
             this.selectionEndX = this.selectionStartX;
             this.selecting = true;
         });
 
         this.canvas.addEventListener("mousemove", (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-
-            this.mouseX = e.clientX - rect.left;
-            this.mouseY = e.clientY - rect.top;
+            this.mouseX = this.#toGraphX(e);
+            this.mouseY = this.#toGraphY(e);
 
             if (this.selecting) {
                 this.selectionEndX = this.mouseX;
@@ -69,12 +67,20 @@ export class Graph {
             }
 
             if (this.selecting) {
-                const rect = this.canvas.getBoundingClientRect();
-                this.selectionEndX = e.clientX - rect.left;
+                this.selectionEndX = this.#toGraphX(e);
                 this.selecting = false;
                 this.render();
             }
         });
+    }
+
+    // mouse position in graph area coordinates, (0, 0) is the top-left of the graph area
+    #toGraphX(e) {
+        return e.clientX - this.canvas.getBoundingClientRect().left - this.marginPx;
+    }
+
+    #toGraphY(e) {
+        return e.clientY - this.canvas.getBoundingClientRect().top - this.marginPx;
     }
 
     element() {
@@ -145,21 +151,50 @@ export class Graph {
             ctx.stroke();
         }
 
+        ctx.restore();
+    }
+
+    // Background and border of the graph area, the margin around it stays transparent.
+    drawGraphArea(ctx) {
+        ctx.save();
+        ctx.fillStyle = "#050a11";
+        ctx.fillRect(0, 0, this.graphWidthPx, this.graphHeightPx);
+        ctx.strokeStyle = "rgba(52, 229, 189, 0.65)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-0.5, -0.5, this.graphWidthPx + 1, this.graphHeightPx + 1);
+        ctx.restore();
+    }
+
+    // Triangles in the margin above and below the graph area, pointing at the zero point.
+    drawZeroMarkers(ctx) {
+        if (this.graphWidthUs <= 0) {
+            return;
+        }
+
+        const zeroX = this.zeroShiftUs / this.graphWidthUs * this.graphWidthPx;
+        if (zeroX < 0 || zeroX > this.graphWidthPx) {
+            return;     // panned out of view
+        }
+
+        const size = 6;     // height of the triangle, fits in the margin
+        const gap = 1;      // space between the triangle tip and the graph area
+
+        ctx.save();
         ctx.fillStyle = "white";
 
         // Top marker
         ctx.beginPath();
-        ctx.moveTo(zeroX - 5, 0);
-        ctx.lineTo(zeroX + 5, 0);
-        ctx.lineTo(zeroX, 6);
+        ctx.moveTo(zeroX - 5, -gap - size);
+        ctx.lineTo(zeroX + 5, -gap - size);
+        ctx.lineTo(zeroX, -gap);
         ctx.closePath();
         ctx.fill();
 
         // Bottom marker
         ctx.beginPath();
-        ctx.moveTo(zeroX - 5, graphHeightPx);
-        ctx.lineTo(zeroX + 5, graphHeightPx);
-        ctx.lineTo(zeroX, graphHeightPx - 6);
+        ctx.moveTo(zeroX - 5, this.graphHeightPx + gap + size);
+        ctx.lineTo(zeroX + 5, this.graphHeightPx + gap + size);
+        ctx.lineTo(zeroX, this.graphHeightPx + gap);
         ctx.closePath();
         ctx.fill();
 
@@ -431,18 +466,35 @@ export class Graph {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
 
+        const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
+        const canvasWidthPx = this.canvas.width / dpr;
+        const canvasHeightPx = this.canvas.height / dpr;
+        ctx.clearRect(0, 0, canvasWidthPx, canvasHeightPx);
+
+        this.graphWidthPx = Math.max(0, canvasWidthPx - 2 * this.marginPx);
+        this.graphHeightPx = Math.max(0, canvasHeightPx - 2 * this.marginPx);
+
+        // everything is drawn in graph area coordinates
+        ctx.save();
+        ctx.translate(this.marginPx, this.marginPx);
+        this.drawGraphArea(ctx);
+
+        // the graph itself is clipped to the graph area
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, this.graphWidthPx, this.graphHeightPx);
+        ctx.clip();
         this.renderGraph(ctx);
         this.drawSelection(ctx);
         this.drawCursor(ctx);
+        ctx.restore();
+
+        this.drawZeroMarkers(ctx);
+        ctx.restore();
     }
 
     renderGraph(ctx) {
-
         // We always draw the grid and pre-trigger cursor
-        const dpr = window.devicePixelRatio || 1; // dpr == 1.25 if your browser zoom is 125%
-        this.graphWidthPx = this.canvas.width / dpr;
-        this.graphHeightPx = this.canvas.height / dpr;
-        ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
 
         const graphWidthMs = this.getGraphWidthMs();
         const preTriggerMs = this.getPreTriggerMs();
@@ -493,6 +545,8 @@ export class Graph {
             endPointUs,
             zeroPointUs
         );
+        bars.areaWidthPx = this.graphWidthPx;
+        bars.areaHeightPx = this.graphHeightPx;
 
         // Pair open/close events over all data, so events that started before the view are
         // still found. Only events that overlap the view are added to the bars, so threads and
