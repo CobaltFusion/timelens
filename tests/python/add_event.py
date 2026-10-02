@@ -166,11 +166,11 @@ def sequence_test(counter, fixed, prefix=True) -> None:
 def sequence(counter, sequence_id) -> None:
     match sequence_id:
         case "normal":
-            sequence_test(counter, False, False)
+            sequence_test(counter, fixed=False, prefix=False)
         case "real":
-            sequence_test(counter, False)
+            sequence_test(counter, fixed=False, prefix=True)
         case "fixed":
-            sequence_test(counter, True)
+            sequence_test(counter, fixed=True, prefix=True)  # fixed means exact duration
         case _:
             raise ValueError(f"Unknown sequence: {sequence_id}")
 
