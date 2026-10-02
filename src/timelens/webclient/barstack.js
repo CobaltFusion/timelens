@@ -16,6 +16,9 @@ class Line {
 
         // End time of the event currently occupying each lane.
         this.lanes = [];
+
+        // All events (closed and still open) with their assigned lane, in draw order.
+        this.layoutEvents = [];
     }
 
     getLane(timestamp) {
@@ -102,6 +105,9 @@ export class BarStack {
             line.occupyLane(lane, event.end_time);
             event.lane = lane;
         }
+
+        // drawn as laid out, so an event keeps its lane when it goes from open to closed
+        line.layoutEvents = events;
     }
 
     layout() {
@@ -161,21 +167,7 @@ export class BarStack {
         const sortedLines = [...this.lines.entries()].sort(([a], [b]) => a - b);
 
         for (const [, line] of sortedLines) {
-            const unclosedEvents = Array.from(line.openMap.values());
-
-            for (const event of unclosedEvents) {
-                const drawEvent = {
-                    ...event,
-                    end_time: line.lastEndTime
-                };
-
-                const lane = line.getLane(drawEvent.timestamp);
-                line.occupyLane(lane, drawEvent.end_time);
-                drawEvent.lane = lane;
-                this.drawEvent(line, drawEvent);
-            }
-
-            for (const event of line.closedEvents) {
+            for (const event of line.layoutEvents) {
                 this.drawEvent(line, event);
             }
         }
