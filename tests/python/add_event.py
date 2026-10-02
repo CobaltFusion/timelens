@@ -74,26 +74,19 @@ def add_event(counter: int, name: str, category: str, duration_ms: float, fixed:
 
 
 def loop_event() -> None:
-    """Write a 100 ms event every 1 second until interrupted."""
+    """Write a 'pre' (20 ms), 'error' (100 ms) and 'post' (10 ms) event every 1 second until interrupted."""
 
-    name = "error"
     category = "loop"
-    duration_ms = 100
-    print("Sending a 100 ms 'loop' event every 1 second. Press Ctrl+C to stop.")
+    steps = [("pre", 20), ("error", 100), ("post", 10)]
+    print("Sending 'pre' (20 ms), 'error' (100 ms) and 'post' (10 ms) events every 1 second. Press Ctrl+C to stop.")
     next_event = time.perf_counter()
     try:
         while True:
             counter = _next_counter()
             next_event += 1.0
-            ts = _timestamp_us()
-            write_event(counter, name, category, "B", tid=345, fixed=False, ts=ts, prefix=True)
-            time.sleep(duration_ms / 1000.0)
-            end = ts = ts + duration_ms * 1000
-            write_event(counter, name, category, "E", tid=345, fixed=False, ts=end * 1000, prefix=True)
 
-            write_event(counter, "post", category, "B", tid=345, fixed=False, ts=end, prefix=True)
-            time.sleep(1 / 100.0)
-            write_event(counter, "post", category, "E", tid=345, fixed=False, ts=end + 1000, prefix=True)
+            for name, duration_ms in steps:
+                add_event(counter, name, category, duration_ms)
 
             remaining = next_event - time.perf_counter()
             if remaining > 0:
@@ -180,7 +173,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("-n", "--name", help="Name of the telemetry event.")
     mode.add_argument("-s", "--sequence", metavar="SEQUENCE_ID", help="Generate a predefined event sequence.")
-    mode.add_argument("-l", "--loop", action="store_true", help="Send a 100 ms event every 1 second until interrupted.")
+    mode.add_argument("-l", "--loop", action="store_true", help="Send 'pre', 'error' and 'post' events every 1 second until interrupted.")
     parser.add_argument("-c", "--category", help="Telemetry category.")
     parser.add_argument("-d", "--duration-ms", type=float, metavar="MILLISECONDS", help="Duration of the event in milliseconds.")
     args = parser.parse_args()

@@ -329,6 +329,7 @@ button:focus-visible {
     width: 160px;
     height: 36px;
     display: block;
+    cursor: pointer;
     box-sizing: border-box;
     color: var(--accent);
 
