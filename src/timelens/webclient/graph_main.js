@@ -69,8 +69,30 @@ class Main {
     }
 
     keyHandler(e) {
-        const key = e.key;
-        if (key === "d") {
+        // don't steal keys while typing, e.g. in the trigger word field
+        const target = e.target;
+        if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) {
+            return;
+        }
+        if (e.ctrlKey || e.altKey || e.metaKey) {
+            return;
+        }
+
+        const key = e.key.toLowerCase();
+        const graphs = [...this.widgets].map(widget => widget.component);
+
+        // pan/zoom: freezes the graphs on the current data until 'q' is pressed
+        const panFraction = 0.1;
+        const zoomFactor = 1.25;
+        switch (key) {
+            case "a": graphs.forEach(graph => graph.pan(-panFraction)); return;
+            case "d": graphs.forEach(graph => graph.pan(panFraction)); return;
+            case "w": graphs.forEach(graph => graph.zoom(zoomFactor)); return;
+            case "s": graphs.forEach(graph => graph.zoom(1 / zoomFactor)); return;
+            case "q": graphs.forEach(graph => graph.resume()); return;
+        }
+
+        if (key === "i") {
             getSettings().toggleDebuggingEnabled();
         }
         if (key === "r") {
