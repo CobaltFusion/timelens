@@ -6,7 +6,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from timelens.logwatcher import LogWatcher
@@ -24,6 +24,14 @@ class Server:
         self.count = 0
 
         self.app = FastAPI(lifespan=self.lifespan)
+
+        @self.app.middleware("http")
+        async def disable_cache(request: Request, call_next):
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            return response
 
         # The order matters: mount must be last, otherwise it can shadow
         # the other handlers.
