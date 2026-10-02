@@ -63,9 +63,6 @@ class Main {
 
         this.trafficIndication = new TrafficIndication(topPanel);
         this.healthIndication = new HealthIndication(topPanel);
-
-        this.preTriggerControl = null;
-        this.graphWidthControl = null;
     }
 
     keyHandler(e) {
@@ -79,17 +76,16 @@ class Main {
         }
 
         const key = e.key.toLowerCase();
-        const graphs = [...this.widgets].map(widget => widget.component);
-
-        // pan/zoom: freezes the graphs on the current data until 'q' or RUN is pressed
+        // pan/zoom acts on the selected graph, and freezes it on the current data until 'q' or RUN is pressed
+        const graph = ResizableContainer.getSelected()?.component;
         const panFraction = 0.1;
         const zoomFactor = 1.25;
         switch (key) {
-            case "a": graphs.forEach(graph => graph.pan(-panFraction)); return;
-            case "d": graphs.forEach(graph => graph.pan(panFraction)); return;
-            case "w": graphs.forEach(graph => graph.zoom(1 / zoomFactor)); return;
-            case "s": graphs.forEach(graph => graph.zoom(zoomFactor)); return;
-            case "q": graphs.forEach(graph => graph.resume()); return;
+            case "a": graph?.pan(-panFraction); return;
+            case "d": graph?.pan(panFraction); return;
+            case "w": graph?.zoom(1 / zoomFactor); return;
+            case "s": graph?.zoom(zoomFactor); return;
+            case "q": graph?.resume(); return;
         }
 
         if (key === "i") {
@@ -314,7 +310,7 @@ class Main {
         preTriggerLabel.textContent = "PreTrigger:";
         controls.appendChild(preTriggerLabel);
 
-        this.preTriggerControl = new NumericControl({
+        const preTriggerControl = new NumericControl({
             parent: controls,
             value: graph.getPreTriggerMs(),
             step: 10,
@@ -329,7 +325,7 @@ class Main {
         graphWidthLabel.textContent = "View:";
         controls.appendChild(graphWidthLabel);
 
-        this.graphWidthControl = new NumericControl({
+        const graphWidthControl = new NumericControl({
             parent: controls,
             value: graph.getGraphWidthMs(),
             step: 10,
@@ -389,8 +385,8 @@ class Main {
         graph.onStatusChanged = () => {
             const isRunning = graph.isRunning();
             stopRunButton.classList.toggle("running", isRunning);
-            this.preTriggerControl?.setValue(graph.getPreTriggerMs(), false);   // only display, notifying would reset the trigger mode
-            this.graphWidthControl?.setValue(graph.getGraphWidthMs(), false);
+            preTriggerControl.setValue(graph.getPreTriggerMs(), false);   // only display, notifying would reset the trigger mode
+            graphWidthControl.setValue(graph.getGraphWidthMs(), false);
         };
         stopRunButton.classList.toggle("running", graph.isRunning());
         controls.appendChild(stopRunButton);
@@ -423,6 +419,7 @@ class Main {
 
         widget.prepend(controls);
         this.widgets.add(widget);
+        widget.select();    // a new graph is the one the keyboard controls
     }
 }
 

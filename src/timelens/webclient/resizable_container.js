@@ -1,14 +1,19 @@
 ﻿import { performanceMonitor } from "./globals.js"
 
+// at most one container is selected at a time
+let selectedContainer = null;
+
 /**
  * A container that wraps a component and provides resize and close behavior.
- * It can be styled in the css.
+ * It is styled in the css: 'resizable-container', 'resizable-container-close',
+ * and 'selected' for the selected container. Clicking inside the container selects it.
  */
 export class ResizableContainer {
-    constructor({ parent, component, onClose }) {
+    constructor({ parent, component, onClose, onSelect = null }) {
         this.parent = parent;
         this.component = component;
         this.onClose = onClose;
+        this.onSelect = onSelect;
         this.prependedElements = []
 
         if (!(this.parent instanceof HTMLElement)) {
@@ -24,40 +29,20 @@ export class ResizableContainer {
     _createContainer() {
         // Outer box
         this.container = document.createElement("div");
-        this.container.style.position = "relative";
-        this.container.style.display = "inline-block";
-        this.container.style.borderRadius = "8px";
-        this.container.style.overflow = "hidden"; // clips inner content nicely
-        this.container.style.background = "#1111"; // dark
-        this.container.style.border = "1px solid #00ff88";
-        this.container.style.boxShadow = "0 4px 22px rgba(0,0,0,0.4)";
+        this.container.classList.add("resizable-container");
+
+        // capture phase, so the click selects the container even if a child handles the event
+        this.container.addEventListener("pointerdown", () => this.select(), { capture: true });
 
         // Close button
         this.closeButton = document.createElement("button");
-        this.closeButton.style.display = "flex";
-        this.closeButton.style.alignItems = "center";
-        this.closeButton.style.justifyContent = "center";
-        this.closeButton.style.fontSize = "11px";
-        this.closeButton.style.lineHeight = "1";
-        this.closeButton.style.padding = "0";
+        this.closeButton.classList.add("resizable-container-close");
         this.closeButton.textContent = "x";
 
-        this.closeButton.style.position = "absolute";
-        this.closeButton.style.top = "0px";
-        this.closeButton.style.right = "0px";
-
-        this.closeButton.style.width = "20px";
-        this.closeButton.style.height = "20px";
-        this.closeButton.style.minWidth = "20px";
-        this.closeButton.style.minHeight = "20px";
-
-        this.closeButton.style.border = "none";
-        this.closeButton.style.borderRadius = "0 8px 0 8px";
-        this.closeButton.style.background = "rgba(0,0,0,0.6)";
-        this.closeButton.style.color = "#00ff88";
-        this.closeButton.style.cursor = "pointer";
-
         this.closeButton.addEventListener("click", () => {
+            if (selectedContainer === this) {
+                selectedContainer = null;
+            }
             this.resizeObserver.disconnect();
             this.container.remove();
             this.onClose();
@@ -70,6 +55,24 @@ export class ResizableContainer {
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(this.container);
         this.resize();
+    }
+
+    select() {
+        if (selectedContainer === this) {
+            return;
+        }
+        selectedContainer?.container.classList.remove("selected");
+        selectedContainer = this;
+        this.container.classList.add("selected");
+        this.onSelect?.(this);
+    }
+
+    isSelected() {
+        return selectedContainer === this;
+    }
+
+    static getSelected() {
+        return selectedContainer;
     }
 
     prepend(element) {
