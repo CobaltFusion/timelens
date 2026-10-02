@@ -80,6 +80,8 @@ export class Graph {
             this.shiftHeld = false;
         });
 
+        this.#addTouchGestures();
+
         this.canvas.addEventListener("mouseup", (e) => {
             if (e.button !== 0) {
                 return;
@@ -93,6 +95,53 @@ export class Graph {
                 this.render();
             }
         });
+    }
+
+    // Touch (iPad): drag left/right to pan, pinch to zoom. The mouse keeps its selection behavior.
+    #addTouchGestures() {
+        const touches = new Map();      // pointerId -> { x, y } in graph area coordinates
+
+        const pinchState = () => {
+            const [a, b] = [...touches.values()];
+            return { centerX: (a.x + b.x) / 2, distance: Math.hypot(a.x - b.x, a.y - b.y) };
+        };
+
+        this.canvas.addEventListener("pointerdown", (e) => {
+            if (e.pointerType !== "touch") {
+                return;
+            }
+            this.canvas.setPointerCapture(e.pointerId);
+            touches.set(e.pointerId, { x: this.#toGraphX(e), y: this.#toGraphY(e) });
+        });
+
+        this.canvas.addEventListener("pointermove", (e) => {
+            const previous = touches.get(e.pointerId);
+            if (!previous) {
+                return;
+            }
+
+            if (touches.size === 1) {
+                const x = this.#toGraphX(e);
+                this.panByPx(x - previous.x);
+                touches.set(e.pointerId, { x, y: this.#toGraphY(e) });
+            }
+            else if (touches.size === 2) {
+                const before = pinchState();
+                touches.set(e.pointerId, { x: this.#toGraphX(e), y: this.#toGraphY(e) });
+                const after = pinchState();
+
+                if (after.distance > 0) {
+                    this.zoomAt(before.distance / after.distance, before.centerX);
+                }
+                this.panByPx(after.centerX - before.centerX);
+            }
+        });
+
+        const endTouch = (e) => {
+            touches.delete(e.pointerId);
+        };
+        this.canvas.addEventListener("pointerup", endTouch);
+        this.canvas.addEventListener("pointercancel", endTouch);
     }
 
     // mouse position in graph area coordinates, (0, 0) is the top-left of the graph area
@@ -475,9 +524,21 @@ export class Graph {
         }
     }
 
+    // Move the content by 'dx' pixels, positive moves it to the right (shows earlier events).
+    panByPx(dx) {
+        if (this.graphWidthPx > 0) {
+            this.pan(-dx / this.graphWidthPx);
+        }
+    }
+
     // factor < 1 zooms in, factor > 1 zooms out. The time under the mouse cursor stays
     // in place, if the mouse is outside the graph its last position is used.
     zoom(factor) {
+        this.zoomAt(factor, this.mouseX);
+    }
+
+    // Zoom keeping the time at graph x-position 'anchorX' in place.
+    zoomAt(factor, anchorX) {
         this.#enterManualView();
         const view = this.manualView;
         if (!view) {
@@ -488,7 +549,7 @@ export class Graph {
         const maxWidthUs = 60 * 1e6;    // the collector keeps the last minute
         const newWidthUs = Math.min(maxWidthUs, Math.max(minWidthUs, view.widthUs * factor));
 
-        const anchor = this.graphWidthPx > 0 ? Math.min(1, Math.max(0, this.mouseX / this.graphWidthPx)) : 0.5;
+        const anchor = this.graphWidthPx > 0 ? Math.min(1, Math.max(0, anchorX / this.graphWidthPx)) : 0.5;
         const anchorUs = view.startUs + anchor * view.widthUs;
         view.startUs = anchorUs - anchor * newWidthUs;
         view.widthUs = newWidthUs;

@@ -246,6 +246,9 @@ button:focus-visible {
     border: none;
     background: transparent;
     box-shadow: inset 0 0 2rem rgba(52, 229, 189, 0.04);
+
+    /* the browser only scrolls vertically, horizontal drags and pinches pan and zoom the graph */
+    touch-action: pan-y;
 }
 
 .graph-panel .resizable-container-close {
