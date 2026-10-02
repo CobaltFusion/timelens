@@ -54,13 +54,14 @@ export const EventType = Object.freeze({
 
 export const TriggerMode = Object.freeze({
     AUTO: "Auto",           // every trigger is automatically re-triggers
-    SINGLE: "Single",       // the first next trigger will stop data-collection after graphWidthMs
+    SINGLE: "Single",       // waits for the next trigger, records up to 10 seconds after it, then stops data-collection
     FREE: "Free"            // set when no 'trigger word' is set, will keep collecting data and show the last graphWidthMs
 });
 
 export const TriggerState = Object.freeze({
     Idle: "Idle",
     Waiting: "Waiting",  // looking for trigger
+    Recording: "Recording",  // single trigger found, recording until the post-trigger time has passed
 });
 
 export const TriggerResult = Object.freeze({

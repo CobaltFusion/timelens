@@ -389,8 +389,8 @@ class Main {
         graph.onStatusChanged = () => {
             const isRunning = graph.isRunning();
             stopRunButton.classList.toggle("running", isRunning);
-            this.preTriggerControl?.setValue(graph.getPreTriggerMs());
-            this.graphWidthControl?.setValue(graph.getGraphWidthMs());
+            this.preTriggerControl?.setValue(graph.getPreTriggerMs(), false);   // only display, notifying would reset the trigger mode
+            this.graphWidthControl?.setValue(graph.getGraphWidthMs(), false);
         };
         stopRunButton.classList.toggle("running", graph.isRunning());
         controls.appendChild(stopRunButton);
