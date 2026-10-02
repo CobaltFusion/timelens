@@ -120,20 +120,6 @@ export class BarStack {
         }
     }
 
-    formatTimestamp(time) {
-        const sign = time < 0 ? '-' : '';
-        time = Math.abs(time);
-        const seconds = Math.floor(time / 1_000_000);
-        const milliseconds = Math.floor((time % 1_000_000) / 1_000);
-        const microseconds = time % 1_000;
-
-        if (seconds > 0) {
-            return `${sign}${seconds}s ${milliseconds}ms ${microseconds}us:`;
-        }
-
-        return `${sign}${milliseconds}ms ${microseconds}us:`;
-    }
-
     // Picks s, ms or µs so the number stays readable.
     formatDuration(durationUs) {
         const absoluteUs = Math.abs(durationUs);
@@ -157,8 +143,7 @@ export class BarStack {
 
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
-        const hover = `${this.formatTimestamp(event.timestamp - this.zeroPointUs)} ${event.name}`
-        this.drawBar(line, event, hover, y);
+        this.drawBar(line, event, y);
     }
 
     drawEvents() {
@@ -216,23 +201,28 @@ export class BarStack {
 
     drawTooltip(hover) {
         const event = hover.event;
+        const offsetMs = (event.timestamp - this.zeroPointUs) / 1000;
+
+        const titleFont = { font: "bold 16px monospace", height: 22 };
+        const textFont = { font: "13px monospace", height: 17 };
         const lines = [
-            hover.title,
-            `received: ${this.formatWallTime(event.receivedMs)}`,
-            `pid:      ${event.processId ?? "-"}`,
-            `tid:      ${event.groupId ?? "-"}`,
-            `duration: ${this.formatDuration(hover.durationUs)}${event.type === EventType.OPEN ? " (open)" : ""}`
+            { text: event.name, ...titleFont },
+            { text: `offset:   ${offsetMs.toFixed(3)} ms`, ...textFont },
+            { text: `duration: ${this.formatDuration(hover.durationUs)}${event.type === EventType.OPEN ? " (open)" : ""}`, ...textFont },
+            { text: `received: ${this.formatWallTime(event.receivedMs)}`, ...textFont },
+            { text: `pid:      ${event.processId ?? "-"}`, ...textFont },
+            { text: `tid:      ${event.groupId ?? "-"}`, ...textFont }
         ];
 
-        this.ctx.font = "10px monospace";
-
         // Measure text size
-        const padding = 6;
-        const lineHeight = 13;
-        const textWidth = Math.max(...lines.map(text => this.ctx.measureText(text).width));
+        const padding = 8;
+        const textWidth = Math.max(...lines.map(line => {
+            this.ctx.font = line.font;
+            return this.ctx.measureText(line.text).width;
+        }));
 
         const tooltipWidth = textWidth + padding * 2;
-        const tooltipHeight = lines.length * lineHeight + padding;
+        const tooltipHeight = lines.reduce((height, line) => height + line.height, 0) + padding;
 
         // Position near the mouse, but keep the tooltip inside the graph.
         const dpr = window.devicePixelRatio || 1;
@@ -254,17 +244,16 @@ export class BarStack {
         this.ctx.fillStyle = "#00ff88";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "middle";
-        lines.forEach((text, index) => {
-            this.ctx.fillText(
-                text,
-                tx + padding,
-                ty + padding / 2 + lineHeight * (index + 0.5)
-            );
-        });
+        let lineY = ty + padding / 2;
+        for (const line of lines) {
+            this.ctx.font = line.font;
+            this.ctx.fillText(line.text, tx + padding, lineY + line.height / 2);
+            lineY += line.height;
+        }
     }
 
-    // Show the text by default, but show 'hover' if the mouse is over the bar.
-    drawBar(line, event, hover, y) {
+    // Draws the bar with its text, and remembers it for the tooltip if the mouse is over it.
+    drawBar(line, event, y) {
         assert(typeof event.name === "string", "event.name must be string");
 
         let durationUs = event.end_time - event.timestamp;
@@ -304,7 +293,7 @@ export class BarStack {
             this.mouseY <= y + line.height;
 
         if (isHovered) {
-            this.hover = { title: hover, event, durationUs };
+            this.hover = { event, durationUs };
         }
     }
 }
