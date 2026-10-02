@@ -52,19 +52,20 @@ function getColor(name) {
 }
 
 export class BarStack {
-    constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, endPointUs) {
+    constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, endPointUs, zeroPointUs) {
         this.ctx = ctx;
         this.mouseX = mouseX;
         this.mouseY = mouseY;
         this.scale = pixelsPerMicrosecond;
         this.startPointUs = startPointUs;
         this.endPointUs = endPointUs;
+        this.zeroPointUs = zeroPointUs;
 
         this.y = 0;
         this.height = 12;
         this.lines = new Map();
         this.beginTime = Infinity;
-        this.hover = null;
+        this.hover = null;   // the hover shows the offset from the zero-point
     }
 
     getLine(id) {
@@ -114,20 +115,22 @@ export class BarStack {
     }
 
     formatTimestamp(time) {
+        const sign = time < 0 ? '-' : '';
+        time = Math.abs(time);
         const seconds = Math.floor(time / 1_000_000);
         const milliseconds = Math.floor((time % 1_000_000) / 1_000);
         const microseconds = time % 1_000;
 
         if (seconds > 0) {
-            return `${seconds}s ${milliseconds}ms ${microseconds}us:`;
+            return `${sign}${seconds}s ${milliseconds}ms ${microseconds}us:`;
         }
 
-        return `${milliseconds}ms ${microseconds}us:`;
+        return `${sign}${milliseconds}ms ${microseconds}us:`;
     }
 
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
-        const hover = `${this.formatTimestamp(event.timestamp - this.startPointUs)} ${event.name}`
+        const hover = `${this.formatTimestamp(event.timestamp - this.zeroPointUs)} ${event.name}`
         this.drawBar(line, event, hover, y);
     }
 

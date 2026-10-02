@@ -390,7 +390,8 @@ export class Graph {
             this.mouseY,
             this.graphWidthPx / this.graphWidthUs,
             this.startPointUs,
-            endPointUs
+            endPointUs,
+            this.startPointUs + this.zeroShiftUs
         );
 
         for (let i = 0; i < data.length; ++i) {
