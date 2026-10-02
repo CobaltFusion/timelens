@@ -170,6 +170,11 @@ export class TriggerSource {
         return this.#getBufferDataFrom(this.displayStartPointUs);
     }
 
+    // all data the graph can currently show, regardless of the display start point
+    getAllData() {
+        return this.#getInternalDataBuffer();
+    }
+
     // return all data from 'timePoint' and after
     #getBufferDataFrom(timePoint) {
         return this.#getInternalDataBuffer().filter(

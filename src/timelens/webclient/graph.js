@@ -24,6 +24,10 @@ export class Graph {
         this.graphWidthMs = 1000;
         this.onStatusChanged = null;
 
+        // Manual view (pan/zoom with the keyboard): while active, incoming events are
+        // ignored and the graph shows a snapshot of the data until resume() is called.
+        this.manualView = null;     // { data, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
+
         this.triggerSource.onStatusChanged = () => {
             this.onStatusChanged?.();
         };
@@ -105,12 +109,9 @@ export class Graph {
 
     // The grid divides the area from zero to the right edge into 20 segments.
     // The major line aligns with the zero point.
-    drawGrid(ctx, graphWidthUs, graphWidthPx, graphHeightPx, zeroShiftUs) {
+    drawGrid(ctx, graphWidthUs, graphWidthPx, graphHeightPx, zeroShiftUs, stepUs) {
         ctx.save();
         ctx.lineWidth = 1;
-
-        const minorGridLineCount = 20;
-        const stepUs = (graphWidthUs - zeroShiftUs) / minorGridLineCount;
 
         const drawVerticalLine = (x, index) => {
             const isMajorLine = index % 2 === 0;
@@ -128,14 +129,11 @@ export class Graph {
         const zeroX = zeroShiftUs / graphWidthUs * graphWidthPx;
         const stepPx = stepUs / graphWidthUs * graphWidthPx;
 
-        // Lines before zero
-        for (let index = 0, x = zeroX; x > 0; x -= stepPx, ++index) {
-            drawVerticalLine(x, index);
-        }
-
-        // Lines after zero
-        for (let index = 0, x = zeroX; x < graphWidthPx; x += stepPx, ++index) {
-            drawVerticalLine(x, index);
+        // Only the visible lines, the zero point itself may be outside the view when panned.
+        const firstIndex = Math.ceil(-zeroX / stepPx);
+        const lastIndex = Math.floor((graphWidthPx - zeroX) / stepPx);
+        for (let index = firstIndex; index <= lastIndex; ++index) {
+            drawVerticalLine(zeroX + index * stepPx, Math.abs(index));
         }
 
         const renderAdjustment = 0.5;
@@ -346,6 +344,93 @@ export class Graph {
         this.triggerSource.single();
     }
 
+    // Normal grid: 20 segments from the zero point to the right edge.
+    getGridStepUs() {
+        const minorGridLineCount = 20;
+        return (this.graphWidthUs - this.zeroShiftUs) / minorGridLineCount;
+    }
+
+    // While zooming, the step doubles or halves so there are always roughly 20 lines,
+    // and every line still sits at a multiple of the original step from the zero point.
+    getManualGridStepUs() {
+        const view = this.manualView;
+        const targetLineCount = 20;
+        const exponent = Math.round(Math.log2(view.widthUs / (targetLineCount * view.baseStepUs)));
+        return view.baseStepUs * Math.pow(2, exponent);
+    }
+
+    // Freeze the current view on a snapshot of the data, so it can be panned and zoomed.
+    #enterManualView() {
+        if (this.manualView || this.graphWidthUs <= 0) {
+            return;
+        }
+
+        this.manualView = {
+            data: (this.triggerSource.getAllData() ?? []).map(event => ({ ...event })),
+            startUs: this.startPointUs,
+            widthUs: this.graphWidthUs,
+            zeroPointUs: this.startPointUs + this.zeroShiftUs,
+            nowUs: this.collector.estimatedNowUs(),
+            baseStepUs: this.getGridStepUs()
+        };
+    }
+
+    // Pan by a fraction of the visible width, negative is to the left.
+    pan(fraction) {
+        this.#enterManualView();
+        if (this.manualView) {
+            this.manualView.startUs += fraction * this.manualView.widthUs;
+        }
+    }
+
+    // factor < 1 zooms in, factor > 1 zooms out. Zooms around the mouse cursor if it
+    // is over the graph, otherwise around the center.
+    zoom(factor) {
+        this.#enterManualView();
+        const view = this.manualView;
+        if (!view) {
+            return;
+        }
+
+        const minWidthUs = 10;
+        const maxWidthUs = 60 * 1e6;    // the collector keeps the last minute
+        const newWidthUs = Math.min(maxWidthUs, Math.max(minWidthUs, view.widthUs * factor));
+
+        const anchor = this.mouseInside && this.graphWidthPx > 0 ? this.mouseX / this.graphWidthPx : 0.5;
+        const anchorUs = view.startUs + anchor * view.widthUs;
+        view.startUs = anchorUs - anchor * newWidthUs;
+        view.widthUs = newWidthUs;
+    }
+
+    // Leave the manual view and continue showing incoming events.
+    resume() {
+        this.manualView = null;
+    }
+
+    drawManualViewLabel(ctx) {
+        const text = "paused - a/d: pan, w/s: zoom, q: resume";
+
+        ctx.save();
+        ctx.font = "12px monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+
+        const paddingX = 6;
+        const boxWidth = ctx.measureText(text).width + paddingX * 2;
+        const boxHeight = 18;
+        const boxX = this.graphWidthPx - boxWidth - 8;
+        const boxY = 8;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        ctx.strokeStyle = "rgba(245, 158, 11, 0.9)";
+        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxWidth - 1, boxHeight - 1);
+
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillText(text, this.graphWidthPx - 8 - paddingX, boxY + 3);
+        ctx.restore();
+    }
+
     render() {
         const ctx = this.canvas.getContext("2d");
         if (!ctx) return
@@ -366,21 +451,41 @@ export class Graph {
         const graphWidthMs = this.getGraphWidthMs();
         const preTriggerMs = this.getPreTriggerMs();
 
-        // preTriggerMs < 0 will add to the width, while >= 0 will not affect the width
-        const extraWidth = Math.max(preTriggerMs * -1, 0);
-        this.zeroShiftUs = extraWidth * 1e3; // how far is the zero-point from the beginning of display in microseconds
-        this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
-        this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs);
+        let data;
+        let estimatedNowUs;
+        let zeroPointUs;
 
-        const freeStartPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
-        this.startPointUs = this.triggerSource.updateStartPoint(freeStartPointUs);
+        if (this.manualView) {
+            const view = this.manualView;
+            this.startPointUs = view.startUs;
+            this.graphWidthUs = view.widthUs;
+            this.zeroShiftUs = view.zeroPointUs - view.startUs;
+            this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs, this.getManualGridStepUs());
+            this.drawManualViewLabel(ctx);
 
-        const data = this.triggerSource.getGraphData();
+            data = view.data;
+            estimatedNowUs = view.nowUs;
+            zeroPointUs = view.zeroPointUs;
+        }
+        else {
+            // preTriggerMs < 0 will add to the width, while >= 0 will not affect the width
+            const extraWidth = Math.max(preTriggerMs * -1, 0);
+            this.zeroShiftUs = extraWidth * 1e3; // how far is the zero-point from the beginning of display in microseconds
+            this.graphWidthUs = ((graphWidthMs + extraWidth) * 1e3);
+            this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs, this.getGridStepUs());
+
+            const freeStartPointUs = this.collector.getLastTimepointUs() - this.graphWidthUs;
+            this.startPointUs = this.triggerSource.updateStartPoint(freeStartPointUs);
+
+            data = this.triggerSource.getGraphData();
+            estimatedNowUs = this.collector.estimatedNowUs();
+            zeroPointUs = this.startPointUs + this.zeroShiftUs;
+        }
+
         if (data.length === 0) {
             return;
         }
 
-        const estimatedNowUs = this.collector.estimatedNowUs();
         const graphEndUs = this.startPointUs + this.graphWidthUs;
         const endPointUs = Math.min(estimatedNowUs, graphEndUs);
 
@@ -391,7 +496,7 @@ export class Graph {
             this.graphWidthPx / this.graphWidthUs,
             this.startPointUs,
             endPointUs,
-            this.startPointUs + this.zeroShiftUs
+            zeroPointUs
         );
 
         for (let i = 0; i < data.length; ++i) {
