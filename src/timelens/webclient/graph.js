@@ -494,35 +494,61 @@ export class Graph {
             zeroPointUs
         );
 
+        // Pair open/close events over all data, so events that started before the view are
+        // still found. Only events that overlap the view are added to the bars, so threads and
+        // lanes are not taken up by events that are not visible.
+        const isVisible = (startUs, endUs) => endUs >= this.startPointUs && startUs <= graphEndUs;
+        const groups = new Map();   // groupId -> { openMap, lastEndTime }
+
         for (let i = 0; i < data.length; ++i) {
             const event = data[i];
-            const line = bars.getLine(event.groupId);
-            if (event.timestamp > line.lastEndTime) {
-                line.lastEndTime = event.timestamp;
+            let group = groups.get(event.groupId);
+            if (!group) {
+                group = { openMap: new Map(), lastEndTime: 0 };
+                groups.set(event.groupId, group);
+            }
+            if (event.timestamp > group.lastEndTime) {
+                group.lastEndTime = event.timestamp;
             }
 
             if (event.type === EventType.OPEN) {
-                line.openMap.set(event.name, event);
-
-                if (event.timestamp < bars.beginTime) {
-                    bars.beginTime = event.timestamp;
-                }
+                group.openMap.set(event.name, event);
             }
 
             if (event.type === EventType.CLOSE) {
-                const start_event = line.openMap.get(event.name);
+                const start_event = group.openMap.get(event.name);
                 if (!start_event) continue;
-                const closedEvent = {
-                    ...start_event,   // take a copy
-                    end_time: event.timestamp,          // closedEvent now has timestamp + end_time
-                    type: EventType.CLOSE
-                };
-                line.closedEvents.push(closedEvent);
-                line.openMap.delete(event.name);
+                group.openMap.delete(event.name);
+
+                if (isVisible(start_event.timestamp, event.timestamp)) {
+                    const closedEvent = {
+                        ...start_event,   // take a copy
+                        end_time: event.timestamp,          // closedEvent now has timestamp + end_time
+                        type: EventType.CLOSE
+                    };
+                    bars.getLine(event.groupId).closedEvents.push(closedEvent);
+                }
             }
 
-            if (event.type === EventType.DURATION) {
-                line.closedEvents.push(event);
+            if (event.type === EventType.DURATION && isVisible(event.timestamp, event.end_time ?? event.timestamp)) {
+                bars.getLine(event.groupId).closedEvents.push(event);
+            }
+        }
+
+        // events that are still open extend to the end of the view
+        for (const [groupId, group] of groups) {
+            const openEvents = [...group.openMap.values()].filter(event => event.timestamp <= graphEndUs);
+            if (openEvents.length === 0 && !bars.lines.has(groupId)) {
+                continue;
+            }
+
+            const line = bars.getLine(groupId);
+            line.lastEndTime = group.lastEndTime;
+            for (const event of openEvents) {
+                line.openMap.set(event.name, event);
+                if (event.timestamp < bars.beginTime) {
+                    bars.beginTime = event.timestamp;
+                }
             }
         }
 

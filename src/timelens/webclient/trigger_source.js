@@ -202,7 +202,8 @@ export class TriggerSource {
         if (this.triggerResult === TriggerState.Waiting && this.triggerResult === TriggerResult.None) {
             return [];
         }
-        return this.#getBufferDataFrom(this.displayStartPointUs);
+        // not filtered on displayStartPointUs, events that started before the view can still be (partly) visible
+        return this.#getInternalDataBuffer();
     }
 
     // all data the graph can currently show, regardless of the display start point
