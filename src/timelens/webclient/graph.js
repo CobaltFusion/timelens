@@ -18,6 +18,8 @@ export class Graph {
         this.graphWidthUs = 0;
         this.startPointUs = 0;      // timepoint where we start rendering the actual graph
         this.mouseInside = false;
+        this.shiftHeld = false;     // while held, the cursor snaps to the begin or end of the hovered event
+        this.hoveredBar = null;     // { x1, x2 } of the event under the mouse, from the last render
         this.selectionStartX = null;
         this.selectionEndX = null;
         this.selecting = false;
@@ -46,7 +48,9 @@ export class Graph {
                 return;
             }
 
-            this.selectionStartX = this.#toGraphX(e);
+            this.mouseX = this.#toGraphX(e);
+            this.shiftHeld = e.shiftKey;
+            this.selectionStartX = this.getCursorX();
             this.selectionEndX = this.selectionStartX;
             this.selecting = true;
         });
@@ -54,11 +58,26 @@ export class Graph {
         this.canvas.addEventListener("mousemove", (e) => {
             this.mouseX = this.#toGraphX(e);
             this.mouseY = this.#toGraphY(e);
+            this.shiftHeld = e.shiftKey;
 
             if (this.selecting) {
-                this.selectionEndX = this.mouseX;
-                this.render();
+                this.render();      // render() updates selectionEndX
             }
+        });
+
+        // shift can be pressed or released without moving the mouse
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Shift") {
+                this.shiftHeld = true;
+            }
+        });
+        window.addEventListener("keyup", (e) => {
+            if (e.key === "Shift") {
+                this.shiftHeld = false;
+            }
+        });
+        window.addEventListener("blur", () => {
+            this.shiftHeld = false;
         });
 
         this.canvas.addEventListener("mouseup", (e) => {
@@ -67,7 +86,9 @@ export class Graph {
             }
 
             if (this.selecting) {
-                this.selectionEndX = this.#toGraphX(e);
+                this.mouseX = this.#toGraphX(e);
+                this.shiftHeld = e.shiftKey;
+                this.selectionEndX = this.getCursorX();
                 this.selecting = false;
                 this.render();
             }
@@ -201,16 +222,38 @@ export class Graph {
         ctx.restore();
     }
 
+    // The cursor follows the mouse, with shift held it snaps to the nearest visible
+    // begin or end of the event under the mouse.
+    getSnapX() {
+        if (!this.shiftHeld || !this.hoveredBar) {
+            return null;
+        }
+
+        const edges = [this.hoveredBar.x1, this.hoveredBar.x2]
+            .filter(x => x >= 0 && x <= this.graphWidthPx);
+        if (edges.length === 0) {
+            return null;
+        }
+
+        return edges.reduce((nearest, x) =>
+            Math.abs(x - this.mouseX) < Math.abs(nearest - this.mouseX) ? x : nearest);
+    }
+
+    getCursorX() {
+        return this.getSnapX() ?? this.mouseX;
+    }
+
     drawCursor(ctx) {
         if (!this.mouseInside) {
             return;
         }
 
-        const x = Math.round(this.mouseX) + 0.5;
+        const snapped = this.getSnapX() !== null;
+        const x = Math.round(this.getCursorX()) + 0.5;
 
         ctx.save();
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.strokeStyle = snapped ? "#00ff88" : "rgba(255, 255, 255, 0.7)";
         ctx.lineWidth = 1;
 
         ctx.beginPath();
@@ -485,6 +528,9 @@ export class Graph {
         ctx.rect(0, 0, this.graphWidthPx, this.graphHeightPx);
         ctx.clip();
         this.renderGraph(ctx);
+        if (this.selecting) {
+            this.selectionEndX = this.getCursorX();
+        }
         this.drawSelection(ctx);
         this.drawCursor(ctx);
         ctx.restore();
@@ -495,6 +541,7 @@ export class Graph {
 
     renderGraph(ctx) {
         // We always draw the grid and pre-trigger cursor
+        this.hoveredBar = null;
 
         const graphWidthMs = this.getGraphWidthMs();
         const preTriggerMs = this.getPreTriggerMs();
@@ -607,6 +654,7 @@ export class Graph {
         }
 
         bars.drawEvents();
+        this.hoveredBar = bars.hover;
     }
 
     resize(width, height) {
