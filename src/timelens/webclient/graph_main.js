@@ -81,14 +81,14 @@ class Main {
         const key = e.key.toLowerCase();
         const graphs = [...this.widgets].map(widget => widget.component);
 
-        // pan/zoom: freezes the graphs on the current data until 'q' is pressed
+        // pan/zoom: freezes the graphs on the current data until 'q' or RUN is pressed
         const panFraction = 0.1;
         const zoomFactor = 1.25;
         switch (key) {
             case "a": graphs.forEach(graph => graph.pan(-panFraction)); return;
             case "d": graphs.forEach(graph => graph.pan(panFraction)); return;
-            case "w": graphs.forEach(graph => graph.zoom(zoomFactor)); return;
-            case "s": graphs.forEach(graph => graph.zoom(1 / zoomFactor)); return;
+            case "w": graphs.forEach(graph => graph.zoom(1 / zoomFactor)); return;
+            case "s": graphs.forEach(graph => graph.zoom(zoomFactor)); return;
             case "q": graphs.forEach(graph => graph.resume()); return;
         }
 
@@ -387,12 +387,12 @@ class Main {
         });
 
         graph.onStatusChanged = () => {
-            const isRunning = graph.triggerSource.isRunning();
+            const isRunning = graph.isRunning();
             stopRunButton.classList.toggle("running", isRunning);
             this.preTriggerControl?.setValue(graph.getPreTriggerMs());
             this.graphWidthControl?.setValue(graph.getGraphWidthMs());
         };
-        stopRunButton.classList.toggle("running", graph.triggerSource.isRunning());
+        stopRunButton.classList.toggle("running", graph.isRunning());
         controls.appendChild(stopRunButton);
 
         const singleButton = document.createElement("button");

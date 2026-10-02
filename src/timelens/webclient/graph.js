@@ -336,8 +336,19 @@ export class Graph {
         this.triggerSource.auto();
     }
 
+    // Running means the graph follows incoming events, it is paused while panning/zooming
+    // or after a single trigger stopped the trigger source.
+    isRunning() {
+        return !this.manualView && this.triggerSource.isRunning();
+    }
+
     toggleRunning() {
-        this.triggerSource.toggleRunning();
+        if (this.isRunning()) {
+            this.#enterManualView();
+        }
+        else {
+            this.resume();
+        }
     }
 
     single() {
@@ -373,6 +384,7 @@ export class Graph {
             nowUs: this.collector.estimatedNowUs(),
             baseStepUs: this.getGridStepUs()
         };
+        this.onStatusChanged?.();
     }
 
     // Pan by a fraction of the visible width, negative is to the left.
@@ -383,8 +395,8 @@ export class Graph {
         }
     }
 
-    // factor < 1 zooms in, factor > 1 zooms out. Zooms around the mouse cursor if it
-    // is over the graph, otherwise around the center.
+    // factor < 1 zooms in, factor > 1 zooms out. The time under the mouse cursor stays
+    // in place, if the mouse is outside the graph its last position is used.
     zoom(factor) {
         this.#enterManualView();
         const view = this.manualView;
@@ -396,7 +408,7 @@ export class Graph {
         const maxWidthUs = 60 * 1e6;    // the collector keeps the last minute
         const newWidthUs = Math.min(maxWidthUs, Math.max(minWidthUs, view.widthUs * factor));
 
-        const anchor = this.mouseInside && this.graphWidthPx > 0 ? this.mouseX / this.graphWidthPx : 0.5;
+        const anchor = this.graphWidthPx > 0 ? Math.min(1, Math.max(0, this.mouseX / this.graphWidthPx)) : 0.5;
         const anchorUs = view.startUs + anchor * view.widthUs;
         view.startUs = anchorUs - anchor * newWidthUs;
         view.widthUs = newWidthUs;
@@ -405,30 +417,12 @@ export class Graph {
     // Leave the manual view and continue showing incoming events.
     resume() {
         this.manualView = null;
-    }
-
-    drawManualViewLabel(ctx) {
-        const text = "paused - a/d: pan, w/s: zoom, q: resume";
-
-        ctx.save();
-        ctx.font = "12px monospace";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "top";
-
-        const paddingX = 6;
-        const boxWidth = ctx.measureText(text).width + paddingX * 2;
-        const boxHeight = 18;
-        const boxX = this.graphWidthPx - boxWidth - 8;
-        const boxY = 8;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
-        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.9)";
-        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxWidth - 1, boxHeight - 1);
-
-        ctx.fillStyle = "#f59e0b";
-        ctx.fillText(text, this.graphWidthPx - 8 - paddingX, boxY + 3);
-        ctx.restore();
+        if (!this.triggerSource.isRunning()) {
+            this.triggerSource.toggleRunning();     // notifies onStatusChanged
+        }
+        else {
+            this.onStatusChanged?.();
+        }
     }
 
     render() {
@@ -461,7 +455,6 @@ export class Graph {
             this.graphWidthUs = view.widthUs;
             this.zeroShiftUs = view.zeroPointUs - view.startUs;
             this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs, this.getManualGridStepUs());
-            this.drawManualViewLabel(ctx);
 
             data = view.data;
             estimatedNowUs = view.nowUs;

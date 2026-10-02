@@ -7,16 +7,21 @@ import { performanceMonitor } from "./globals.js"
  * @param {number} timestamp
  * @param {number} groupId
  * @param {number} value
+ * @param {number} count
+ * @param {number} processId
+ * @param {number} receivedMs  browser wall time (ms since the unix epoch) the message was received
  * @returns {TSEvent}
  */
-function makeEvent(name, type, timestamp, groupId, value, count) {
+function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs) {
     return {
         name: name,
         type: type,
         timestamp: timestamp,     // microseconds (µs)
         groupId: groupId,
         value: value,
-        count: count
+        count: count,
+        processId: processId,
+        receivedMs: receivedMs
     };
 }
 
@@ -76,7 +81,7 @@ export class Collector {
             const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
             const groupId = tid; // use tid as grouping for single line
             const value = 0;
-            const newEvent = makeEvent(name, type, ts, groupId, value, count);
+            const newEvent = makeEvent(name, type, ts, groupId, value, count, pid, Date.now());
             this.onIncomingEvent?.(newEvent);
             this.incoming.push(newEvent);
 

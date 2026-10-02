@@ -128,6 +128,27 @@ export class BarStack {
         return `${sign}${milliseconds}ms ${microseconds}us:`;
     }
 
+    // Picks s, ms or µs so the number stays readable.
+    formatDuration(durationUs) {
+        const absoluteUs = Math.abs(durationUs);
+        if (absoluteUs >= 1_000_000) {
+            return `${(durationUs / 1_000_000).toFixed(3)} s`;
+        }
+        if (absoluteUs >= 1_000) {
+            return `${(durationUs / 1_000).toFixed(3)} ms`;
+        }
+        return `${durationUs.toFixed(0)} µs`;
+    }
+
+    formatWallTime(timeMs) {
+        if (timeMs === undefined) {
+            return "-";
+        }
+        const date = new Date(timeMs);
+        const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+        return `${date.toLocaleTimeString([], { hour12: false })}.${milliseconds}`;
+    }
+
     drawEvent(line, event) {
         const y = line.y + event.lane * line.lineSpacing;
         const hover = `${this.formatTimestamp(event.timestamp - this.zeroPointUs)} ${event.name}`
@@ -160,11 +181,11 @@ export class BarStack {
         }
         // Draw the tooltip last so it is always on top.
         if (this.hover) {
-            this.drawTooltip(this.hover.name, this.hover.duration);
+            this.drawTooltip(this.hover);
         }
     }
 
-    drawTextOnBar(name, x, width, y, height, durationMs) {
+    drawTextOnBar(name, x, width, y, height, durationUs) {
 
         const horizontalPadding = 4;
         const availableWidth = width - horizontalPadding * 2;
@@ -176,7 +197,7 @@ export class BarStack {
         this.ctx.font = "14px monospace";
 
         const texts = [
-            `${name} (${durationMs} ms)`,
+            `${name} (${this.formatDuration(durationUs)})`,
             `${name}`,
             `${name.slice(0, 3)}...`
         ];
@@ -201,17 +222,25 @@ export class BarStack {
         );
     }
 
-    drawTooltip(hover, duration) {
-        const text = `${hover} (${duration.toFixed(3)} ms)`;
+    drawTooltip(hover) {
+        const event = hover.event;
+        const lines = [
+            hover.title,
+            `received: ${this.formatWallTime(event.receivedMs)}`,
+            `pid:      ${event.processId ?? "-"}`,
+            `tid:      ${event.groupId ?? "-"}`,
+            `duration: ${this.formatDuration(hover.durationUs)}${event.type === EventType.OPEN ? " (open)" : ""}`
+        ];
 
         this.ctx.font = "10px monospace";
 
         // Measure text size
-        const metrics = this.ctx.measureText(text);
         const padding = 6;
+        const lineHeight = 13;
+        const textWidth = Math.max(...lines.map(text => this.ctx.measureText(text).width));
 
-        const tooltipWidth = metrics.width + padding * 2;
-        const tooltipHeight = 16;
+        const tooltipWidth = textWidth + padding * 2;
+        const tooltipHeight = lines.length * lineHeight + padding;
 
         // Position near the mouse, but keep the tooltip inside the graph.
         const dpr = window.devicePixelRatio || 1;
@@ -233,18 +262,20 @@ export class BarStack {
         this.ctx.fillStyle = "#00ff88";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "middle";
-        this.ctx.fillText(
-            text,
-            tx + padding,
-            ty + tooltipHeight / 2
-        );
+        lines.forEach((text, index) => {
+            this.ctx.fillText(
+                text,
+                tx + padding,
+                ty + padding / 2 + lineHeight * (index + 0.5)
+            );
+        });
     }
 
     // Show the text by default, but show 'hover' if the mouse is over the bar.
     drawBar(line, event, hover, y) {
         assert(typeof event.name === "string", "event.name must be string");
 
-        let durationMs = (event.end_time - event.timestamp) / 1000;
+        let durationUs = event.end_time - event.timestamp;
         const x1 = Math.round((event.timestamp - this.startPointUs) * this.scale);
         let x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
         let width = x2 - x1;
@@ -253,7 +284,7 @@ export class BarStack {
         if (event.type === EventType.OPEN) {
             x2 = Math.round((this.endPointUs - this.startPointUs) * this.scale);
             width = x2 - x1;
-            durationMs = (this.endPointUs - event.timestamp) / 1000;
+            durationUs = this.endPointUs - event.timestamp;
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
             gradient.addColorStop(0, color);
             gradient.addColorStop(0.75, color);
@@ -268,10 +299,10 @@ export class BarStack {
         }
 
         if (getSettings().isDebuggingEnabled()) {
-            this.drawTextOnBar(`${event.count} = ${event.name}`, x1, width, y, line.height, durationMs);
+            this.drawTextOnBar(`${event.count} = ${event.name}`, x1, width, y, line.height, durationUs);
         }
         else {
-            this.drawTextOnBar(`${event.name}`, x1, width, y, line.height, durationMs);
+            this.drawTextOnBar(`${event.name}`, x1, width, y, line.height, durationUs);
         }
 
         const isHovered =
@@ -281,7 +312,7 @@ export class BarStack {
             this.mouseY <= y + line.height;
 
         if (isHovered) {
-            this.hover = { name: hover, duration: durationMs };
+            this.hover = { title: hover, event, durationUs };
         }
     }
 }
