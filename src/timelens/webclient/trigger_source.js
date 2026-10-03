@@ -61,6 +61,7 @@ export class TriggerSource {
         this.historyBeforeSearchUs = 60 * 1e6;  // a stopped capture keeps up to a minute before 'searchStartPointUs'
         this.triggerWord = "";
         this.triggerMatcher = makeWildcardMatcher("");
+        /** @type {typeof TriggerEdge[keyof typeof TriggerEdge]} */
         this.triggerEdge = TriggerEdge.RISING;
         this.dataLength = 0;
         this.onStatusChanged = null;

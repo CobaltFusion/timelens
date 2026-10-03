@@ -172,7 +172,7 @@ class Main {
             }, 100);
 
             // beeping
-            if (event.type === EventType.OPEN) {
+            if (event.type === EventType.OPEN || event.type === EventType.DURATION) {
                 if (containsIgnoreCase(event.name, "error")) {
                     console.log("Error beeping");
                     getAudioAlerts().beep(1300, 0, 0.03, "square");

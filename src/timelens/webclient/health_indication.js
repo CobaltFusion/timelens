@@ -1,3 +1,5 @@
+import { EventType } from "./globals.js";
+
 // Display modes, a click on the indicator cycles through them.
 const Mode = Object.freeze({
     DURATIONS: 0,   // one line per event name, length is the last duration
@@ -68,6 +70,18 @@ export class HealthIndication {
         this.addSignatureMessage(event);
 
         const { name, timestamp } = event;
+
+        // a duration event is complete on its own, it does not pair with a begin or end
+        if (event.type === EventType.DURATION) {
+            this.addEvent({
+                name,
+                start: timestamp,
+                duration: (event.end_time ?? timestamp) - timestamp
+            });
+            this.scheduleDraw();
+            return;
+        }
+
         const previous = this.pendingEvents.get(name);
 
         if (previous !== undefined) {
