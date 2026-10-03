@@ -131,6 +131,13 @@ export class TriggerSource {
         this.searchStartPointUs = this.collector.getLastTimepointUs();
     }
 
+    // drops the copy that is shown while stopped
+    clearCopy() {
+        if (!this.running) {
+            this.data = [];
+        }
+    }
+
     auto() {
         this.#determineTriggerMode(TriggerMode.AUTO);
     }

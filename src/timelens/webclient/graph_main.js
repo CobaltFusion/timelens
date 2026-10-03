@@ -38,6 +38,13 @@ class Main {
         this.resetButton.addEventListener("click", () => this.collector.reset());
         topPanel.appendChild(this.resetButton);
 
+        this.clearButton = document.createElement("button");
+        this.clearButton.classList.add("control-button");
+        this.clearButton.textContent = "Clear";
+        this.clearButton.title = "Remove all received events from the buffer";
+        this.clearButton.addEventListener("click", () => this.clearAll());
+        topPanel.appendChild(this.clearButton);
+
         this.audioButton = document.createElement("button");
         this.audioButton.id = "id_audio_button";
         this.audioButton.classList.add("audio-button", "control-button");
@@ -174,6 +181,14 @@ class Main {
         window.onload = () => {
             this.renderObjects();
         };
+    }
+
+    // empties the shared buffer and the copies kept by stopped or panned/zoomed graphs
+    clearAll() {
+        this.collector.clear();
+        for (const widget of this.widgets) {
+            widget.component.clearCopies();
+        }
     }
 
     resizeObjects() {
@@ -348,14 +363,6 @@ class Main {
         const separator = document.createElement("span");
         separator.classList.add("control-separator");
         controls.appendChild(separator);
-
-        const clearButton = document.createElement("button");
-        clearButton.textContent = "CLEAR";
-        clearButton.classList.add("control-button");
-        clearButton.addEventListener("click", () => {
-            graph.clear();
-        });
-        controls.appendChild(clearButton);
 
         const autoButton = document.createElement("button");
         autoButton.textContent = "AUTO";

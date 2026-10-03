@@ -462,9 +462,12 @@ export class Graph {
         }
     }
 
-    clear() {
-        this.triggerSource.clear();
-        this.render();
+    // drops the events this graph keeps apart from the shared buffer
+    clearCopies() {
+        this.triggerSource.clearCopy();
+        if (this.manualView) {
+            this.manualView.data = [];
+        }
     }
 
     auto() {
