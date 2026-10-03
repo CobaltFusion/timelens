@@ -199,9 +199,18 @@ export class TriggerSource {
     }
 
     #isTrigger(event) {
-        // in the raw data a 'B' is an OPEN event and an 'E' is a CLOSE event, both at their own timestamp
+        // in the raw data a 'B' is an OPEN event and an 'E' is a CLOSE event, both at their own timestamp,
+        // a DURATION event has both edges
         const edgeType = this.triggerEdge === TriggerEdge.FALLING ? EventType.CLOSE : EventType.OPEN;
-        return event.type === edgeType && this.triggerMatcher(event.name);
+        return (event.type === edgeType || event.type === EventType.DURATION) && this.triggerMatcher(event.name);
+    }
+
+    // the time of the selected edge, only a DURATION event has its falling edge at 'end_time'
+    #triggerTimeUs(event) {
+        if (this.triggerEdge === TriggerEdge.FALLING && event.type === EventType.DURATION) {
+            return event.end_time ?? event.timestamp;
+        }
+        return event.timestamp;
     }
 
     // Searches only the events that were not searched before, 'data' has 'length' and 'at(i)'.
@@ -253,7 +262,7 @@ export class TriggerSource {
         if (this.triggerState === TriggerState.Waiting) {
             const trigger = this.#findNewTrigger(data);
             if (trigger !== undefined) {
-                this.triggerFoundTimeUs = trigger.timestamp;
+                this.triggerFoundTimeUs = this.#triggerTimeUs(trigger);
                 if (this.triggerMode === TriggerMode.SINGLE) {
                     this.triggerState = TriggerState.Recording;     // stop looking for triggers
                 }
