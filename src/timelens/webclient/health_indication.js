@@ -28,6 +28,7 @@ export class HealthIndication {
         this.lineWidth = 2;
         this.eventHistory = [];
         this.pendingEvents = new Map();
+        this.drawFrame = null;          // pending requestAnimationFrame, see scheduleDraw()
         this.eventColors = new Map();
 
         // Signature mode state
@@ -83,7 +84,18 @@ export class HealthIndication {
             this.pendingEvents.set(name, event);
         }
 
-        this.draw();
+        this.scheduleDraw();
+    }
+
+    // Messages can arrive much faster than the screen refreshes, so draw at most once per frame.
+    scheduleDraw() {
+        if (this.drawFrame !== null) {
+            return;
+        }
+        this.drawFrame = requestAnimationFrame(() => {
+            this.drawFrame = null;
+            this.draw();
+        });
     }
 
     addEvent(event) {
@@ -247,8 +259,6 @@ export class HealthIndication {
 
         // mark anomalies so they stand out even when the segment is short
         ctx.fillStyle = anomalyColor;
-        ctx.shadowColor = anomalyColor;
-        ctx.shadowBlur = 4;
         for (let i = 0; i < count; ++i) {
             if (this.signature[i].anomaly) {
                 ctx.beginPath();
@@ -260,11 +270,9 @@ export class HealthIndication {
         // current position
         const head = points[points.length - 1];
         ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = "#ffffff";
         ctx.beginPath();
         ctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
     }
 
     getBounds(points) {
@@ -324,12 +332,9 @@ export class HealthIndication {
             this.ctx.strokeStyle = color;
             this.ctx.lineWidth = this.lineWidth;
             this.ctx.lineCap = "round";
-            this.ctx.shadowColor = color;
-            this.ctx.shadowBlur = 3;
             this.ctx.stroke();
         }
 
-        this.ctx.shadowBlur = 0;
     }
 
     resize() {
@@ -347,6 +352,7 @@ export class HealthIndication {
     }
 
     destroy() {
+        cancelAnimationFrame(this.drawFrame);
         this.resizeObserver.disconnect();
         this.canvas.remove();
     }
