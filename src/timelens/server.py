@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from timelens.event_filter import EventFilter
 from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
@@ -33,6 +34,7 @@ class Server:
         self.store = SpanStore()
         self.profiles = ProfileStore()
         self.watches = {}   # websocket -> {triggerId: (matcher, edge)}
+        self.filters = {}   # websocket -> EventFilter, clients without a filter get every span
         self.count = 0
 
         self.app = FastAPI(lifespan=self.lifespan)
@@ -80,12 +82,25 @@ class Server:
             return
 
         # an open span is sent when it begins, the same span (same id) again when it ends
-        await self.broadcast({"type": "span", **span})
+        await self.broadcast_span(span)
         await self.notify_triggers(span, edges)
 
+    # The span as it is sent to 'websocket', with the color of its filter, None if the filter rejects it.
+    def filtered(self, websocket, span):
+        event_filter = self.filters.get(websocket)
+        if event_filter is None:
+            return span
+        if not event_filter.accepts(span):
+            return None
+        color = event_filter.color_of(span)
+        return span if color is None else {**span, "color": color}
+
     # Sends a 'trigger' message for each edge that matches a watch of a client.
+    # Spans the filter of the client rejects do not trigger.
     async def notify_triggers(self, span, edges):
         for websocket, watches in list(self.watches.items()):
+            if self.filtered(websocket, span) is None:
+                continue
             for trigger_id, (matcher, watched_edge) in list(watches.items()):
                 for edge, time_us in edges:
                     if edge != watched_edge or not matcher(span["name"]):
@@ -100,12 +115,20 @@ class Server:
                         logger.exception("Failed to send trigger to WebSocket")
                         self.watches.pop(websocket, None)
 
-    async def broadcast(self, message):
+    # Sends 'span' to every client, filtered per client. Clients without a filter share one message.
+    async def broadcast_span(self, span):
 
         dead = []
-        data = json.dumps(message)
+        unfiltered_data = json.dumps({"type": "span", **span})
 
         for ws in self.clients:
+            if ws in self.filters:
+                sent_span = self.filtered(ws, span)
+                if sent_span is None:
+                    continue
+                data = json.dumps({"type": "span", **sent_span})
+            else:
+                data = unfiltered_data
             try:
                 await ws.send_text(data)
             except Exception:
@@ -113,8 +136,17 @@ class Server:
                 dead.append(ws)
 
         for ws in dead:
-            self.clients.remove(ws)
-            self.watches.pop(ws, None)
+            self.forget(ws)
+
+    def forget(self, websocket):
+        self.clients.discard(websocket)
+        self.watches.pop(websocket, None)
+        self.filters.pop(websocket, None)
+
+    # the 'accept' predicate for the store, None when the client has no filter
+    def accept_of(self, websocket):
+        event_filter = self.filters.get(websocket)
+        return event_filter.accepts if event_filter is not None else None
 
     @asynccontextmanager
     async def lifespan(self, app):
@@ -152,11 +184,11 @@ class Server:
         request_id = msg.get("requestId")
         start_us, end_us = self.range_of(msg)
 
-        spans, truncated = self.store.query(start_us, end_us, QUERY_LIMIT)
+        spans, truncated = self.store.query(start_us, end_us, QUERY_LIMIT, accept=self.accept_of(websocket))
 
         offset = 0
         while True:
-            chunk = spans[offset:offset + QUERY_CHUNK_SIZE]
+            chunk = [self.filtered(websocket, span) for span in spans[offset:offset + QUERY_CHUNK_SIZE]]
             offset += len(chunk)
             done = offset >= len(spans)
             await websocket.send_text(json.dumps({
@@ -184,18 +216,39 @@ class Server:
         await websocket.send_text(json.dumps({
             "type": "stats",
             "requestId": msg.get("requestId"),
-            "stats": self.store.stats(start_us, end_us),
+            "stats": self.store.stats(start_us, end_us, accept=self.accept_of(websocket)),
         }))
 
     # The time of the first or last matching edge in [startUs, endUs], null if there is none.
     async def handle_find(self, websocket, msg):
         start_us, end_us = self.range_of(msg)
         matcher = make_wildcard_matcher(msg.get("pattern") or "")
-        time_us = self.store.find(matcher, msg.get("edge"), start_us, end_us, msg.get("which", "last"))
+        time_us = self.store.find(matcher, msg.get("edge"), start_us, end_us, msg.get("which", "last"),
+                                  accept=self.accept_of(websocket))
         await websocket.send_text(json.dumps({
             "type": "found",
             "requestId": msg.get("requestId"),
             "timeUs": time_us,
+        }))
+
+    # Replaces the filter of 'websocket', an empty list of rules removes it. On an error the
+    # previous filter stays and the reply has 'error' set, e.g. "rule 3: invalid regex: ...".
+    async def handle_set_filter(self, websocket, msg):
+        error = None
+        try:
+            event_filter = EventFilter(msg.get("rules") or [])
+        except ValueError as exc:
+            error = str(exc)
+        else:
+            if event_filter.is_empty():
+                self.filters.pop(websocket, None)
+            else:
+                self.filters[websocket] = event_filter
+
+        await websocket.send_text(json.dumps({
+            "type": "filter",
+            "requestId": msg.get("requestId"),
+            "error": error,
         }))
 
     # From now on, a 'trigger' message is sent for every edge that matches 'pattern'.
@@ -242,9 +295,11 @@ class Server:
                 if action == "unwatch_trigger":
                     self.handle_unwatch_trigger(websocket, msg)
 
+                if action == "set_filter":
+                    await self.handle_set_filter(websocket, msg)
+
         except WebSocketDisconnect:
-            self.clients.discard(websocket)
-            self.watches.pop(websocket, None)
+            self.forget(websocket)
 
     async def devtools(self):
         # Silence a harmless message from Chrome DevTools.

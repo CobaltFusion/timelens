@@ -155,3 +155,37 @@ def test_old_closed_spans_stay_in_query():
     store.open_history_us = 100
 
     assert spans_of(store, 990, 1000) == [("long", 10, 1000)]
+
+
+def not_b(span):
+    return span["name"] != "b"
+
+
+def test_query_with_accept_limits_after_filtering():
+    store = make_store(evt("X", "a", 10, dur=1), evt("X", "b", 20, dur=1), evt("X", "a", 30, dur=1), evt("X", "b", 40, dur=1))
+
+    spans, truncated = store.query(-INF, INF, accept=not_b)
+    assert [(s["name"], s["ts"]) for s in spans] == [("a", 10), ("a", 30)]
+    assert truncated is False
+
+    spans, truncated = store.query(-INF, INF, limit=2, accept=not_b)
+    assert len(spans) == 2 and truncated is False
+
+    spans, truncated = store.query(-INF, INF, limit=1, accept=not_b)
+    assert [(s["name"], s["ts"]) for s in spans] == [("a", 30)]
+    assert truncated is True
+
+
+def test_stats_with_accept():
+    store = make_store(evt("X", "a", 10, dur=5), evt("X", "b", 20, dur=7))
+
+    assert set(store.stats(-INF, INF, accept=not_b)) == {"a"}
+
+
+def test_find_with_accept():
+    store = make_store(evt("X", "a", 10, dur=5), evt("X", "b", 20, dur=7))
+    any_name = make_wildcard_matcher("*")
+
+    assert store.find(any_name, RISING, -INF, INF, "last", accept=not_b) == 10
+    assert store.find(any_name, FALLING, -INF, INF, "last", accept=not_b) == 15
+    assert store.find(any_name, RISING, -INF, INF, "last") == 20

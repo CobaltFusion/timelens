@@ -40,7 +40,9 @@ class Main {
 
         this.settingsWindow = new SettingsWindow({
             getProfile: () => this.getProfile(),
-            applyProfile: (profile) => this.applyProfile(profile)
+            applyProfile: (profile) => this.applyProfile(profile),
+            getFilters: () => this.getFilters(),
+            applyFilters: (rules) => this.applyFilters(rules)
         });
         this.settingsButton = document.createElement("button");
         this.settingsButton.textContent = "Settings";
@@ -238,23 +240,40 @@ class Main {
             console.error("Loading the default profile failed:", error);
         }
         if (profile !== null) {
-            this.applyProfile(profile);
+            this.applyProfile(profile).catch(error => console.error("Applying the filters of the default profile failed:", error));
         }
         else if (this.widgets.size === 0) {
             this.addScope();
         }
     }
 
-    // the graphs and their settings, in the order they are shown
+    // the graphs and their settings in the order they are shown, and the filter rules
     getProfile() {
         const graphs = [...this.widgets].map(widget => ({
             ...widget.component.getSettings(),
             ...widget.getSize()
         }));
-        return { version: profileVersion, graphs };
+        return { version: profileVersion, graphs, filters: this.getFilters() };
     }
 
-    // replaces all graphs with the graphs of 'profile', there is always at least one graph
+    getFilters() {
+        return this.collector.filterRules;
+    }
+
+    // The server applies the filter to everything it sends, so the buffer and the data of
+    // stopped graphs are fetched again. Throws for invalid rules, the previous filter then stays.
+    async applyFilters(rules) {
+        await this.collector.setFilter(rules);
+        if (this.collector.isConnected()) {
+            await this.collector.reset();
+        }
+        for (const widget of this.widgets) {
+            widget.component.refetch();
+        }
+    }
+
+    // Replaces all graphs and the filter with those of 'profile', there is always at least one graph.
+    // A profile without filters removes the filter. Rejects when its filter rules are invalid.
     applyProfile(profile) {
         for (const widget of [...this.widgets]) {
             widget.close();
@@ -266,6 +285,7 @@ class Main {
         if (this.widgets.size === 0) {
             this.addScope();
         }
+        return this.applyFilters(Array.isArray(profile?.filters) ? profile.filters : []);
     }
 
     // empties the shared buffer and the data stopped or panned/zoomed graphs fetched from the server

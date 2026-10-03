@@ -171,15 +171,26 @@ export class TriggerSource {
         this.running = false;
         this.#searchTrigger();      // while waiting for a trigger, look in the stopped range
         this.onStatusChanged?.();
+        this.#fetchStoppedRange(generation);
+    }
 
-        // the stopped range is requested from the server instead of copying the buffer
-        this.collector.query(stoppedRange.beginUs, stoppedRange.endUs)
+    // the stopped range is requested from the server instead of copying the buffer
+    #fetchStoppedRange(generation) {
+        const { beginUs, endUs } = this.stoppedRange;
+        this.collector.query(beginUs, endUs)
             .then(events => {
                 if (generation === this.fetchGeneration && !this.running) {
                     this.data = events;
                 }
             })
             .catch(error => console.error("Fetching the stopped range failed:", error));
+    }
+
+    // fetches the stopped range again, e.g. after the filter changed, the current data is shown until it arrives
+    refetch() {
+        if (!this.running && this.stoppedRange) {
+            this.#fetchStoppedRange(++this.fetchGeneration);
+        }
     }
 
     #start() {

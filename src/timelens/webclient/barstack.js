@@ -277,7 +277,7 @@ export class BarStack {
         let x2 = Math.round((event.end_time - this.startPointUs) * this.scale);
         let width = x2 - x1;
 
-        const color = getColor(event.name);
+        const color = event.color ?? getColor(event.name);
         if (event.type === EventType.OPEN) {
             x2 = Math.round((this.endPointUs - this.startPointUs) * this.scale);
             width = x2 - x1;

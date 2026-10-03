@@ -450,7 +450,9 @@ button:focus-visible {
 }
 /* Settings window, a modal <dialog> */
 .settings-dialog {
-    width: min(32rem, calc(100vw - 2rem));
+    width: min(48rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
     padding: 1rem 1.25rem;
     border: 1px solid var(--panel-border);
     border-radius: 8px;
@@ -506,4 +508,81 @@ button:focus-visible {
 
 .settings-status.error {
     color: var(--status-disconnected);
+}
+
+.settings-dialog h2:not(:first-of-type) {
+    margin-top: 1.25rem;
+}
+
+.filter-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+/* field, pattern, match, type, color, remove: wraps on narrow screens */
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.filter-row .control-input {
+    min-width: 0;
+}
+
+.filter-row input[type="text"] {
+    flex: 1 1 12rem;
+}
+
+.filter-color {
+    width: 2.4rem;
+    height: 2.2rem;
+    padding: 0.1rem;
+    border: 1px solid rgba(119, 160, 218, 0.38);
+    border-radius: 0.35rem;
+    background: #091321;
+    cursor: pointer;
+}
+
+.filter-color[hidden] {
+    display: none;
+}
+
+/* closes the settings window, at the top right; the title makes room for it */
+.settings-close-x {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.settings-close-x:hover {
+    border-color: var(--panel-border);
+    color: var(--text);
+}
+
+.settings-dialog h2:first-of-type {
+    padding-right: 1.6rem;
+}
+
+/* the Close button, at the bottom right */
+.settings-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--panel-border);
 }

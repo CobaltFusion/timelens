@@ -17,7 +17,7 @@ const maxBufferedEvents = 1 << 18;
  * @param {number} receivedMs  browser wall time (ms since the unix epoch) the message was received
  * @returns {TSEvent}
  */
-function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined, id = undefined) {
+function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined, id = undefined, color = undefined) {
     return {
         name: name,
         type: type,
@@ -28,7 +28,8 @@ function makeEvent(name, type, timestamp, groupId, value, count, processId, rece
         count: count,
         processId: processId,
         receivedMs: receivedMs,
-        id: id                    // span id from the server
+        id: id,                   // span id from the server
+        color: color              // '#rrggbb' forced by a color filter rule, undefined otherwise
     };
 }
 
@@ -65,6 +66,7 @@ export class Collector {
         this.pendingRequests = new Map();   // requestId -> { spans, resolve, reject }
         this.lastTriggerId = 0;
         this.triggerWatches = new Map();    // triggerId -> { pattern, edge, callback(timeUs) }
+        this.filterRules = [];              // the filter rules the server applies to everything it sends
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -82,6 +84,11 @@ export class Collector {
 
         // fill the buffer with the recent history, otherwise a new page starts empty
         this.ws.onopen = () => {
+            // the server handles messages in order, so the history below already arrives filtered
+            if (this.filterRules.length > 0) {
+                this.#request({ action: "set_filter", rules: this.filterRules })
+                    .catch(error => console.error("Setting the filter failed:", error));
+            }
             // watches that were started before the connection was open, e.g. from the default profile
             for (const [triggerId, { pattern, edge }] of this.triggerWatches) {
                 this.#send({ action: "watch_trigger", triggerId, pattern, edge });
@@ -109,11 +116,11 @@ export class Collector {
     /** @returns {TSEvent} */
     #toEvent(span) {
         // notice that the variables MUST correspond with the actual JSON field names here!
-        const { id, name, pid, tid, ts, end, count } = span;
+        const { id, name, pid, tid, ts, end, count, color } = span;
         const type = end === null ? EventType.OPEN : EventType.CLOSE;
         const groupId = tid; // use tid as grouping for single line
         const value = 0;
-        return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), end ?? undefined, id);
+        return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), end ?? undefined, id, color);
     }
 
     #onSpan(span) {
@@ -176,6 +183,14 @@ export class Collector {
             case "bounds": request.resolve({ firstUs: data.firstUs, lastUs: data.lastUs }); break;
             case "stats": request.resolve(new Map(Object.entries(data.stats))); break;
             case "found": request.resolve(data.timeUs); break;
+            case "filter":
+                if (data.error) {
+                    request.reject(new Error(data.error));
+                }
+                else {
+                    request.resolve();
+                }
+                break;
             default: request.reject(new Error(`Unexpected reply type '${data.type}'`));
         }
     }
@@ -251,6 +266,19 @@ export class Collector {
                 this.#send({ action: "unwatch_trigger", triggerId });
             }
         };
+    }
+
+    /**
+     * Sets the filter rules the server applies to all spans, triggers, queries and statistics
+     * for this client, see 'event_filter.py'. Rejects with the server's error for invalid rules,
+     * the previous rules then stay. When not connected, the rules are sent when the connection opens.
+     * @param {Array<{field: string, pattern: string, match: string, type: string, color?: string}>} rules
+     */
+    async setFilter(rules) {
+        if (this.isConnected()) {
+            await this.#request({ action: "set_filter", rules });
+        }
+        this.filterRules = rules;
     }
 
     /**

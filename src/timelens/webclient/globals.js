@@ -83,6 +83,7 @@ export const TriggerResult = Object.freeze({
  * @property {number} [end_time]
  * @property {number} [groupId]
  * @property {number} [value]
+ * @property {string} [color]   '#rrggbb' forced by a color filter rule
  */
 
 export function roundUpNice(value) {

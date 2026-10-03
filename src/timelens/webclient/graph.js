@@ -537,6 +537,19 @@ export class Graph {
             });
     }
 
+    // Fetches the shown events and statistics again, e.g. after the filter changed.
+    // While following live data the collector's buffer is shown, that is refilled by the caller.
+    refetch() {
+        this.triggerSource.refetch();
+        if (this.manualView) {
+            this.#fetchManualView();
+        }
+        this.statsRangeKey = "";
+        this.statsRequestedMs = -Infinity;
+        this.statsPending = false;
+        ++this.statsGeneration;
+    }
+
     // drops the events this graph fetched from the server
     clearFetched() {
         this.triggerSource.clearFetched();

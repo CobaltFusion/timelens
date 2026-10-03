@@ -72,8 +72,9 @@ class SpanStore:
 
     # Returns (spans, truncated), the spans that overlap [start_us, end_us], ordered by begin.
     # Open spans are included, unless they began more than 'open_history_us' before the newest event.
+    # Only spans for which 'accept(span)' is true are included, when it is given.
     # When there are more than 'limit', the newest are returned.
-    def query(self, start_us, end_us, limit=None):
+    def query(self, start_us, end_us, limit=None, accept=None):
         earliest_us = start_us - self.max_duration_us
         begin = bisect.bisect_left(self._begin, earliest_us)
         end = bisect.bisect_right(self._begin, end_us)
@@ -88,6 +89,8 @@ class SpanStore:
             span for span in self._spans[begin:end]
             if (span["ts"] >= open_cutoff_us if span["end"] is None else span["end"] >= start_us)
         )
+        if accept is not None:
+            spans = [span for span in spans if accept(span)]
 
         truncated = False
         if limit is not None and len(spans) > limit:
@@ -98,13 +101,13 @@ class SpanStore:
 
     # Duration statistics per name over the closed spans that begin in [start_us, end_us]:
     # {name: {count, min, max, mean, m2}}, 'm2' is the sum of squared differences from the mean.
-    def stats(self, start_us, end_us):
+    def stats(self, start_us, end_us, accept=None):
         begin = bisect.bisect_left(self._begin, start_us)
         end = bisect.bisect_right(self._begin, end_us)
         result = {}
 
         for span in self._spans[begin:end]:
-            if span["end"] is None:
+            if span["end"] is None or (accept is not None and not accept(span)):
                 continue
 
             duration_us = span["end"] - span["ts"]
@@ -125,14 +128,17 @@ class SpanStore:
 
     # The time of the first or last ('which') edge in [start_us, end_us] of a span whose
     # name matches, or None. A 'rising' edge is the begin, a 'falling' edge the end of a closed span.
-    def find(self, matcher, edge, start_us, end_us, which="last"):
+    def find(self, matcher, edge, start_us, end_us, which="last", accept=None):
+        def accepted(span):
+            return matcher(span["name"]) and (accept is None or accept(span))
+
         if edge == FALLING:
             begin = bisect.bisect_left(self._begin, start_us - self.max_duration_us)
             end = bisect.bisect_right(self._begin, end_us)
             times = [
                 span["end"]
                 for span in self._spans[begin:end]
-                if span["end"] is not None and start_us <= span["end"] <= end_us and matcher(span["name"])
+                if span["end"] is not None and start_us <= span["end"] <= end_us and accepted(span)
             ]
             if not times:
                 return None
@@ -144,7 +150,7 @@ class SpanStore:
 
         for i in indices:
             span = self._spans[i]
-            if matcher(span["name"]):
+            if accepted(span):
                 return span["ts"]
         return None
 
