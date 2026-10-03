@@ -51,6 +51,7 @@ export class TriggerSource {
         this.triggerFoundTimeUs = 0;
         this.preTriggerUs = -10000; // default to -10ms
         this.singleRecordUs = 10 * 1e6;  // a single trigger records up to 10s after the trigger
+        this.historyBeforeSearchUs = 60 * 1e6;  // a stopped capture keeps up to a minute before 'searchStartPointUs'
         this.triggerWord = "";
         this.dataLength = 0;
         this.onStatusChanged = null;
@@ -115,11 +116,13 @@ export class TriggerSource {
         return this.running;
     }
 
-    // stops collecting, events after 'endUs' are not included
+    // stops collecting, events after 'endUs' are not included, nor events more than
+    // 'historyBeforeSearchUs' before the search start point
     #stop(endUs = Infinity) {
+        const beginUs = this.searchStartPointUs - this.historyBeforeSearchUs;
         // take a deep copy of the current data buffer
         this.data = this.collector.data()
-            .filter(event => event.timestamp <= endUs)
+            .filter(event => event.timestamp >= beginUs && event.timestamp <= endUs)
             .map(event => ({ ...event }));
         this.#setRunning(false);
     }
