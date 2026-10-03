@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -13,6 +14,10 @@ LOG_FILE = LOG_DIR / "telemetry_test_123_345.vson"
 COUNTER_FILE = LOG_DIR / "telemetry_test.counter"
 
 PID = 123
+
+# Used when the script is run without any arguments.
+DEFAULT_ARGS = ["-n", "pre", "-n", "error", "-n", "post", "-c", "loop", "-d", "20", "-d", "100", "-d", "10",
+                "-l", "--real", "--prefix"]
 
 # VSON timestamp epoch.
 _EPOCH = datetime(2026, 9, 1, tzinfo=timezone.utc)
@@ -143,7 +148,8 @@ def play_sequence(counter: int, steps: list[tuple[str, str, float]], fixed: bool
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate telemetry events for testing. Repeat -n/-c/-d to describe a sequence of back-to-back events.")
+        description="Generate telemetry events for testing. Repeat -n/-c/-d to describe a sequence of back-to-back events. "
+                    f"Without arguments, runs: {' '.join(DEFAULT_ARGS)}")
     parser.add_argument("-n", "--name", action="append", required=True, help="Name of the telemetry event (repeatable).")
     parser.add_argument("-c", "--category", action="append", required=True,
                         help="Telemetry category (repeatable; give once to apply to all events).")
@@ -158,7 +164,7 @@ def main() -> None:
                              "computed from the requested durations.")
     parser.set_defaults(timing="real")
     parser.add_argument("-p", "--prefix", action="store_true", help="Prefix event names with the invocation counter.")
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:] or DEFAULT_ARGS)
 
     count = len(args.name)
 
