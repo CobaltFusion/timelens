@@ -144,7 +144,7 @@ export class SignatureSound {
         const audio = this.audioAlerts.context;
         const ticksPerSecond = 1000 / this.tickMs;
 
-        for (const [key, count] of this.tickCounts) {
+        for (const key of this.tickCounts) {
             if (!this.voices.has(key) && this.voices.size < this.maxVoices) {
                 this.voices.set(key, this.#createVoice(key));
             }
