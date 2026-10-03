@@ -40,14 +40,7 @@ export class ResizableContainer {
         this.closeButton.textContent = "x";
         this.closeButton.title = "Close this graph";
 
-        this.closeButton.addEventListener("click", () => {
-            if (selectedContainer === this) {
-                selectedContainer = null;
-            }
-            this.resizeObserver.disconnect();
-            this.container.remove();
-            this.onClose();
-        });
+        this.closeButton.addEventListener("click", () => this.close());
 
         // Assemble
         this.container.appendChild(this.closeButton);
@@ -56,6 +49,25 @@ export class ResizableContainer {
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(this.container);
         this.resize();
+    }
+
+    close() {
+        if (selectedContainer === this) {
+            selectedContainer = null;
+        }
+        this.resizeObserver.disconnect();
+        this.container.remove();
+        this.onClose();
+    }
+
+    // the size set by resizing the container, empty strings when it was not resized (the css decides)
+    getSize() {
+        return { width: this.container.style.width, height: this.container.style.height };
+    }
+
+    setSize({ width = "", height = "" }) {
+        this.container.style.width = width;
+        this.container.style.height = height;
     }
 
     select() {

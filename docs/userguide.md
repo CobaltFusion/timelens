@@ -36,6 +36,7 @@ The browser keeps the last minute of events.
 | Control | What it does |
 |---|---|
 | **Add Graph** | Adds another graph panel. Each graph has its own trigger and view settings. |
+| **Settings** | Saves the graphs and their settings as a profile on the server, or loads one. See [Profiles](#profiles). |
 | **Reset** | Asks the server to replay the last 10 minutes of recorded data. |
 | **Clear** | Removes all received events, including the snapshots held by stopped graphs. |
 | Speaker icon | Turns audio alerts on or off. |
@@ -129,3 +130,27 @@ The data range depends on the state of the graph:
 ### Layout
 
 Each graph panel can be resized. Remove a graph with the `x` in its corner.
+
+## Profiles
+
+A profile saves your graphs so you can get them back later. **Settings** in the top bar opens the profiles window.
+
+A profile contains:
+
+- the graphs, in their order on the screen,
+- per graph: the trigger word, trigger edge, PreTrigger, View width and the panel size if you resized it.
+
+It does not contain audio, the signature sound, the health indicator mode, or whether a graph is running or stopped.
+
+In the profiles window:
+
+| Button | What it does |
+|---|---|
+| **Load** | Replaces all graphs with the selected profile. You can also double-click a profile. |
+| **Save** | Saves the current graphs under the typed name. Asks first if the profile already exists. |
+| **Save as default** | Saves the current graphs as the `default` profile. |
+| **Delete** | Deletes the selected profile. |
+
+The `default` profile is loaded automatically when TimeLens is opened. Without it, TimeLens starts with one empty graph. The `default` profile only changes when you save to it, so changes you make during a session are not kept unless you save them.
+
+Profiles are stored by the server, so every browser that connects to it sees the same profiles. They are JSON files in `~/.timelens/profiles/`, in the home directory of the user that runs the server. A profile name can contain letters, digits, spaces, `_`, `.` and `-`.

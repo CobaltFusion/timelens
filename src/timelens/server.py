@@ -7,10 +7,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
+from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
 from timelens.span_store import SpanStore
 from timelens.wildcard import make_wildcard_matcher
 
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 QUERY_CHUNK_SIZE = 10_000
 QUERY_LIMIT = 500_000
 
+# Larger profiles are refused, a profile only holds a few settings per graph.
+PROFILE_MAX_BYTES = 64 * 1024
+
 
 class Server:
     def __init__(self):
@@ -27,6 +31,7 @@ class Server:
         self.watcher = None
         self.peer_discovery = None
         self.store = SpanStore()
+        self.profiles = ProfileStore()
         self.watches = {}   # websocket -> {triggerId: (matcher, edge)}
         self.count = 0
 
@@ -45,6 +50,10 @@ class Server:
         self.app.websocket("/ws")(self.websocket_endpoint)
         self.app.get("/.well-known/appspecific/com.chrome.devtools.json")(self.devtools)
         self.app.get("/api/servers")(self.servers)
+        self.app.get("/api/profiles")(self.list_profiles)
+        self.app.get("/api/profiles/{name}")(self.get_profile)
+        self.app.put("/api/profiles/{name}")(self.put_profile)
+        self.app.delete("/api/profiles/{name}")(self.delete_profile)
         self.app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
 
     async def handle_line(self, line, path):
@@ -244,6 +253,41 @@ class Server:
     async def servers(self):
         peers = await self.peer_discovery.discover()
         return JSONResponse({"servers": peers})
+
+    async def list_profiles(self):
+        return JSONResponse({"profiles": self.profiles.list(), "default": DEFAULT_PROFILE})
+
+    async def get_profile(self, name: str):
+        if not self.profiles.is_valid_name(name):
+            return JSONResponse({"error": "invalid profile name"}, status_code=400)
+        profile = self.profiles.load(name)
+        if profile is None:
+            return JSONResponse({"error": "profile not found"}, status_code=404)
+        return JSONResponse(profile)
+
+    async def put_profile(self, name: str, request: Request):
+        if not self.profiles.is_valid_name(name):
+            return JSONResponse({"error": "invalid profile name"}, status_code=400)
+
+        body = await request.body()
+        if len(body) > PROFILE_MAX_BYTES:
+            return JSONResponse({"error": "profile is too large"}, status_code=413)
+        try:
+            profile = json.loads(body)
+        except json.JSONDecodeError:
+            profile = None
+        if not isinstance(profile, dict):
+            return JSONResponse({"error": "a profile must be a JSON object"}, status_code=400)
+
+        self.profiles.save(name, profile)
+        return Response(status_code=204)
+
+    async def delete_profile(self, name: str):
+        if not self.profiles.is_valid_name(name):
+            return JSONResponse({"error": "invalid profile name"}, status_code=400)
+        if not self.profiles.delete(name):
+            return JSONResponse({"error": "profile not found"}, status_code=404)
+        return Response(status_code=204)
 
 
 server = Server()

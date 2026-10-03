@@ -6,6 +6,11 @@ import { Graph } from "./graph.js";
 import { TrafficIndication } from "./traffic_indication.js";
 import { HealthIndication } from "./health_indication.js";
 import { SignatureSound } from "./signature_sound.js";
+import { SettingsWindow } from "./settings_window.js";
+import { loadProfile } from "./profiles.js";
+
+// the format of the profiles written by 'getProfile()'
+const profileVersion = 1;
 
 
 // [] array
@@ -32,6 +37,19 @@ class Main {
         this.addButton.classList.add("control-button");
         this.addButton.addEventListener("click", () => this.addScope());
         topPanel.appendChild(this.addButton);
+
+        this.settingsWindow = new SettingsWindow({
+            getProfile: () => this.getProfile(),
+            applyProfile: (profile) => this.applyProfile(profile)
+        });
+        this.settingsButton = document.createElement("button");
+        this.settingsButton.textContent = "Settings";
+        this.settingsButton.title = "Save the graphs and their settings as a profile on the server, or load a profile";
+        this.settingsButton.classList.add("control-button");
+        this.settingsButton.addEventListener("click", () => {
+            this.settingsWindow.open().catch(error => console.error("Opening the settings failed:", error));
+        });
+        topPanel.appendChild(this.settingsButton);
 
         this.resetButton = document.createElement("button");
         this.resetButton.classList.add("control-button");
@@ -86,6 +104,10 @@ class Main {
     }
 
     keyHandler(e) {
+        // the graphs behind the settings window should not pan or zoom
+        if (this.settingsWindow.isOpen()) {
+            return;
+        }
         // don't steal keys while typing, e.g. in the trigger word field
         const target = e.target;
         if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) {
@@ -153,7 +175,7 @@ class Main {
     }
 
     init() {
-        this.addScope();
+        this.loadDefaultProfile();
 
         this.audioButton.addEventListener("click", async () => {
             await getAudioAlerts().toggleAudio();
@@ -204,6 +226,46 @@ class Main {
         window.onload = () => {
             this.renderObjects();
         };
+    }
+
+    // Shows the graphs of the 'default' profile, or one graph with the default settings
+    // if there is no such profile or it can not be loaded.
+    async loadDefaultProfile() {
+        let profile = null;
+        try {
+            profile = await loadProfile("default");
+        } catch (error) {
+            console.error("Loading the default profile failed:", error);
+        }
+        if (profile !== null) {
+            this.applyProfile(profile);
+        }
+        else if (this.widgets.size === 0) {
+            this.addScope();
+        }
+    }
+
+    // the graphs and their settings, in the order they are shown
+    getProfile() {
+        const graphs = [...this.widgets].map(widget => ({
+            ...widget.component.getSettings(),
+            ...widget.getSize()
+        }));
+        return { version: profileVersion, graphs };
+    }
+
+    // replaces all graphs with the graphs of 'profile', there is always at least one graph
+    applyProfile(profile) {
+        for (const widget of [...this.widgets]) {
+            widget.close();
+        }
+        const graphs = Array.isArray(profile?.graphs) ? profile.graphs : [];
+        for (const settings of graphs) {
+            this.addScope(settings);
+        }
+        if (this.widgets.size === 0) {
+            this.addScope();
+        }
     }
 
     // empties the shared buffer and the data stopped or panned/zoomed graphs fetched from the server
@@ -460,9 +522,13 @@ class Main {
         updateTriggerStatus();
     }
 
-    addScope() {
+    // 'settings' is one graph of a profile, the controls are created afterwards so they show its values
+    addScope(settings = null) {
         const graphPanel = document.getElementById("id_graph_panel");
         const graph = new Graph(this.collector);
+        if (settings) {
+            graph.applySettings(settings);
+        }
 
         const controls = document.createElement("div");
         controls.classList.add("control-panel");
@@ -477,6 +543,9 @@ class Main {
             }
         });
 
+        if (typeof settings?.width === "string" && typeof settings?.height === "string") {
+            widget.setSize(settings);
+        }
         widget.prepend(controls);
         this.widgets.add(widget);
         widget.select();    // a new graph is the one the keyboard controls

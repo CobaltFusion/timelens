@@ -64,7 +64,7 @@ export class Collector {
         this.lastRequestId = 0;
         this.pendingRequests = new Map();   // requestId -> { spans, resolve, reject }
         this.lastTriggerId = 0;
-        this.triggerWatches = new Map();    // triggerId -> callback(timeUs)
+        this.triggerWatches = new Map();    // triggerId -> { pattern, edge, callback(timeUs) }
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -82,6 +82,10 @@ export class Collector {
 
         // fill the buffer with the recent history, otherwise a new page starts empty
         this.ws.onopen = () => {
+            // watches that were started before the connection was open, e.g. from the default profile
+            for (const [triggerId, { pattern, edge }] of this.triggerWatches) {
+                this.#send({ action: "watch_trigger", triggerId, pattern, edge });
+            }
             this.reset().catch(error => console.error("Initial history request failed:", error));
         };
 
@@ -94,7 +98,7 @@ export class Collector {
                     this.#onSpan(data);
                     return;
                 case "trigger":
-                    this.triggerWatches.get(data.triggerId)?.(data.timeUs);
+                    this.triggerWatches.get(data.triggerId)?.callback(data.timeUs);
                     return;
                 default:
                     this.#handleReply(data);
@@ -239,7 +243,7 @@ export class Collector {
      */
     watchTrigger(pattern, edge, callback) {
         const triggerId = ++this.lastTriggerId;
-        this.triggerWatches.set(triggerId, callback);
+        this.triggerWatches.set(triggerId, { pattern, edge, callback });
         this.#send({ action: "watch_trigger", triggerId, pattern, edge });
 
         return () => {

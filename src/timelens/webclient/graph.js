@@ -1,4 +1,4 @@
-import { EventType, roundUpNice } from "./globals.js";
+import { EventType, TriggerEdge, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
@@ -448,6 +448,33 @@ export class Graph {
 
     setPreTrigger(milliseconds) {
         this.triggerSource.setPreTriggerUs(milliseconds * 1000);
+    }
+
+    // the settings that are saved in a profile
+    getSettings() {
+        return {
+            triggerWord: this.getTriggerWord(),
+            triggerEdge: this.getTriggerEdge(),
+            preTriggerMs: this.getPreTriggerMs(),
+            graphWidthMs: this.getGraphWidthMs()
+        };
+    }
+
+    // applies the settings of a profile, missing or invalid values are ignored
+    applySettings(settings) {
+        if (typeof settings?.triggerWord === "string") {
+            this.setTriggerWord(settings.triggerWord);
+        }
+        if (Object.values(TriggerEdge).includes(settings?.triggerEdge)) {
+            this.setTriggerEdge(settings.triggerEdge);
+        }
+        // the PreTrigger control only allows values <= 0
+        if (Number.isFinite(settings?.preTriggerMs) && settings.preTriggerMs <= 0) {
+            this.setPreTrigger(settings.preTriggerMs);
+        }
+        if (Number.isFinite(settings?.graphWidthMs) && settings.graphWidthMs > 0) {
+            this.setgraphWidthMs(settings.graphWidthMs);
+        }
     }
 
     getPreTriggerMs() {
