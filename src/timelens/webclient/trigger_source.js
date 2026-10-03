@@ -49,7 +49,8 @@ export class TriggerSource {
         this.triggerMode = TriggerMode.FREE;
         this.triggerState = TriggerState.Idle;
         this.running = true;
-        this.data = null;
+        this.data = null;                 // while stopped, the events fetched from the server for the stopped range
+        this.fetchGeneration = 0;         // replies to older fetches are ignored
         this.displayStartPointUs = 0;
         this.searchStartPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
         this.searchStartSequence = 0;     // the same point as a sequence number in the collector's buffer
@@ -144,12 +145,27 @@ export class TriggerSource {
     // 'historyBeforeSearchUs' before the search start point
     #stop(endUs = Infinity) {
         const beginUs = this.searchStartPointUs - this.historyBeforeSearchUs;
-        // take a deep copy of the current data buffer
-        this.data = this.collector.data()
-            .filter(event => event.timestamp >= beginUs && event.timestamp <= endUs)
-            .map(event => ({ ...event }));
+        const generation = ++this.fetchGeneration;
+        this.data = [];
         this.stoppedDataScanned = false;
         this.#setRunning(false);
+
+        // the stopped range is requested from the server instead of copying the buffer
+        this.collector.query(beginUs, Math.min(endUs, this.collector.getLastTimepointUs()))
+            .then(events => {
+                if (generation !== this.fetchGeneration || this.running) {
+                    return;
+                }
+                this.data = events;
+                this.stoppedDataScanned = false;    // search the fetched events for the trigger
+            })
+            .catch(error => console.error("Fetching the stopped range failed:", error));
+    }
+
+    #start() {
+        ++this.fetchGeneration;     // a reply that is still underway is no longer wanted
+        this.data = null;
+        this.#setRunning(true);
     }
 
     clear() {
@@ -157,9 +173,10 @@ export class TriggerSource {
         this.searchStartSequence = this.collector.data().pushCount;
     }
 
-    // drops the copy that is shown while stopped
-    clearCopy() {
+    // drops the data fetched for the stopped range
+    clearFetched() {
         if (!this.running) {
+            ++this.fetchGeneration;
             this.data = [];
         }
     }
@@ -177,7 +194,7 @@ export class TriggerSource {
             if (this.triggerMode === TriggerMode.SINGLE) {
                 this.auto();
             }
-            this.#setRunning(true);
+            this.#start();
         }
     }
 
@@ -185,7 +202,7 @@ export class TriggerSource {
         this.clear();
         this.#determineTriggerMode(TriggerMode.SINGLE);
         if (!this.running) {
-            this.#setRunning(true);
+            this.#start();
         }
     }
 
@@ -302,12 +319,12 @@ export class TriggerSource {
     }
 
     // Returns something with 'length' and 'at(i)', not a copy: while running a view on the
-    // collector's buffer from the search start point onwards, while stopped the copy taken at stop.
+    // collector's buffer from the search start point onwards, while stopped the fetched events.
     #getInternalDataBuffer() {
         if (this.running) {
             return this.collector.data().viewFrom(this.searchStartSequence);
         }
-        // if not running, return the last copy in the internal data buffer
+        // if not running, return the events fetched for the stopped range
         return this.data;
     }
 }
