@@ -69,6 +69,7 @@ export class BarStack {
         this.lines = new Map();
         this.beginTime = Infinity;
         this.hover = null;   // the hover shows the offset from the zero-point
+        this.durationStats = new Map();   // name -> { count, min, max, mean, m2 }, filled by the caller
     }
 
     getLine(id) {
@@ -213,6 +214,19 @@ export class BarStack {
             { text: `pid:      ${event.processId ?? "-"}`, ...textFont },
             { text: `tid:      ${event.groupId ?? "-"}`, ...textFont }
         ];
+
+        const stats = this.durationStats.get(event.name);
+        if (stats && stats.count > 0) {
+            // sample standard deviation, undefined for a single sample
+            const stddev = stats.count > 1 ? this.formatDuration(Math.sqrt(stats.m2 / (stats.count - 1))) : "-";
+            lines.push(
+                { text: `samples:  ${stats.count}`, ...textFont },
+                { text: `min:      ${this.formatDuration(stats.min)}`, ...textFont },
+                { text: `max:      ${this.formatDuration(stats.max)}`, ...textFont },
+                { text: `avg:      ${this.formatDuration(stats.mean)}`, ...textFont },
+                { text: `stddev:   ${stddev} (sample)`, ...textFont }
+            );
+        }
 
         // Measure text size
         const padding = 8;
