@@ -117,7 +117,7 @@ class Server:
 
         logger.warning("Monitoring path: %s", path)
 
-        self.watcher = LogWatcher(path, self.handle_line)
+        self.watcher = LogWatcher(path, self.handle_line, history_us=self.store.retention_us)
         await self.watcher.start()
 
         self.peer_discovery = PeerDiscovery(http_port=8080)
