@@ -372,7 +372,7 @@ class Main {
         autoSet.title = "Set the view width to fit the longest event in the buffer";
         autoSet.classList.add("control-button");
         autoSet.addEventListener("click", () => {
-            graph.autoSet();
+            graph.autoSet().catch(error => console.error("AutoSet failed:", error));
         });
         controls.appendChild(autoSet);
 

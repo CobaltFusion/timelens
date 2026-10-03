@@ -2,6 +2,9 @@ import { EventType, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
+// While a graph follows live data, its duration statistics are requested this often.
+const statsIntervalMs = 1000;
+
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -32,6 +35,14 @@ export class Graph {
         // { data, fetchedStartUs, fetchedEndUs, generation, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
         this.manualView = null;
         this.manualFetchGeneration = 0;     // replies to older fetches are ignored
+
+        // Duration statistics per event name for the hover text, computed by the server
+        // over the data range of the graph.
+        this.durationStats = new Map();
+        this.statsRangeKey = "";
+        this.statsRequestedMs = -Infinity;
+        this.statsPending = false;
+        this.statsGeneration = 0;
 
         this.triggerSource.onStatusChanged = () => {
             this.onStatusChanged?.();
@@ -443,35 +454,59 @@ export class Graph {
         return this.triggerSource.getPreTriggerUs() / 1000;
     }
 
-    autoSet() {
-        const data = this.collector.data();
-        const openEvents = new Map();
+    // Fits the view to the longest event in the buffered minute, the server finds it.
+    async autoSet() {
+        const bufferedHistoryUs = 60 * 1e6;
+        const stats = await this.collector.stats(this.collector.getLastTimepointUs() - bufferedHistoryUs, Infinity);
         let longestEventUs = 0;
-
-        for (const event of data) {
-            if (event.type === EventType.OPEN) {
-                openEvents.set(event.name, event);
-            } else if (event.type === EventType.CLOSE) {
-                const openEvent = openEvents.get(event.name);
-                if (!openEvent) {
-                    continue;
-                }
-
-                longestEventUs = Math.max(
-                    longestEventUs,
-                    event.timestamp - openEvent.timestamp
-                );
-
-                openEvents.delete(event.name);
-            } else if (event.type === EventType.DURATION) {
-                longestEventUs = Math.max(longestEventUs, (event.end_time ?? event.timestamp) - event.timestamp);
-            }
+        for (const s of stats.values()) {
+            longestEventUs = Math.max(longestEventUs, s.max);
         }
 
         if (longestEventUs > 0) {
             this.setgraphWidthMs(roundUpNice(longestEventUs) * 1.2 / 1000);
             this.onStatusChanged?.();
         }
+    }
+
+    // Requests the duration statistics of the shown data range. While following live data at
+    // most every 'statsIntervalMs', while stopped or panned/zoomed only when the range changes.
+    #updateStats() {
+        if (!this.collector.isConnected()) {
+            return;
+        }
+
+        const view = this.manualView;
+        const range = view ? { beginUs: view.fetchedStartUs, endUs: view.fetchedEndUs } : this.triggerSource.getDataRangeUs();
+        const key = `${range.beginUs}:${range.endUs}`;
+        const nowMs = performance.now();
+
+        if (this.isRunning()) {
+            if (this.statsPending || nowMs - this.statsRequestedMs < statsIntervalMs) {
+                return;
+            }
+        }
+        else if (key === this.statsRangeKey) {
+            return;
+        }
+
+        this.statsRangeKey = key;
+        this.statsRequestedMs = nowMs;
+        this.statsPending = true;
+        const generation = ++this.statsGeneration;
+
+        this.collector.stats(range.beginUs, range.endUs)
+            .then(stats => {
+                if (generation === this.statsGeneration) {
+                    this.durationStats = stats;
+                }
+            })
+            .catch(error => console.error("Requesting duration statistics failed:", error))
+            .finally(() => {
+                if (generation === this.statsGeneration) {
+                    this.statsPending = false;
+                }
+            });
     }
 
     // drops the events this graph fetched from the server
@@ -546,8 +581,8 @@ export class Graph {
         this.onStatusChanged?.();
     }
 
-    // Requests the visible range plus one width on each side, the margin leaves room to pan
-    // and finds the start of events that began before the view.
+    // Requests the visible range plus one width on each side, the margin leaves room to pan.
+    // The server also returns the events that began before the range and still overlap it.
     #fetchManualView() {
         const view = this.manualView;
         if (!view) {
@@ -701,6 +736,8 @@ export class Graph {
             zeroPointUs = this.startPointUs + this.zeroShiftUs;
         }
 
+        this.#updateStats();
+
         if (data.length === 0) {
             return;
         }
@@ -720,34 +757,19 @@ export class Graph {
         bars.areaWidthPx = this.graphWidthPx;
         bars.areaHeightPx = this.graphHeightPx;
 
-        // Pair open/close events over all data, so events that started before the view are
-        // still found. Only events that overlap the view are added to the bars, so threads and
+        bars.durationStats = this.durationStats;
+
+        // The server pairs the begin and end of an event into one span, so this only sorts the
+        // spans per thread. Only spans that overlap the view are added to the bars, so threads and
         // lanes are not taken up by events that are not visible.
         const isVisible = (startUs, endUs) => endUs >= this.startPointUs && startUs <= graphEndUs;
-        const groups = new Map();   // groupId -> { openMap, lastEndTime }
-
-        // Duration statistics per event name, over all closed events in the data (not just the visible ones).
-        const stats = bars.durationStats;
-        const addSample = (name, durationUs) => {
-            let s = stats.get(name);
-            if (!s) {
-                s = { count: 0, min: Infinity, max: -Infinity, mean: 0, m2: 0 };
-                stats.set(name, s);
-            }
-            // Welford's online algorithm, numerically stable for mean and variance.
-            s.count += 1;
-            const delta = durationUs - s.mean;
-            s.mean += delta / s.count;
-            s.m2 += delta * (durationUs - s.mean);
-            if (durationUs < s.min) s.min = durationUs;
-            if (durationUs > s.max) s.max = durationUs;
-        };
+        const groups = new Map();   // groupId -> { openEvents, lastEndTime }
 
         for (let i = 0; i < data.length; ++i) {
             const event = data.at(i);
             let group = groups.get(event.groupId);
             if (!group) {
-                group = { openMap: new Map(), lastEndTime: 0 };
+                group = { openEvents: [], lastEndTime: 0 };
                 groups.set(event.groupId, group);
             }
             const eventEndUs = event.end_time ?? event.timestamp;
@@ -756,43 +778,24 @@ export class Graph {
             }
 
             if (event.type === EventType.OPEN) {
-                group.openMap.set(event.name, event);
-            }
-
-            if (event.type === EventType.CLOSE) {
-                const start_event = group.openMap.get(event.name);
-                if (!start_event) continue;
-                group.openMap.delete(event.name);
-                addSample(event.name, event.timestamp - start_event.timestamp);
-
-                if (isVisible(start_event.timestamp, event.timestamp)) {
-                    const closedEvent = {
-                        ...start_event,   // take a copy
-                        end_time: event.timestamp,          // closedEvent now has timestamp + end_time
-                        type: EventType.CLOSE
-                    };
-                    bars.getLine(event.groupId).closedEvents.push(closedEvent);
+                if (event.timestamp <= graphEndUs) {
+                    group.openEvents.push(event);
                 }
             }
-
-            if (event.type === EventType.DURATION) {
-                addSample(event.name, (event.end_time ?? event.timestamp) - event.timestamp);
-                if (isVisible(event.timestamp, event.end_time ?? event.timestamp)) {
-                    bars.getLine(event.groupId).closedEvents.push(event);
-                }
+            else if (isVisible(event.timestamp, eventEndUs)) {
+                bars.getLine(event.groupId).closedEvents.push(event);
             }
         }
 
         // events that are still open extend to the end of the view
         for (const [groupId, group] of groups) {
-            const openEvents = [...group.openMap.values()].filter(event => event.timestamp <= graphEndUs);
-            if (openEvents.length === 0 && !bars.lines.has(groupId)) {
+            if (group.openEvents.length === 0 && !bars.lines.has(groupId)) {
                 continue;
             }
 
             const line = bars.getLine(groupId);
             line.lastEndTime = group.lastEndTime;
-            for (const event of openEvents) {
+            for (const event of group.openEvents) {
                 line.openMap.set(event.name, event);
                 if (event.timestamp < bars.beginTime) {
                     bars.beginTime = event.timestamp;
