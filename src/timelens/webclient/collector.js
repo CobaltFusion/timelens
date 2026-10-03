@@ -1,5 +1,10 @@
 import { EventType } from "./globals.js";
 import { performanceMonitor } from "./globals.js"
+import { RingBuffer } from "./ring_buffer.js";
+
+// Upper limit on the number of buffered events. Normally the buffer holds the last minute,
+// above ~4400 events/s the oldest events are overwritten before they are a minute old.
+const maxBufferedEvents = 1 << 18;
 
 /**
  * @param {string} name
@@ -48,7 +53,7 @@ function makeEvent(name, type, timestamp, groupId, value, count, processId, rece
  */
 export class Collector {
     constructor() {
-        this.incoming = []; // this an array of structs, if GC becomes a problem, we should turn this into a struct of arrays for zero-reallocation
+        this.incoming = new RingBuffer(maxBufferedEvents);
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
@@ -92,13 +97,12 @@ export class Collector {
     }
 
     clear() {
-        // this clears the elements, incoming[0]  // undefined
-        // but does not release the underlying storage, so its efficient and GC friendly
-        this.incoming.length = 0;
+        this.incoming.clear();
     }
 
+    // returns a reference to the RingBuffer, not a copy
     data() {
-        return this.incoming; // returns a reference, not a copy
+        return this.incoming;
     }
 
     getLastTimepointUs() {
@@ -158,15 +162,8 @@ export class Collector {
         // }
     }
 
-    // this function is approximately O(n), still data is copied, so its not ideal.
+    // drops the oldest events up to the first one at or after 'cutoffTime', nothing is copied
     trimIncomingData(cutoffTime) {
-        const index = this.incoming.findIndex(event => event.timestamp >= cutoffTime);
-
-        if (index < 0) {
-            this.incoming.length = 0;
-            return;
-        }
-        // starting at array index 0, remove index elements.
-        this.incoming.splice(0, index);
+        this.incoming.dropWhile(event => event.timestamp < cutoffTime);
     }
 }
