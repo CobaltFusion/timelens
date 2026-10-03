@@ -328,6 +328,43 @@ button:focus-visible {
     color: var(--stop-run-color);
 }
 
+.trigger-status {
+    margin-left: 6px;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.trigger-status.recording {
+    background: linear-gradient(to right,
+            rgba(22, 186, 109, 0.3) var(--recording-progress, 0%),
+            transparent var(--recording-progress, 0%));
+}
+
+.trigger-status:empty {
+    display: none;      /* free running, no trigger word */
+}
+
+.trigger-status.waiting {
+    color: var(--status-disconnected);
+    animation: trigger-wait-pulse 1.6s ease-in-out infinite;
+}
+
+.trigger-status.triggered {
+    color: var(--status-connected);
+}
+
+.trigger-status.auto {
+    color: var(--muted);
+}
+
+@keyframes trigger-wait-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+}
+
 .stop-run-divider {
     width: 100%;
     height: 1px;

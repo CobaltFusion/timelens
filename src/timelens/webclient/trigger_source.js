@@ -79,6 +79,27 @@ export class TriggerSource {
             this.triggerState = TriggerState.Idle;
         }
         this.triggerResult = TriggerResult.None;
+        this.onStatusChanged?.();
+    }
+
+    // null when no trigger word is set (free running)
+    getTriggerStatus() {
+        if (this.triggerMode === TriggerMode.FREE) {
+            return null;
+        }
+        if (this.triggerMode === TriggerMode.AUTO) {
+            return "Auto";
+        }
+        return this.triggerResult === TriggerResult.Found ? "Triggered" : "Wait";
+    }
+
+    // 0..1 while a single capture is recording after its trigger, otherwise null
+    getRecordingProgress() {
+        if (!this.running || this.triggerState !== TriggerState.Recording) {
+            return null;
+        }
+        const elapsedUs = this.collector.estimatedNowUs() - this.triggerFoundTimeUs;
+        return Math.min(Math.max(elapsedUs / this.singleRecordUs, 0), 1);
     }
 
     getTriggerWord() {
@@ -181,10 +202,13 @@ export class TriggerSource {
                 this.triggerFoundTimeUs = 0;
                 return 0;
             }
-            this.triggerResult = TriggerResult.Found;
             this.triggerFoundTimeUs = data[triggerIndex].timestamp;
             if (this.triggerMode === TriggerMode.SINGLE) {
                 this.triggerState = TriggerState.Recording;     // stop looking for triggers
+            }
+            if (this.triggerResult !== TriggerResult.Found) {
+                this.triggerResult = TriggerResult.Found;
+                this.onStatusChanged?.();
             }
         }
 

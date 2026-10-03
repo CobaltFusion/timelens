@@ -405,6 +405,14 @@ export class Graph {
         return this.triggerSource.getTriggerWord();
     }
 
+    getTriggerStatus() {
+        return this.triggerSource.getTriggerStatus();
+    }
+
+    getRecordingProgress() {
+        return this.triggerSource.getRecordingProgress();
+    }
+
     setgraphWidthMs(milliseconds) {
         const value = Number(milliseconds);
 
