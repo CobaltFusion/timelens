@@ -64,6 +64,11 @@ export const TriggerState = Object.freeze({
     Recording: "Recording",  // single trigger found, recording until the post-trigger time has passed
 });
 
+export const TriggerEdge = Object.freeze({
+    RISING: "rising",    // trigger on the begin of an event
+    FALLING: "falling"   // trigger on the end of an event
+});
+
 export const TriggerResult = Object.freeze({
     None: "None",
     Found: "Found"
