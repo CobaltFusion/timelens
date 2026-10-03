@@ -13,7 +13,7 @@ export class TrafficIndication {
 
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("traffic-indication");
-        this.canvas.title = "Incoming traffic";
+        this.canvas.title = "Incoming traffic: events per 100 ms over the last 6 seconds";
 
         parent.appendChild(this.canvas);
 

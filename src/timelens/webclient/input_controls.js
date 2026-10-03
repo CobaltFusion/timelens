@@ -218,6 +218,7 @@ export class NumericControl {
         min = -Infinity,
         max = Infinity,
         unit = "",
+        title = "",
         onChange = null
     }) {
         this.parent = parent;
@@ -227,6 +228,7 @@ export class NumericControl {
         this.min = min;
         this.max = max;
         this.unit = unit;
+        this.title = title;
         this.onChange = onChange;
 
         if (!(parent instanceof HTMLElement)) {
@@ -248,16 +250,19 @@ export class NumericControl {
         this.minusButton = document.createElement("button");
         this.minusButton.classList.add("control-button");
         this.minusButton.textContent = "-";
+        this.minusButton.title = `Decrease by ${this.step}${this.unit ? ` ${this.unit}` : ""}`;
 
         this.plusButton = document.createElement("button");
         this.plusButton.classList.add("control-button");
         this.plusButton.textContent = "+";
+        this.plusButton.title = `Increase by ${this.step}${this.unit ? ` ${this.unit}` : ""}`;
 
         this.input = document.createElement("input");
         this.input.classList.add("control-input");
         this.input.classList.add("numeric-control-input");
         this.input.type = "number";
         this.input.step = this.inputStep;
+        this.input.title = this.title;
 
         this.unitSpan = document.createElement("span");
         this.unitSpan.textContent = this.unit ? ` ${this.unit}` : "";

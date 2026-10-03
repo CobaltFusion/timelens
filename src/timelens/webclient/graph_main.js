@@ -28,6 +28,7 @@ class Main {
 
         this.addButton = document.createElement("button");
         this.addButton.textContent = "Add Graph";
+        this.addButton.title = "Add another graph panel, each graph has its own trigger and view settings";
         this.addButton.classList.add("control-button");
         this.addButton.addEventListener("click", () => this.addScope());
         topPanel.appendChild(this.addButton);
@@ -64,6 +65,7 @@ class Main {
         this.connectionStatus = document.createElement("button");
         this.connectionStatus.classList.add("connection-status", "control-button");
         this.connectionStatus.id = "id_connection_status";
+        this.connectionStatus.title = "Connection to the TimeLens server, reload the page to reconnect";
         topPanel.appendChild(this.connectionStatus);
 
         this.setConnectionStatus(true);
@@ -74,7 +76,7 @@ class Main {
 
         this.incomingTraffic = document.createElement("span");
         this.incomingTraffic.classList.add("incoming-traffic");
-        this.incomingTraffic.title = "Incoming traffic";
+        this.incomingTraffic.title = "Lights up when events arrive from the server";
         topPanel.appendChild(this.incomingTraffic);
 
         this.trafficIndication = new TrafficIndication(topPanel);
@@ -141,10 +143,11 @@ class Main {
                     <path d="M21 9l-5 6"/>
                 </svg>`;
 
-        this.audioButton.setAttribute(
-            "aria-label",
-            audioEnabled ? "Mute audio" : "Enable audio"
-        );
+        const audioLabel = audioEnabled
+            ? "Mute audio alerts"
+            : "Enable audio alerts, events named 'error' or 'message' beep";
+        this.audioButton.title = audioLabel;
+        this.audioButton.setAttribute("aria-label", audioLabel);
     }
 
     init() {
@@ -315,6 +318,8 @@ class Main {
         triggerWordInput.value = graph.getTriggerWord();
         triggerWordInput.classList.add("control-input");
         triggerWordInput.classList.add("numeric-control-input");
+        triggerWordInput.title = "Event name to trigger on, case-insensitive, '*' matches any text. Leave empty to run freely";
+        triggerWordLabel.title = triggerWordInput.title;
 
         triggerWordInput.addEventListener("input", () => {
             graph.setTriggerWord(String(triggerWordInput.value));
@@ -327,6 +332,7 @@ class Main {
 
         const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";
+        preTriggerLabel.title = "Time shown before the trigger point, -10 ms puts the trigger 10 ms from the left edge";
         controls.appendChild(preTriggerLabel);
 
         const preTriggerControl = new NumericControl({
@@ -337,11 +343,13 @@ class Main {
             min: -Infinity,
             max: -0,
             unit: "ms",
+            title: preTriggerLabel.title,
             onChange: (value) => graph.setPreTrigger(value)
         });
 
         const graphWidthLabel = document.createElement("label");
         graphWidthLabel.textContent = "View:";
+        graphWidthLabel.title = "Width of the graph in time";
         controls.appendChild(graphWidthLabel);
 
         const graphWidthControl = new NumericControl({
@@ -351,6 +359,7 @@ class Main {
             inputStep: 1,
             min: 0.001,
             unit: "ms",
+            title: graphWidthLabel.title,
             onChange: (value) => {
                 graph.setgraphWidthMs(value);
             }
@@ -358,6 +367,7 @@ class Main {
 
         const autoSet = document.createElement("button");
         autoSet.textContent = "AutoSet";
+        autoSet.title = "Set the view width to fit the longest event in the buffer";
         autoSet.classList.add("control-button");
         autoSet.addEventListener("click", () => {
             graph.autoSet();
@@ -370,6 +380,7 @@ class Main {
 
         const autoButton = document.createElement("button");
         autoButton.textContent = "AUTO";
+        autoButton.title = "Keep following the most recent trigger";
         autoButton.classList.add("control-button");
         autoButton.addEventListener("click", () => {
             graph.auto();
@@ -378,6 +389,7 @@ class Main {
 
         const stopRunButton = document.createElement("button");
         stopRunButton.classList.add("control-button", "stop-run-button");
+        stopRunButton.title = "Freeze the graph on its current data, or resume following live data";
 
         const stopSpan = document.createElement("span");
         stopSpan.textContent = "STOP";
@@ -404,6 +416,7 @@ class Main {
 
         const singleButton = document.createElement("button");
         singleButton.textContent = "SINGLE";
+        singleButton.title = "Wait for the next trigger, record 10 seconds after it, then stop";
         singleButton.classList.add("control-button");
         singleButton.addEventListener("click", () => {
             graph.single();
@@ -412,6 +425,7 @@ class Main {
 
         const triggerStatus = document.createElement("span");
         triggerStatus.classList.add("trigger-status");
+        triggerStatus.title = "Trigger status: Auto, Wait (no trigger found yet) or Triggered";
         controls.appendChild(triggerStatus);
 
         const updateTriggerStatus = () => {

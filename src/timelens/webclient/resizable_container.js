@@ -38,6 +38,7 @@ export class ResizableContainer {
         this.closeButton = document.createElement("button");
         this.closeButton.classList.add("resizable-container-close");
         this.closeButton.textContent = "x";
+        this.closeButton.title = "Close this graph";
 
         this.closeButton.addEventListener("click", () => {
             if (selectedContainer === this) {

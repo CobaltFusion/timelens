@@ -7,8 +7,8 @@ const Mode = Object.freeze({
 });
 
 const modeTitles = [
-    "Health indication: durations (click to switch)",
-    "Health indication: message signature (click to switch)"
+    "Health indication: duration of the last events, one line per event name (click to switch)",
+    "Health indication: message signature, events at an unusual interval are red (click to switch)"
 ];
 
 const anomalyColor = "#ff4d4d";
