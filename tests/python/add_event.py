@@ -61,32 +61,15 @@ def write_event(counter: int, name: str, category: str, phase: str, tid: int, fi
         f.write((json.dumps(event) + ",\n").encode("utf-8"))
 
 
-def add_event(counter: int, name: str, category: str, duration_ms: float, fixed: bool = False) -> None:
-    """Write a single event immediately."""
+def loop(action) -> None:
+    """Call action(counter) every 1 second until interrupted."""
 
-    ts = _timestamp_us()
-    write_event(counter, name, category, "B", tid=345, fixed=fixed, ts=ts, prefix=True)
-
-    try:
-        time.sleep(duration_ms / 1000.0)
-    finally:
-        write_event(counter, name, category, "E", tid=345, fixed=fixed, ts=ts + int(duration_ms * 1000), prefix=True)
-
-
-def loop_event() -> None:
-    """Write a 'pre' (20 ms), 'error' (100 ms) and 'post' (10 ms) event every 1 second until interrupted."""
-
-    category = "loop"
-    steps = [("pre", 20), ("error", 100), ("post", 10)]
-    print("Sending 'pre' (20 ms), 'error' (100 ms) and 'post' (10 ms) events every 1 second. Press Ctrl+C to stop.")
+    print("Repeating every 1 second. Press Ctrl+C to stop.")
     next_event = time.perf_counter()
     try:
         while True:
-            counter = _next_counter()
             next_event += 1.0
-
-            for name, duration_ms in steps:
-                add_event(counter, name, category, duration_ms)
+            action(_next_counter())
 
             remaining = next_event - time.perf_counter()
             if remaining > 0:
@@ -104,17 +87,17 @@ class ScheduledEvent:
     category: str
     start_ms: float
     duration_ms: float
-    fixed: bool
-    prefix: bool
 
 
 class EventScheduler:
-    def __init__(self, counter: int) -> None:
+    def __init__(self, counter: int, fixed: bool, prefix: bool) -> None:
         self.counter = counter
+        self.fixed = fixed
+        self.prefix = prefix
         self.events: list[ScheduledEvent] = []
 
-    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category, fixed, prefix) -> None:
-        self.events.append(ScheduledEvent(tid, name, category, start, duration_ms, fixed, prefix))
+    def schedule_event(self, tid: int, name: str, start: float, duration_ms: float, category: str) -> None:
+        self.events.append(ScheduledEvent(tid, name, category, start, duration_ms))
 
     @staticmethod
     def _wait_until(target_ns: int) -> None:
@@ -130,79 +113,75 @@ class EventScheduler:
         actions = []
 
         for event in self.events:
-            actions.append((event.start_ms, 0, event, "B"))
-            actions.append((event.start_ms + event.duration_ms, 1, event, "E"))
+            actions.append((event.start_ms, 1, event, "B"))
+            actions.append((event.start_ms + event.duration_ms, 0, event, "E"))
 
-        # Sort by timestamp. B is emitted before E at the same timestamp.
+        # Sort by timestamp. E is emitted before B at the same timestamp,
+        # so back-to-back events close before the next one opens.
         actions.sort(key=lambda action: (action[0], action[1]))
 
         # Use a monotonic clock for scheduling so system clock changes
         # do not affect the timing of the generated sequence.
         playback_start_ns = time.perf_counter_ns()
+        playback_start_us = _timestamp_us()
         for offset_ms, _, event, phase in actions:
             target_ns = playback_start_ns + int(offset_ms * 1000_000)
             self._wait_until(target_ns)
-            write_event(self.counter, event.name, event.category, phase, event.tid, event.fixed, int(target_ns / 1000), event.prefix)
+            ts = playback_start_us + int(offset_ms * 1000)
+            write_event(self.counter, event.name, event.category, phase, event.tid, self.fixed, ts, self.prefix)
 
 
-def sequence_test(counter, fixed, prefix=True) -> None:
-    """Generate a 300 ms event containing several timed events."""
-    scheduler = EventScheduler(counter)
-    category = "sequence"
-    scheduler.schedule_event(100, "test", 0, 300, category, fixed, prefix)
-    scheduler.schedule_event(101, "prepare", 0, 20, category, fixed, prefix)
-    scheduler.schedule_event(101, "process", 20, 20, category, fixed, prefix)
-    scheduler.schedule_event(101, "stop", 280, 20, category, fixed, prefix)
+def play_sequence(counter: int, steps: list[tuple[str, str, float]], fixed: bool, prefix: bool) -> None:
+    """Play (name, category, duration_ms) steps back to back."""
+    scheduler = EventScheduler(counter, fixed, prefix)
+    start_ms = 0.0
+    for name, category, duration_ms in steps:
+        scheduler.schedule_event(345, name, start_ms, duration_ms, category)
+        start_ms += duration_ms
     scheduler.play()
 
 
-def sequence(counter, sequence_id) -> None:
-    match sequence_id:
-        case "normal":
-            sequence_test(counter, fixed=False, prefix=False)
-        case "real":
-            sequence_test(counter, fixed=False, prefix=True)
-        case "fixed":
-            sequence_test(counter, fixed=True, prefix=True)  # fixed means exact duration
-        case _:
-            raise ValueError(f"Unknown sequence: {sequence_id}")
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate telemetry events for testing.")
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("-n", "--name", help="Name of the telemetry event.")
-    mode.add_argument("-s", "--sequence", metavar="SEQUENCE_ID", help="Generate a predefined event sequence.")
-    mode.add_argument("-l", "--loop", action="store_true", help="Send 'pre', 'error' and 'post' events every 1 second until interrupted.")
-    parser.add_argument("-c", "--category", help="Telemetry category.")
-    parser.add_argument("-d", "--duration-ms", type=float, metavar="MILLISECONDS", help="Duration of the event in milliseconds.")
+    parser = argparse.ArgumentParser(
+        description="Generate telemetry events for testing. Repeat -n/-c/-d to describe a sequence of back-to-back events.")
+    parser.add_argument("-n", "--name", action="append", required=True, help="Name of the telemetry event (repeatable).")
+    parser.add_argument("-c", "--category", action="append", required=True,
+                        help="Telemetry category (repeatable; give once to apply to all events).")
+    parser.add_argument("-d", "--duration-ms", action="append", type=float, required=True, metavar="MILLISECONDS",
+                        help="Duration of the event in milliseconds (repeatable; give once to apply to all events).")
+    parser.add_argument("-l", "--loop", action="store_true", help="Repeat the sequence every 1 second until interrupted.")
+    timing = parser.add_mutually_exclusive_group()
+    timing.add_argument("--real", dest="timing", action="store_const", const="real",
+                        help="Timestamps taken from the wall clock when each event is written (default).")
+    timing.add_argument("--fixed", dest="timing", action="store_const", const="fixed",
+                        help="Events are written at wall clock time, but timestamps are ideal values "
+                             "computed from the requested durations.")
+    parser.set_defaults(timing="real")
+    parser.add_argument("-p", "--prefix", action="store_true", help="Prefix event names with the invocation counter.")
     args = parser.parse_args()
 
+    count = len(args.name)
+
+    def expand(values: list, option: str) -> list:
+        if len(values) == 1:
+            return values * count
+        if len(values) != count:
+            parser.error(f"{option} must be given once or once per -n/--name ({count} times), got {len(values)}")
+        return values
+
+    categories = expand(args.category, "-c/--category")
+    durations = expand(args.duration_ms, "-d/--duration-ms")
+    steps = list(zip(args.name, categories, durations))
+
+    fixed = args.timing == "fixed"
+
+    def action(counter):
+        play_sequence(counter, steps, fixed, args.prefix)
+
     if args.loop:
-        if args.category is not None or args.duration_ms is not None:
-            parser.error("-c/--category and -d/--duration-ms cannot be used with -l")
-        loop_event()
-        return
-
-    counter = _next_counter()
-    if args.sequence is not None:
-        if args.category is not None or args.duration_ms is not None:
-            parser.error("-c/--category and -d/--duration-ms cannot be used with -s")
-
-        try:
-            sequence(counter, args.sequence)
-        except ValueError as exc:
-            parser.error(str(exc))
-
-        return
-
-    if args.category is None:
-        parser.error("-c/--category is required with -n/--name")
-
-    if args.duration_ms is None:
-        parser.error("-d/--duration-ms is required with -n/--name")
-
-    add_event(counter, args.name, args.category, args.duration_ms)
+        loop(action)
+    else:
+        action(_next_counter())
 
 
 if __name__ == "__main__":
