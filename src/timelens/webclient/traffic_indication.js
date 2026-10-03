@@ -1,3 +1,5 @@
+import { require2dContext } from "./dom.js";
+
 export class TrafficIndication {
     constructor(parent) {
         this.sampleIntervalMs = 100;
@@ -17,7 +19,7 @@ export class TrafficIndication {
 
         parent.appendChild(this.canvas);
 
-        this.ctx = this.canvas.getContext("2d");
+        this.ctx = require2dContext(this.canvas);
 
         this.timer = setInterval(() => {
             this.sample();

@@ -1,3 +1,4 @@
+import { require2dContext } from "./dom.js";
 import { EventType } from "./globals.js";
 
 // Display modes, a click on the indicator cycles through them.
@@ -51,7 +52,7 @@ export class HealthIndication {
 
         parent.appendChild(this.canvas);
 
-        this.ctx = this.canvas.getContext("2d");
+        this.ctx = require2dContext(this.canvas);
 
         this.resize();
         this.resizeObserver = new ResizeObserver(() => {

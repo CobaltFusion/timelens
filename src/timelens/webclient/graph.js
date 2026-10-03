@@ -870,6 +870,6 @@ export class Graph {
 
         // Scale drawing operations
         const ctx = this.canvas.getContext("2d");
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 }
