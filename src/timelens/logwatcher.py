@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from pathlib import Path
 
@@ -11,11 +12,62 @@ from watchfiles import awatch
 
 logger = logging.getLogger(__name__)
 
+# An existing file is read from about 'history_us' before its newest event, the start is
+# found by stepping back from the end of the file this many bytes at a time.
+TAIL_STEP_BYTES = 1 << 20
+
+# Same as the retention of the span store.
+DEFAULT_HISTORY_US = 30 * 60 * 1_000_000
+
+
+# The 'ts' of a line of a log file, None if it has none or is not a complete event.
+def _timestamp_of(line):
+    line = line.strip()
+    if line.startswith(b"["):
+        line = line[1:]
+    if line.endswith(b","):
+        line = line[:-1]
+    try:
+        evt = json.loads(line)
+    except ValueError:
+        return None
+    ts = evt.get("ts") if isinstance(evt, dict) else None
+    return ts if isinstance(ts, (int, float)) else None
+
+
+# (offset, ts) of the first complete line at or after 'offset' that has a 'ts', or None.
+def _first_timestamp(f, offset):
+    f.seek(offset)
+    if offset > 0:
+        f.readline()    # skip the partial line
+    while True:
+        line_offset = f.tell()
+        line = f.readline()
+        if not line:
+            return None
+        ts = _timestamp_of(line)
+        if ts is not None:
+            return line_offset, ts
+
+
+# The 'ts' of the last line at or after 'offset' that has one, or None.
+def _last_timestamp(f, offset):
+    f.seek(offset)
+    if offset > 0:
+        f.readline()    # skip the partial line
+    last = None
+    for line in f:
+        ts = _timestamp_of(line)
+        if ts is not None:
+            last = ts
+    return last
+
 
 class LogWatcher:
-    def __init__(self, path, callback):
+    def __init__(self, path, callback, history_us=DEFAULT_HISTORY_US):
         self.path = Path(path)
         self.callback = callback
+        self.history_us = history_us
 
         self._runner: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -87,11 +139,37 @@ class LogWatcher:
         task.add_done_callback(_cleanup)
         self._tailers[path] = task
 
+    # The offset of the line to start reading 'path' from: the first line of the 'TAIL_STEP_BYTES'
+    # step back from the end where the events are 'history_us' older than the newest event.
+    # 0 for small files, or when the whole file is newer.
+    def _tail_offset(self, path):
+        with path.open("rb") as f:
+            size = f.seek(0, 2)
+            if size <= TAIL_STEP_BYTES:
+                return 0
+
+            newest_us = _last_timestamp(f, size - TAIL_STEP_BYTES)
+            if newest_us is None:
+                return 0
+            cutoff_us = newest_us - self.history_us
+
+            offset = size
+            while offset > 0:
+                offset = max(0, offset - TAIL_STEP_BYTES)
+                found = _first_timestamp(f, offset)
+                if found is not None and found[1] <= cutoff_us:
+                    return found[0]
+            return 0
+
     async def _tail_file(self, path):
         try:
+            offset = self._tail_offset(path)
+            if offset > 0:
+                logger.info("Skipping the first %d bytes of %s", offset, path)
+
             with path.open("r", encoding="utf8") as f:
-                # Uncomment if you only want new lines.
-                # f.seek(0, 2)
+                # 'offset' is at the start of a line, so it is also a valid position in text mode
+                f.seek(offset)
 
                 while not self._stop.is_set():
                     line = f.readline()
