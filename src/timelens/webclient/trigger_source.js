@@ -1,4 +1,4 @@
-import { EventType, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
+import { EventType, TriggerEdge, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
 
 // Returns a function that tests a text against 'search', case-insensitive, '*' matches anything.
 // The search word is prepared once, so testing only lowercases the text.
@@ -61,6 +61,7 @@ export class TriggerSource {
         this.historyBeforeSearchUs = 60 * 1e6;  // a stopped capture keeps up to a minute before 'searchStartPointUs'
         this.triggerWord = "";
         this.triggerMatcher = makeWildcardMatcher("");
+        this.triggerEdge = TriggerEdge.RISING;
         this.dataLength = 0;
         this.onStatusChanged = null;
     }
@@ -77,6 +78,15 @@ export class TriggerSource {
         this.triggerWord = value;
         this.triggerMatcher = makeWildcardMatcher(value);
         this.#determineTriggerMode(TriggerMode.AUTO);
+    }
+
+    setTriggerEdge(value) {
+        this.triggerEdge = value;
+        this.#determineTriggerMode(TriggerMode.AUTO);
+    }
+
+    getTriggerEdge() {
+        return this.triggerEdge;
     }
 
     #determineTriggerMode(triggerMode) {
@@ -189,7 +199,9 @@ export class TriggerSource {
     }
 
     #isTrigger(event) {
-        return event.type === EventType.OPEN && this.triggerMatcher(event.name);
+        // in the raw data a 'B' is an OPEN event and an 'E' is a CLOSE event, both at their own timestamp
+        const edgeType = this.triggerEdge === TriggerEdge.FALLING ? EventType.CLOSE : EventType.OPEN;
+        return event.type === edgeType && this.triggerMatcher(event.name);
     }
 
     // Searches only the events that were not searched before, 'data' has 'length' and 'at(i)'.

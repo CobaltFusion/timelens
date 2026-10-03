@@ -414,6 +414,14 @@ export class Graph {
         return this.triggerSource.getTriggerWord();
     }
 
+    setTriggerEdge(edge) {
+        this.triggerSource.setTriggerEdge(edge);
+    }
+
+    getTriggerEdge() {
+        return this.triggerSource.getTriggerEdge();
+    }
+
     getTriggerStatus() {
         return this.triggerSource.getTriggerStatus();
     }

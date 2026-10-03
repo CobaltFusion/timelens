@@ -165,12 +165,14 @@ export class BarStack {
 
     drawTextOnBar(name, x, width, y, height, durationUs) {
 
-        const horizontalPadding = 4;
-        const availableWidth = width - horizontalPadding * 2;
-
-        if (availableWidth <= 0) {
+        // Bars this narrow can't show anything readable, so skip measuring text for them.
+        const minimumTextBarWidth = 20;
+        if (width < minimumTextBarWidth) {
             return;
         }
+
+        const horizontalPadding = 4;
+        const availableWidth = width - horizontalPadding * 2;
 
         this.ctx.font = "14px monospace";
 

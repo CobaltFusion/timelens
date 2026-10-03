@@ -1,5 +1,5 @@
 import { Collector } from "./collector.js";
-import { EventType, getAudioAlerts, getSettings } from "./globals.js";
+import { EventType, TriggerEdge, getAudioAlerts, getSettings } from "./globals.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph.js";
@@ -236,14 +236,14 @@ class Main {
             : "var(--status-disconnected)";
     }
 
-    addEdgeControlButton(controls) {
+    addEdgeControlButton(controls, graph) {
         const edgeButton = document.createElement("button");
         edgeButton.classList.add("control-button");
         edgeButton.setAttribute("aria-label", "Edge mode");
 
         const edgeModes = [
             {
-                value: "rising",
+                value: TriggerEdge.RISING,
                 label: "Rising edge",
                 icon: `
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -263,7 +263,7 @@ class Main {
                 `
             },
             {
-                value: "falling",
+                value: TriggerEdge.FALLING,
                 label: "Falling edge",
                 icon: `
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -281,36 +281,22 @@ class Main {
                               stroke-linejoin="round"/>
                     </svg>
                 `
-            },
-            {
-                value: "duration",
-                label: "Pulse duration",
-                icon: `
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M2 17 H7 V7 H17 V17 H22"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"/>
-                    </svg>
-                `
             }
         ];
 
-        let edgeModeIndex = 0;
+        let edgeModeIndex = Math.max(0, edgeModes.findIndex(mode => mode.value === graph.getTriggerEdge()));
 
         const updateEdgeButton = () => {
             const mode = edgeModes[edgeModeIndex];
 
             edgeButton.innerHTML = mode.icon;
-            edgeButton.title = mode.label;
+            edgeButton.title = `Trigger on ${mode.label.toLowerCase()} (${mode.value === TriggerEdge.RISING ? "begin" : "end"} of event)`;
             edgeButton.setAttribute("aria-label", mode.label);
         };
 
         edgeButton.addEventListener("click", () => {
             edgeModeIndex = (edgeModeIndex + 1) % edgeModes.length;
-            this.edgeMode = edgeModes[edgeModeIndex].value;
+            graph.setTriggerEdge(edgeModes[edgeModeIndex].value);
             updateEdgeButton();
         });
 
@@ -337,7 +323,7 @@ class Main {
         triggerWordLabel.appendChild(triggerWordInput);
         controls.appendChild(triggerWordLabel);
 
-        // this.addEdgeControlButton(controls);
+        this.addEdgeControlButton(controls, graph);
 
         const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";
