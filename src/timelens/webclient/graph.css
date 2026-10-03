@@ -3,7 +3,8 @@
     --background: #070b14;
     --panel: rgba(14, 22, 38, 0.84);
     --panel-border: rgba(113, 151, 205, 0.3);
-    --panel-border-selected: rgba(113, 151, 205, 0.42);   /* --panel-border, 40% more opaque */
+    --panel-border-selected: rgba(113, 151, 205, 0.42);
+    /* --panel-border, 40% more opaque */
     --text: #e9f2ff;
     --muted: #8ea1bd;
     --accent: #34e5bd;
@@ -104,7 +105,6 @@ body {
     box-shadow:
         0 1rem 3rem rgba(0, 0, 0, 0.22),
         inset 0 1px rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(14px);
 }
 
 .control-panel label {
@@ -186,7 +186,8 @@ button:focus-visible {
     display: inline-block;
     border: 1px solid #00ff88;
     border-radius: 8px;
-    overflow: hidden;   /* clips inner content nicely */
+    overflow: hidden;
+    /* clips inner content nicely */
     background: #1111;
     box-shadow: 0 4px 22px rgba(0, 0, 0, 0.4);
 
@@ -344,7 +345,8 @@ button:focus-visible {
 }
 
 .trigger-status:empty {
-    display: none;      /* free running, no trigger word */
+    display: none;
+    /* free running, no trigger word */
 }
 
 .trigger-status.waiting {
@@ -361,8 +363,15 @@ button:focus-visible {
 }
 
 @keyframes trigger-wait-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.25; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.25;
+    }
 }
 
 .stop-run-divider {
