@@ -5,6 +5,19 @@ export class AudioAlerts {
         this.audioEnabled = false;
         this.setAudio();
 
+        // All sounds go through a limiter, so overlapping sounds can not add up past full scale.
+        this.limiter = this.audio.createDynamicsCompressor();
+        this.limiter.threshold.value = -6;     // dB
+        this.limiter.knee.value = 0;
+        this.limiter.ratio.value = 20;
+        this.limiter.attack.value = 0.002;     // s
+        this.limiter.release.value = 0.1;
+        this.limiter.connect(this.audio.destination);
+
+        this.volume = 0.2;          // of a single sound
+        this.activeVoices = 0;
+        this.maxRandomVoices = 4;   // random sounds are skipped while this many sounds are playing
+
         this.types = ["sine", "square", "sawtooth", "triangle"];
 
         this.notes = [
@@ -22,19 +35,38 @@ export class AudioAlerts {
     }
 
     beep(frequency, startTime, duration, type = "sine") {
+        // while muted the context is suspended, scheduled sounds would all play at once on unmute
+        if (!this.audioEnabled) {
+            return;
+        }
+
         const osc = this.audio.createOscillator();
         const gain = this.audio.createGain();
 
         osc.type = type;
         osc.frequency.value = frequency;
 
-        gain.gain.value = 0.2;
+        // short fade in and out, starting or stopping at full volume clicks
+        const begin = this.audio.currentTime + startTime;
+        const end = begin + duration;
+        const fade = Math.min(0.005, duration / 4);
+        gain.gain.setValueAtTime(0, begin);
+        gain.gain.linearRampToValueAtTime(this.volume, begin + fade);
+        gain.gain.setValueAtTime(this.volume, end - fade);
+        gain.gain.linearRampToValueAtTime(0, end);
 
         osc.connect(gain);
-        gain.connect(this.audio.destination);
+        gain.connect(this.limiter);
 
-        osc.start(this.audio.currentTime + startTime);
-        osc.stop(this.audio.currentTime + startTime + duration);
+        ++this.activeVoices;
+        osc.onended = () => {
+            --this.activeVoices;
+            osc.disconnect();
+            gain.disconnect();
+        };
+
+        osc.start(begin);
+        osc.stop(end);
     }
 
     randomNote(startTime = 0) {
@@ -51,6 +83,11 @@ export class AudioAlerts {
     }
 
     playPseudoRandomSound(name) {
+        // with many events at once, more sounds only turn into noise
+        if (this.activeVoices >= this.maxRandomVoices) {
+            return;
+        }
+
         let hash = 0;
 
         for (let i = 0; i < name.length; ++i) {
