@@ -30,6 +30,15 @@ export class AudioAlerts {
         ];
     }
 
+    // for sounds made elsewhere, they connect to 'output' so they share the limiter
+    get context() {
+        return this.audio;
+    }
+
+    get output() {
+        return this.limiter;
+    }
+
     alertBeep() {
         this.beep(1300, 0.0, 0.05, "square");
     }

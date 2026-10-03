@@ -284,6 +284,11 @@ button:focus-visible {
     color: #fff;
 }
 
+.signature-button.active {
+    background: var(--accent);
+    color: var(--background);
+}
+
 .audio-button svg {
     width: 18px;
     height: 18px;

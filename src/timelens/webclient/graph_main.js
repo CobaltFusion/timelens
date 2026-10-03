@@ -5,6 +5,7 @@ import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph.js";
 import { TrafficIndication } from "./traffic_indication.js";
 import { HealthIndication } from "./health_indication.js";
+import { SignatureSound } from "./signature_sound.js";
 
 
 // [] array
@@ -51,6 +52,14 @@ class Main {
         topPanel.appendChild(this.audioButton);
 
         this.updateAudioButton();
+
+        this.signatureSound = new SignatureSound(getAudioAlerts(), () => this.collector.estimatedNowUs());
+        this.signatureButton = document.createElement("button");
+        this.signatureButton.classList.add("signature-button", "control-button");
+        this.signatureButton.textContent = "Signature";
+        this.signatureButton.title = "Hear all events as one sound, exceptional events stand out (key: g)";
+        this.signatureButton.addEventListener("click", () => this.toggleSignatureSound());
+        topPanel.appendChild(this.signatureButton);
 
         this.connectionStatus = document.createElement("button");
         this.connectionStatus.classList.add("connection-status", "control-button");
@@ -104,6 +113,14 @@ class Main {
         if (key === "b") {
             getAudioAlerts().alertBeep();
         }
+        if (key === "g") {
+            this.toggleSignatureSound();
+        }
+    }
+
+    toggleSignatureSound() {
+        const enabled = this.signatureSound.toggle();
+        this.signatureButton.classList.toggle("active", enabled);
     }
 
     async updateAudioButton() {
@@ -146,6 +163,7 @@ class Main {
         this.collector.onIncomingEvent = (event) => {
             this.trafficIndication.onIncomingEvent();
             this.healthIndication.onIncomingEvent(event);
+            this.signatureSound.onIncomingEvent(event);
 
             this.incomingTraffic.classList.add("active");
             clearTimeout(this.incomingTrafficTimer);
