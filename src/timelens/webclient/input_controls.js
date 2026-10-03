@@ -237,36 +237,37 @@ export class NumericControl {
             throw new TypeError("NumericControl: 'parent' must be a valid HTMLElement (is the name of the control correct?)");
         }
 
+        // created here and put together by '_build()', so they are never undefined
+        this.div = document.createElement("div");
+        this.minusButton = document.createElement("button");
+        this.plusButton = document.createElement("button");
+        this.input = document.createElement("input");
+        this.unitSpan = document.createElement("span");
+
         this._build();
         this._sync();
     }
 
     _build() {
-
-        this.div = document.createElement("div");
         this.div.style.display = "flex";
         this.div.style.flexDirection = "row";
         this.div.style.alignItems = "center";
         this.div.style.gap = "5px";
 
-        this.minusButton = document.createElement("button");
         this.minusButton.classList.add("control-button");
         this.minusButton.textContent = "-";
         this.minusButton.title = `Decrease by ${this.step}${this.unit ? ` ${this.unit}` : ""}`;
 
-        this.plusButton = document.createElement("button");
         this.plusButton.classList.add("control-button");
         this.plusButton.textContent = "+";
         this.plusButton.title = `Increase by ${this.step}${this.unit ? ` ${this.unit}` : ""}`;
 
-        this.input = document.createElement("input");
         this.input.classList.add("control-input");
         this.input.classList.add("numeric-control-input");
         this.input.type = "number";
         this.input.step = this.inputStep;
         this.input.title = this.title;
 
-        this.unitSpan = document.createElement("span");
         this.unitSpan.textContent = this.unit ? ` ${this.unit}` : "";
 
         this.div.appendChild(this.minusButton);

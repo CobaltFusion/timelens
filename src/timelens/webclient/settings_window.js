@@ -1,5 +1,14 @@
 import { deleteProfile, listProfiles, loadProfile, saveProfile } from "./profiles.js";
 
+/**
+ * @typedef {Object} FilterRule
+ * @property {string} field
+ * @property {string} pattern
+ * @property {string} match
+ * @property {string} type
+ * @property {string} [color]   only for color rules
+ */
+
 // the choices of a filter rule, see 'event_filter.py' on the server
 const filterFields = [
     { value: "name", label: "name" },
@@ -34,6 +43,15 @@ export class SettingsWindow {
         this.applyFilters = applyFilters;
         this.profiles = [];
         this.defaultProfile = "default";
+
+        // created here and filled by '#build()', so they are never undefined
+        this.dialog = document.createElement("dialog");
+        this.list = document.createElement("select");
+        this.nameInput = document.createElement("input");
+        this.status = document.createElement("div");
+        this.filterRows = document.createElement("div");
+        /** @type {Map<Element, () => FilterRule>} */
+        this.ruleOfRow = new Map();     // row element -> () => rule as edited
         this.#build();
     }
 
@@ -49,7 +67,6 @@ export class SettingsWindow {
     }
 
     #build() {
-        this.dialog = document.createElement("dialog");
         this.dialog.classList.add("settings-dialog");
 
         const title = document.createElement("h2");
@@ -60,7 +77,6 @@ export class SettingsWindow {
         description.textContent = "A profile holds the graphs and their trigger and view settings. " +
             "The default profile is loaded when TimeLens is opened.";
 
-        this.list = document.createElement("select");
         this.list.classList.add("control-input", "settings-list");
         this.list.size = 8;
         this.list.title = "Profiles saved on the server";
@@ -71,7 +87,6 @@ export class SettingsWindow {
 
         const nameLabel = document.createElement("label");
         nameLabel.textContent = "Name: ";
-        this.nameInput = document.createElement("input");
         this.nameInput.type = "text";
         this.nameInput.classList.add("control-input");
         this.nameInput.maxLength = 64;
@@ -97,7 +112,6 @@ export class SettingsWindow {
             () => this.#save(this.defaultProfile));
         addButton("Delete", "Delete the selected profile from the server", () => this.#delete());
 
-        this.status = document.createElement("div");
         this.status.classList.add("settings-status");
 
         // an 'x' at the top right and a Close button at the bottom right, both close the window
@@ -134,9 +148,7 @@ export class SettingsWindow {
             "include rules all events are included. An exclude rule wins over all include rules. " +
             "The first matching color rule sets the color of an event. The filters are saved in the profile.";
 
-        this.filterRows = document.createElement("div");
         this.filterRows.classList.add("filter-rows");
-        this.ruleOfRow = new Map();     // row element -> () => rule as edited
 
         const buttons = document.createElement("div");
         buttons.classList.add("settings-buttons");
@@ -228,6 +240,7 @@ export class SettingsWindow {
 
         row.append(field, pattern, match, type, color, remove);
         this.ruleOfRow.set(row, () => {
+            /** @type {FilterRule} */
             const result = { field: field.value, pattern: pattern.value, match: match.value, type: type.value };
             if (type.value === "color") {
                 result.color = color.value;
@@ -248,8 +261,9 @@ export class SettingsWindow {
 
     // the rules as edited, without empty rows
     #editedFilters() {
-        return [...this.filterRows.children]
-            .map(row => this.ruleOfRow.get(row)())
+        // the map is in the order the rows were added, which is the order they are shown
+        return [...this.ruleOfRow.values()]
+            .map(readRule => readRule())
             .filter(rule => rule.pattern.trim() !== "");
     }
 

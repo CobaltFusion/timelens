@@ -24,19 +24,22 @@ export class ResizableContainer {
             throw new TypeError("component must be an object of 'Component' ducktype");
         }
 
+        // created here and put together by '_createContainer()', so they are never undefined
+        this.container = document.createElement("div");
+        this.closeButton = document.createElement("button");
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+
         this._createContainer();
     }
 
     _createContainer() {
         // Outer box
-        this.container = document.createElement("div");
         this.container.classList.add("resizable-container");
 
         // capture phase, so the click selects the container even if a child handles the event
         this.container.addEventListener("pointerdown", () => this.select(), { capture: true });
 
         // Close button
-        this.closeButton = document.createElement("button");
         this.closeButton.classList.add("resizable-container-close");
         this.closeButton.textContent = "x";
         this.closeButton.title = "Close this graph";
@@ -47,7 +50,6 @@ export class ResizableContainer {
         this.container.appendChild(this.closeButton);
         this.component.mount(this.container);
         this.parent.appendChild(this.container);
-        this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(this.container);
         this.resize();
     }
