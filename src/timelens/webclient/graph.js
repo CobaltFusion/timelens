@@ -593,8 +593,8 @@ export class Graph {
 
     // While zooming, the step doubles or halves so there are always roughly 20 lines,
     // and every line still sits at a multiple of the original step from the zero point.
-    getManualGridStepUs() {
-        const view = this.manualView;
+    // 'view' is the manual view that is shown.
+    getManualGridStepUs(view) {
         const targetLineCount = 20;
         const exponent = Math.round(Math.log2(view.widthUs / (targetLineCount * view.baseStepUs)));
         return view.baseStepUs * Math.pow(2, exponent);
@@ -761,7 +761,7 @@ export class Graph {
             this.startPointUs = view.startUs;
             this.graphWidthUs = view.widthUs;
             this.zeroShiftUs = view.zeroPointUs - view.startUs;
-            this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs, this.getManualGridStepUs());
+            this.drawGrid(ctx, this.graphWidthUs, this.graphWidthPx, this.graphHeightPx, this.zeroShiftUs, this.getManualGridStepUs(view));
 
             data = view.data;
             estimatedNowUs = view.nowUs;
