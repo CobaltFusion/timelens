@@ -1,70 +1,31 @@
-import { EventType, TriggerEdge, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
-
-// Returns a function that tests a text against 'search', case-insensitive, '*' matches anything.
-// The search word is prepared once, so testing only lowercases the text.
-function makeWildcardMatcher(search) {
-    const lowerSearch = search.toLowerCase();
-
-    if (!lowerSearch.includes("*")) {
-        return text => text.toLowerCase().includes(lowerSearch);
-    }
-
-    const parts = lowerSearch.split("*");
-    const startsWithWildcard = lowerSearch.startsWith("*");
-    const endsWithWildcard = lowerSearch.endsWith("*");
-
-    return text => {
-        const lowerText = text.toLowerCase();
-        let position = 0;
-
-        for (const part of parts) {
-            if (!part) {
-                continue;
-            }
-
-            const found = lowerText.indexOf(part, position);
-
-            if (found === -1) {
-                return false;
-            }
-
-            position = found + part.length;
-        }
-
-        if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
-            return false;
-        }
-
-        if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
-            return false;
-        }
-
-        return true;
-    };
-}
+import { TriggerEdge, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
 
 export class TriggerSource {
     constructor(collector) {
         this.collector = collector;
+        /** @type {typeof TriggerMode[keyof typeof TriggerMode]} */
         this.triggerMode = TriggerMode.FREE;
+        /** @type {typeof TriggerState[keyof typeof TriggerState]} */
         this.triggerState = TriggerState.Idle;
+        /** @type {typeof TriggerResult[keyof typeof TriggerResult]} */
+        this.triggerResult = TriggerResult.None;
         this.running = true;
         this.data = null;                 // while stopped, the events fetched from the server for the stopped range
+        this.stoppedRange = null;         // while stopped, { beginUs, endUs } of the fetched events
         this.fetchGeneration = 0;         // replies to older fetches are ignored
+        this.triggerGeneration = 0;       // trigger replies for an older search are ignored
+        this.unwatchTrigger = null;       // stops the server watch for the trigger word
         this.displayStartPointUs = 0;
         this.searchStartPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
         this.searchStartSequence = 0;     // the same point as a sequence number in the collector's buffer
-        this.scannedSequence = 0;         // while running, events before this sequence number were searched for the trigger
-        this.stoppedDataScanned = false;  // while stopped, the copy in 'this.data' was searched for the trigger
         this.triggerFoundTimeUs = 0;
         this.preTriggerUs = -10000; // default to -10ms
         this.singleRecordUs = 10 * 1e6;  // a single trigger records up to 10s after the trigger
         this.historyBeforeSearchUs = 60 * 1e6;  // a stopped capture keeps up to a minute before 'searchStartPointUs'
+        this.bufferedHistoryUs = 60 * 1e6;      // the collector's buffer holds the last minute
         this.triggerWord = "";
-        this.triggerMatcher = makeWildcardMatcher("");
         /** @type {typeof TriggerEdge[keyof typeof TriggerEdge]} */
         this.triggerEdge = TriggerEdge.RISING;
-        this.dataLength = 0;
         this.onStatusChanged = null;
     }
 
@@ -78,7 +39,6 @@ export class TriggerSource {
 
     setTriggerWord(value) {
         this.triggerWord = value;
-        this.triggerMatcher = makeWildcardMatcher(value);
         this.#determineTriggerMode(TriggerMode.AUTO);
     }
 
@@ -102,10 +62,63 @@ export class TriggerSource {
         }
         this.triggerResult = TriggerResult.None;
         this.triggerFoundTimeUs = 0;
-        // search everything again
-        this.scannedSequence = 0;
-        this.stoppedDataScanned = false;
+        this.#searchTrigger();
         this.onStatusChanged?.();
+    }
+
+    // The server searches for the trigger: while running it reports every new trigger, in auto
+    // mode the latest trigger that is already in the data is looked up as well. While stopped,
+    // the latest trigger in the stopped range is looked up.
+    #searchTrigger() {
+        this.#stopWatching();
+        if (this.triggerMode === TriggerMode.FREE || this.triggerState !== TriggerState.Waiting) {
+            return;
+        }
+
+        const generation = this.triggerGeneration;
+        const onTrigger = (timeUs) => this.#onTrigger(generation, timeUs);
+        const onError = (error) => console.error("Trigger search failed:", error);
+
+        if (!this.running) {
+            if (this.stoppedRange) {
+                const { beginUs, endUs } = this.stoppedRange;
+                this.collector.find(this.triggerWord, this.triggerEdge, beginUs, endUs, "last").then(onTrigger).catch(onError);
+            }
+            return;
+        }
+
+        this.unwatchTrigger = this.collector.watchTrigger(this.triggerWord, this.triggerEdge, onTrigger);
+        if (this.triggerMode === TriggerMode.AUTO) {
+            const { beginUs } = this.getDataRangeUs();
+            this.collector.find(this.triggerWord, this.triggerEdge, beginUs, Infinity, "last").then(onTrigger).catch(onError);
+        }
+    }
+
+    #stopWatching() {
+        ++this.triggerGeneration;
+        this.unwatchTrigger?.();
+        this.unwatchTrigger = null;
+    }
+
+    // Single uses the _next_ trigger, auto follows the latest one.
+    #onTrigger(generation, timeUs) {
+        if (generation !== this.triggerGeneration || timeUs === null || this.triggerState !== TriggerState.Waiting) {
+            return;
+        }
+
+        if (this.triggerMode === TriggerMode.SINGLE) {
+            this.triggerFoundTimeUs = timeUs;
+            this.triggerState = TriggerState.Recording;     // stop looking for triggers
+            this.#stopWatching();
+        }
+        else if (this.triggerResult !== TriggerResult.Found || timeUs > this.triggerFoundTimeUs) {
+            this.triggerFoundTimeUs = timeUs;
+        }
+
+        if (this.triggerResult !== TriggerResult.Found) {
+            this.triggerResult = TriggerResult.Found;
+            this.onStatusChanged?.();
+        }
     }
 
     // null when no trigger word is set (free running)
@@ -132,32 +145,39 @@ export class TriggerSource {
         return this.triggerWord;
     }
 
-    #setRunning(value) {
-        this.running = value;
-        this.onStatusChanged?.();
-    }
-
     isRunning() {
         return this.running;
+    }
+
+    // The time range of the data the graph shows: while running the buffered events from the
+    // search start point onwards, while stopped the fetched range.
+    getDataRangeUs() {
+        if (!this.running && this.stoppedRange) {
+            return this.stoppedRange;
+        }
+        const bufferBeginUs = this.collector.getLastTimepointUs() - this.bufferedHistoryUs;
+        return { beginUs: Math.max(this.searchStartPointUs, bufferBeginUs), endUs: Infinity };
     }
 
     // stops collecting, events after 'endUs' are not included, nor events more than
     // 'historyBeforeSearchUs' before the search start point
     #stop(endUs = Infinity) {
-        const beginUs = this.searchStartPointUs - this.historyBeforeSearchUs;
+        const lastTimepointUs = this.collector.getLastTimepointUs();
+        const beginUs = Math.max(this.searchStartPointUs - this.historyBeforeSearchUs, lastTimepointUs - this.bufferedHistoryUs);
+        const stoppedRange = { beginUs, endUs: Math.min(endUs, lastTimepointUs) };
         const generation = ++this.fetchGeneration;
+        this.stoppedRange = stoppedRange;
         this.data = [];
-        this.stoppedDataScanned = false;
-        this.#setRunning(false);
+        this.running = false;
+        this.#searchTrigger();      // while waiting for a trigger, look in the stopped range
+        this.onStatusChanged?.();
 
         // the stopped range is requested from the server instead of copying the buffer
-        this.collector.query(beginUs, Math.min(endUs, this.collector.getLastTimepointUs()))
+        this.collector.query(stoppedRange.beginUs, stoppedRange.endUs)
             .then(events => {
-                if (generation !== this.fetchGeneration || this.running) {
-                    return;
+                if (generation === this.fetchGeneration && !this.running) {
+                    this.data = events;
                 }
-                this.data = events;
-                this.stoppedDataScanned = false;    // search the fetched events for the trigger
             })
             .catch(error => console.error("Fetching the stopped range failed:", error));
     }
@@ -165,7 +185,10 @@ export class TriggerSource {
     #start() {
         ++this.fetchGeneration;     // a reply that is still underway is no longer wanted
         this.data = null;
-        this.#setRunning(true);
+        this.stoppedRange = null;
+        this.running = true;
+        this.#searchTrigger();
+        this.onStatusChanged?.();
     }
 
     clear() {
@@ -200,10 +223,10 @@ export class TriggerSource {
 
     single() {
         this.clear();
-        this.#determineTriggerMode(TriggerMode.SINGLE);
         if (!this.running) {
             this.#start();
         }
+        this.#determineTriggerMode(TriggerMode.SINGLE);
     }
 
     // In single mode the trigger stays fixed after it is found, recording continues until
@@ -216,54 +239,6 @@ export class TriggerSource {
         }
     }
 
-    #isTrigger(event) {
-        // in the raw data a 'B' is an OPEN event and an 'E' is a CLOSE event, both at their own timestamp,
-        // a DURATION event has both edges
-        const edgeType = this.triggerEdge === TriggerEdge.FALLING ? EventType.CLOSE : EventType.OPEN;
-        return (event.type === edgeType || event.type === EventType.DURATION) && this.triggerMatcher(event.name);
-    }
-
-    // the time of the selected edge, only a DURATION event has its falling edge at 'end_time'
-    #triggerTimeUs(event) {
-        if (this.triggerEdge === TriggerEdge.FALLING && event.type === EventType.DURATION) {
-            return event.end_time ?? event.timestamp;
-        }
-        return event.timestamp;
-    }
-
-    // Searches only the events that were not searched before, 'data' has 'length' and 'at(i)'.
-    // Single waits for the _next_ trigger, auto follows the latest one.
-    // Returns the trigger event, or undefined if none of the new events is a trigger.
-    #findNewTrigger(data) {
-        let from;
-        if (this.running) {
-            from = Math.max(0, this.scannedSequence - data.firstSequence);
-            this.scannedSequence = data.firstSequence + data.length;
-        }
-        else {
-            from = this.stoppedDataScanned ? data.length : 0;
-            this.stoppedDataScanned = true;
-        }
-
-        if (this.triggerMode === TriggerMode.SINGLE) {
-            for (let i = from; i < data.length; ++i) {
-                const event = data.at(i);
-                if (this.#isTrigger(event)) {
-                    return event;
-                }
-            }
-            return undefined;
-        }
-
-        for (let i = data.length - 1; i >= from; --i) {
-            const event = data.at(i);
-            if (this.#isTrigger(event)) {
-                return event;
-            }
-        }
-        return undefined;
-    }
-
     // set this.displayStartPointUs to where we want to start the display of data
     updateStartPoint(freedisplayStartPointUs) {
         if (this.triggerMode === TriggerMode.FREE) {
@@ -271,28 +246,9 @@ export class TriggerSource {
             return this.displayStartPointUs;
         }
 
-        const data = this.#getInternalDataBuffer();
-        this.dataLength = data.length;
-        if (this.dataLength === 0) {
+        if (this.triggerResult !== TriggerResult.Found) {
+            // trigger specified, but not found (yet).
             return 0;
-        }
-
-        if (this.triggerState === TriggerState.Waiting) {
-            const trigger = this.#findNewTrigger(data);
-            if (trigger !== undefined) {
-                this.triggerFoundTimeUs = this.#triggerTimeUs(trigger);
-                if (this.triggerMode === TriggerMode.SINGLE) {
-                    this.triggerState = TriggerState.Recording;     // stop looking for triggers
-                }
-                if (this.triggerResult !== TriggerResult.Found) {
-                    this.triggerResult = TriggerResult.Found;
-                    this.onStatusChanged?.();
-                }
-            }
-            else if (this.triggerResult !== TriggerResult.Found) {
-                // trigger specified, but not found (yet).
-                return 0;
-            }
         }
 
         if (this.triggerState === TriggerState.Recording) {
@@ -328,6 +284,3 @@ export class TriggerSource {
         return this.data;
     }
 }
-
-
-

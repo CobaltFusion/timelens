@@ -17,41 +17,35 @@ const maxBufferedEvents = 1 << 18;
  * @param {number} receivedMs  browser wall time (ms since the unix epoch) the message was received
  * @returns {TSEvent}
  */
-function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined) {
+function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined, id = undefined) {
     return {
         name: name,
         type: type,
         timestamp: timestamp,     // microseconds (µs)
-        end_time: endTime,        // microseconds (µs), only for DURATION events
+        end_time: endTime,        // microseconds (µs), only for CLOSE and DURATION events
         groupId: groupId,
         value: value,
         count: count,
         processId: processId,
-        receivedMs: receivedMs
+        receivedMs: receivedMs,
+        id: id                    // span id from the server
     };
 }
 
 /**
- * A Collector for events received in Chrome JSON trace format.
+ * A Collector for spans received from the server.
  *
- * Incoming WebSocket messages are expected to contain Chrome JSON trace-style event
- * fields:
- *   name, cat, ph, pid, tid, ts
+ * The server pairs the Chrome JSON trace events ('B'/'E'/'X') into spans:
+ *   { id, name, cat, pid, tid, source, count, ts, end }
+ * An open span is sent when it begins ('end' is null), the same span (same id) again when it ends.
  *
- * All timestamps (`ts` and `te`) are in microseconds (µs).
- * They represent time elapsed since the start of the source process.
+ * All timestamps (`ts` and `end`) are in microseconds (µs).
  *
- * For complete events:
- *   ph != 'E'  -> `ts` is the event start time.
+ * In the buffer an open span is an OPEN event, when it ends that same event becomes a CLOSE
+ * event with `timestamp` = begin and `end_time` = end.
  *
- * For complete events with a duration:
- *   ph == 'X'  -> `ts` is the start time and `dur` the duration, this becomes
- *                 one DURATION event with `end_time` = `ts` + `dur`.
- *
- * For end events:
- *   ph == 'E'  -> the incoming `ts` is interpreted as the end time (`te`),
- *                 and `ts` is set to zero because `makeEvent()` represents
- *                 the event as an open/close pair.
+ * `onIncomingEvent` gets the events as they happen: an OPEN at the begin, a CLOSE at the end
+ * (`timestamp` = end, no `end_time`), or a DURATION for a span that was never seen open.
  *
  * The `tid` field is used as the group ID, so events from the same
  * thread are displayed on the same graph line.
@@ -59,6 +53,7 @@ function makeEvent(name, type, timestamp, groupId, value, count, processId, rece
 export class Collector {
     constructor() {
         this.incoming = new RingBuffer(maxBufferedEvents);
+        this.openSpans = new Map();     // span id -> buffered OPEN event, until the span ends
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
@@ -67,7 +62,9 @@ export class Collector {
         this.onConnectionLost = null;
         this.onIncomingEvent = null;
         this.lastRequestId = 0;
-        this.pendingRequests = new Map();   // requestId -> { events, resolve, reject }
+        this.pendingRequests = new Map();   // requestId -> { spans, resolve, reject }
+        this.lastTriggerId = 0;
+        this.triggerWatches = new Map();    // triggerId -> callback(timeUs)
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -92,38 +89,63 @@ export class Collector {
             performanceMonitor.countWebSocketMessage();
             const data = JSON.parse(event.data);
 
-            // replies to 'query' and 'bounds' requests, live events have no 'type' field
-            if (data.type === "range" || data.type === "bounds") {
-                this.#handleReply(data);
-                return;
+            switch (data.type) {
+                case "span":
+                    this.#onSpan(data);
+                    return;
+                case "trigger":
+                    this.triggerWatches.get(data.triggerId)?.(data.timeUs);
+                    return;
+                default:
+                    this.#handleReply(data);
             }
-
-            const newEvent = this.#toEvent(data);
-
-            // timestamp never go back in time _within one logfile_ or
-            // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
-            this.lastTimepointUs = Math.max(newEvent.end_time ?? newEvent.timestamp, this.lastTimepointUs);
-            this.lastSteadyTimepointUs = performance.now() * 1000;
-
-            this.onIncomingEvent?.(newEvent);
-            this.incoming.push(newEvent);
-
-            const minute = 60 * 1e6; // us
-            this.cutoffTime = this.lastTimepointUs - minute; // keep last minute
-            this.trimIncomingData(this.cutoffTime);
         };
     }
 
     /** @returns {TSEvent} */
-    #toEvent(data) {
+    #toEvent(span) {
         // notice that the variables MUST correspond with the actual JSON field names here!
-        const { name, ph, pid, tid, ts, dur, count } = data;
-        const isDuration = ph === "X";
-        const endTime = isDuration ? ts + (dur ?? 0) : undefined;
-        const type = isDuration ? EventType.DURATION : ph === "E" ? EventType.CLOSE : EventType.OPEN;
+        const { id, name, pid, tid, ts, end, count } = span;
+        const type = end === null ? EventType.OPEN : EventType.CLOSE;
         const groupId = tid; // use tid as grouping for single line
         const value = 0;
-        return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), endTime);
+        return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), end ?? undefined, id);
+    }
+
+    #onSpan(span) {
+        const openEvent = this.openSpans.get(span.id);
+        let notification;
+
+        if (span.end === null) {
+            const newEvent = this.#toEvent(span);
+            this.openSpans.set(span.id, newEvent);
+            this.incoming.push(newEvent);
+            notification = { ...newEvent };
+        }
+        else if (openEvent) {
+            // the buffered open event becomes the closed span
+            this.openSpans.delete(span.id);
+            openEvent.type = EventType.CLOSE;
+            openEvent.end_time = span.end;
+            notification = { ...openEvent, type: EventType.CLOSE, timestamp: span.end, end_time: undefined };
+        }
+        else {
+            // a complete span, or its begin was not received
+            const newEvent = this.#toEvent(span);
+            this.incoming.push(newEvent);
+            notification = { ...newEvent, type: EventType.DURATION };
+        }
+
+        // timestamp never go back in time _within one logfile_ or
+        // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
+        this.lastTimepointUs = Math.max(span.end ?? span.ts, this.lastTimepointUs);
+        this.lastSteadyTimepointUs = performance.now() * 1000;
+
+        this.onIncomingEvent?.(notification);
+
+        const minute = 60 * 1e6; // us
+        this.cutoffTime = this.lastTimepointUs - minute; // keep last minute
+        this.trimIncomingData(this.cutoffTime);
     }
 
     #handleReply(data) {
@@ -132,48 +154,103 @@ export class Collector {
             return;
         }
 
-        if (data.type === "bounds") {
-            this.pendingRequests.delete(data.requestId);
-            request.resolve({ firstUs: data.firstUs, lastUs: data.lastUs });
-            return;
+        if (data.type === "range") {
+            for (const span of data.spans) {
+                request.spans.push(this.#toEvent(span));
+            }
+            if (!data.done) {
+                return;
+            }
+            if (data.truncated) {
+                console.warn("Range query was truncated by the server, only the newest spans are included");
+            }
         }
 
-        for (const raw of data.events) {
-            request.events.push(this.#toEvent(raw));
+        this.pendingRequests.delete(data.requestId);
+        switch (data.type) {
+            case "range": request.resolve(request.spans); break;
+            case "bounds": request.resolve({ firstUs: data.firstUs, lastUs: data.lastUs }); break;
+            case "stats": request.resolve(new Map(Object.entries(data.stats))); break;
+            case "found": request.resolve(data.timeUs); break;
+            default: request.reject(new Error(`Unexpected reply type '${data.type}'`));
         }
-        if (data.done) {
-            this.pendingRequests.delete(data.requestId);
-            if (data.truncated) {
-                console.warn("Range query was truncated by the server, only the newest events are included");
-            }
-            request.resolve(request.events);
+    }
+
+    isConnected() {
+        return this.ws?.readyState === WebSocket.OPEN;
+    }
+
+    #send(message) {
+        if (!this.isConnected()) {
+            return false;
         }
+        this.ws.send(JSON.stringify(message));
+        return true;
     }
 
     #request(message) {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            return Promise.reject(new Error("WebSocket is not connected"));
-        }
         const requestId = ++this.lastRequestId;
         return new Promise((resolve, reject) => {
-            this.pendingRequests.set(requestId, { events: [], resolve, reject });
-            this.ws.send(JSON.stringify({ ...message, requestId }));
+            this.pendingRequests.set(requestId, { spans: [], resolve, reject });
+            if (!this.#send({ ...message, requestId })) {
+                this.pendingRequests.delete(requestId);
+                reject(new Error("WebSocket is not connected"));
+            }
         });
     }
 
+    // JSON has no Infinity, null means unbounded
+    #range(startUs, endUs) {
+        const bound = (us) => Number.isFinite(us) ? us : null;
+        return { startUs: bound(startUs), endUs: bound(endUs) };
+    }
+
     /**
-     * Requests the events with startUs <= timestamp <= endUs from the server, oldest first.
+     * Requests the spans that overlap [startUs, endUs] from the server, ordered by begin.
      * The events are not added to the buffer and do not trigger 'onIncomingEvent'.
      * @returns {Promise<TSEvent[]>}
      */
     query(startUs, endUs) {
-        // JSON has no Infinity, null means unbounded
-        const bound = (us) => Number.isFinite(us) ? us : null;
-        return this.#request({ action: "query", startUs: bound(startUs), endUs: bound(endUs) });
+        return this.#request({ action: "query", ...this.#range(startUs, endUs) });
     }
 
     /**
-     * The timestamps of the oldest and newest event the server has, null when it has none.
+     * Duration statistics per name over the closed spans that begin in [startUs, endUs].
+     * @returns {Promise<Map<string, {count: number, min: number, max: number, mean: number, m2: number}>>}
+     */
+    stats(startUs, endUs) {
+        return this.#request({ action: "stats", ...this.#range(startUs, endUs) });
+    }
+
+    /**
+     * The time of the first or last edge in [startUs, endUs] of a span whose name matches
+     * 'pattern' ('*' matches anything), null if there is none.
+     * @param {string} edge  TriggerEdge.RISING (begin) or TriggerEdge.FALLING (end)
+     * @param {"first" | "last"} which
+     * @returns {Promise<number | null>}
+     */
+    find(pattern, edge, startUs, endUs, which) {
+        return this.#request({ action: "find", pattern, edge, which, ...this.#range(startUs, endUs) });
+    }
+
+    /**
+     * Calls 'callback(timeUs)' for every new edge of a span whose name matches 'pattern'.
+     * @returns {() => void} stops watching
+     */
+    watchTrigger(pattern, edge, callback) {
+        const triggerId = ++this.lastTriggerId;
+        this.triggerWatches.set(triggerId, callback);
+        this.#send({ action: "watch_trigger", triggerId, pattern, edge });
+
+        return () => {
+            if (this.triggerWatches.delete(triggerId)) {
+                this.#send({ action: "unwatch_trigger", triggerId });
+            }
+        };
+    }
+
+    /**
+     * The begin time of the oldest and newest span the server has, null when it has none.
      * @returns {Promise<{firstUs: number | null, lastUs: number | null}>}
      */
     bounds() {
@@ -182,6 +259,7 @@ export class Collector {
 
     clear() {
         this.incoming.clear();
+        this.openSpans.clear();
     }
 
     // returns a reference to the RingBuffer, not a copy
@@ -210,18 +288,24 @@ export class Collector {
             return;
         }
 
-        // live events that arrive while waiting for the reply are kept
+        // spans that arrive while waiting for the reply are kept, they are newer than the fetched ones
         const keepFromSequence = this.incoming.pushCount;
         const minute = 60 * 1e6; // us
-        const events = await this.query(lastUs - minute, lastUs);
+        const fetched = await this.query(lastUs - minute, Infinity);
+
+        const kept = [];
         const view = this.incoming.viewFrom(keepFromSequence);
         for (let i = 0; i < view.length; ++i) {
-            events.push(view.at(i));
+            kept.push(view.at(i));
         }
+        const keptIds = new Set(kept.map(event => event.id));
 
         this.clear();
-        for (const event of events) {
+        for (const event of [...fetched.filter(event => !keptIds.has(event.id)), ...kept]) {
             this.incoming.push(event);
+            if (event.type === EventType.OPEN) {
+                this.openSpans.set(event.id, event);
+            }
             this.lastTimepointUs = Math.max(event.end_time ?? event.timestamp, this.lastTimepointUs);
         }
         this.lastSteadyTimepointUs = performance.now() * 1000;
@@ -236,8 +320,14 @@ export class Collector {
         return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
     }
 
-    // drops the oldest events up to the first one at or after 'cutoffTime', nothing is copied
+    // drops the oldest events up to the first one that begins at or after 'cutoffTime', nothing is copied
     trimIncomingData(cutoffTime) {
-        this.incoming.dropWhile(event => event.timestamp < cutoffTime);
+        this.incoming.dropWhile(event => {
+            if (event.timestamp >= cutoffTime) {
+                return false;
+            }
+            this.openSpans.delete(event.id);
+            return true;
+        });
     }
 }
