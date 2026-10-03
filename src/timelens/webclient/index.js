@@ -1,5 +1,7 @@
+import { requireElement } from "./dom.js";
+
 async function discoverServers() {
-    const container = document.getElementById("servers");
+    const container = requireElement("servers");
 
     try {
         const response = await fetch("/api/servers");
@@ -66,7 +68,7 @@ function selectServer(candidates, localAddress) {
 }
 
 async function retryServer(instanceId) {
-    const container = document.getElementById("servers");
+    const container = requireElement("servers");
 
     try {
         const response = await fetch("/api/servers");

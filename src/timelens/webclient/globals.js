@@ -1,6 +1,3 @@
-import { AudioAlerts } from "./audioalerts.js";
-import { PerformanceMonitor } from "./performancemonitor.js"
-
 export class Settings {
     constructor() {
         this.debugging = false;
@@ -34,11 +31,6 @@ export class Settings {
 const settings = new Settings()
 export function getSettings() {
     return settings;
-}
-
-const audioAlerts = new AudioAlerts();
-export function getAudioAlerts() {
-    return audioAlerts;
 }
 
 /**
@@ -83,7 +75,12 @@ export const TriggerResult = Object.freeze({
  * @property {number} [end_time]
  * @property {number} [groupId]
  * @property {number} [value]
- * @property {string} [color]   '#rrggbb' forced by a color filter rule
+ * @property {number} [count]       sequence number the server gave the event
+ * @property {number} [processId]
+ * @property {number} [receivedMs]  browser wall time (ms since the unix epoch) the message was received
+ * @property {number} [id]          span id from the server
+ * @property {string} [color]       '#rrggbb' forced by a color filter rule
+ * @property {number} [lane]        row within its line, set when the bars are laid out
  */
 
 export function roundUpNice(value) {
@@ -107,6 +104,4 @@ export function roundUpNice(value) {
 
     return nice * magnitude;
 }
-
-export const performanceMonitor = new PerformanceMonitor();
 

@@ -1,3 +1,5 @@
+import { requireElement } from "./dom.js";
+
 function addKnob({
     parent,
     state,
@@ -76,7 +78,7 @@ function add_demo_knobs() {
         offset: 50
     };
 
-    const panel = document.getElementById("id_control_panel");
+    const panel = requireElement("id_control_panel");
 
     addKnob({
         parent: panel,

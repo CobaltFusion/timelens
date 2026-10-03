@@ -1,4 +1,4 @@
-﻿import { performanceMonitor } from "./globals.js"
+﻿import { performanceMonitor } from "./singletons.js";
 
 // at most one container is selected at a time
 let selectedContainer = null;

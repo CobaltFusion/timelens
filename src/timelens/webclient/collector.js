@@ -1,5 +1,5 @@
 import { EventType } from "./globals.js";
-import { performanceMonitor } from "./globals.js"
+import { performanceMonitor } from "./singletons.js";
 import { RingBuffer } from "./ring_buffer.js";
 
 // Upper limit on the number of buffered events. Normally the buffer holds the last minute,

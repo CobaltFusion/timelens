@@ -1,5 +1,7 @@
 import { Collector } from "./collector.js";
-import { EventType, TriggerEdge, getAudioAlerts, getSettings } from "./globals.js";
+import { requireElement } from "./dom.js";
+import { EventType, TriggerEdge, getSettings } from "./globals.js";
+import { getAudioAlerts } from "./singletons.js";
 import { NumericControl } from "./input_controls.js";
 import { ResizableContainer } from "./resizable_container.js";
 import { Graph } from "./graph.js";
@@ -29,7 +31,7 @@ class Main {
         this.trafficIndication = null;
         this.healthIndication = null;
 
-        const topPanel = document.getElementById("id_top_panel");
+        const topPanel = requireElement("id_top_panel");
 
         this.addButton = document.createElement("button");
         this.addButton.textContent = "Add Graph";
@@ -544,7 +546,7 @@ class Main {
 
     // 'settings' is one graph of a profile, the controls are created afterwards so they show its values
     addScope(settings = null) {
-        const graphPanel = document.getElementById("id_graph_panel");
+        const graphPanel = requireElement("id_graph_panel");
         const graph = new Graph(this.collector);
         if (settings) {
             graph.applySettings(settings);
