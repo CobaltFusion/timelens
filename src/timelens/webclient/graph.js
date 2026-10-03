@@ -2,6 +2,15 @@ import { EventType, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
+// deep copy of 'data', which has 'length' and 'at(i)', into an array
+function copyEvents(data) {
+    const copy = new Array(data?.length ?? 0);
+    for (let i = 0; i < copy.length; ++i) {
+        copy[i] = { ...data.at(i) };
+    }
+    return copy;
+}
+
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -517,7 +526,7 @@ export class Graph {
         }
 
         this.manualView = {
-            data: (this.triggerSource.getAllData() ?? []).map(event => ({ ...event })),
+            data: copyEvents(this.triggerSource.getAllData()),
             startUs: this.startPointUs,
             widthUs: this.graphWidthUs,
             zeroPointUs: this.startPointUs + this.zeroShiftUs,
@@ -674,7 +683,7 @@ export class Graph {
         const groups = new Map();   // groupId -> { openMap, lastEndTime }
 
         for (let i = 0; i < data.length; ++i) {
-            const event = data[i];
+            const event = data.at(i);
             let group = groups.get(event.groupId);
             if (!group) {
                 group = { openMap: new Map(), lastEndTime: 0 };

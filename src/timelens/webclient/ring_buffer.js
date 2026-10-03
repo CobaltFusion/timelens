@@ -12,6 +12,12 @@ export class RingBuffer {
         this.items = new Array(capacity).fill(undefined);   // filled, so the array is not sparse
         this.head = 0;      // index of the oldest item
         this.length = 0;
+        this.pushCount = 0; // every pushed item gets sequence number 'pushCount', it is never reset
+    }
+
+    // sequence number of the oldest item, the newest item has 'pushCount - 1'
+    get firstSequence() {
+        return this.pushCount - this.length;
     }
 
     #index(i) {
@@ -19,6 +25,7 @@ export class RingBuffer {
     }
 
     push(item) {
+        ++this.pushCount;
         if (this.length === this.capacity) {
             this.items[this.head] = item;       // overwrite the oldest
             this.head = this.#index(1);
@@ -65,9 +72,35 @@ export class RingBuffer {
         return result;
     }
 
+    // A read-only view on the items from sequence number 'sequence' onwards, without copying.
+    // It is meant to be used right away, pushing or dropping items shifts what it shows.
+    viewFrom(sequence) {
+        return new RingBufferView(this, Math.max(0, sequence - this.firstSequence));
+    }
+
     *[Symbol.iterator]() {
         for (let i = 0; i < this.length; ++i) {
             yield this.items[this.#index(i)];
         }
+    }
+}
+
+export class RingBufferView {
+    constructor(ring, offset) {
+        this.ring = ring;
+        this.offset = offset;
+    }
+
+    get length() {
+        return Math.max(0, this.ring.length - this.offset);
+    }
+
+    // sequence number of the item at(0)
+    get firstSequence() {
+        return this.ring.firstSequence + this.offset;
+    }
+
+    at(i) {
+        return i < 0 ? undefined : this.ring.at(this.offset + i);
     }
 }
