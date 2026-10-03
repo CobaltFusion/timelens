@@ -66,6 +66,8 @@ export class Collector {
         this.lastSteadyTimepointUs = 0;
         this.onConnectionLost = null;
         this.onIncomingEvent = null;
+        this.lastRequestId = 0;
+        this.pendingRequests = new Map();   // requestId -> { events, resolve, reject }
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -74,26 +76,35 @@ export class Collector {
 
         this.ws.onclose = () => {
             console.error("Connection to server closed!");
+            for (const request of this.pendingRequests.values()) {
+                request.reject(new Error("Connection to server closed"));
+            }
+            this.pendingRequests.clear();
             this.onConnectionLost?.();
+        };
+
+        // fill the buffer with the recent history, otherwise a new page starts empty
+        this.ws.onopen = () => {
+            this.reset().catch(error => console.error("Initial history request failed:", error));
         };
 
         this.ws.onmessage = (event) => {
             performanceMonitor.countWebSocketMessage();
             const data = JSON.parse(event.data);
-            // notice that the variables MUST correspond with the actual JSON field names here!
-            const { name, cat, ph, pid, tid, ts, dur, count } = data;
-            const isDuration = ph === "X";
-            const endTime = isDuration ? ts + (dur ?? 0) : undefined;
+
+            // replies to 'query' and 'bounds' requests, live events have no 'type' field
+            if (data.type === "range" || data.type === "bounds") {
+                this.#handleReply(data);
+                return;
+            }
+
+            const newEvent = this.#toEvent(data);
 
             // timestamp never go back in time _within one logfile_ or
             // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
-            this.lastTimepointUs = Math.max(endTime ?? ts, this.lastTimepointUs);
+            this.lastTimepointUs = Math.max(newEvent.end_time ?? newEvent.timestamp, this.lastTimepointUs);
             this.lastSteadyTimepointUs = performance.now() * 1000;
 
-            const type = isDuration ? EventType.DURATION : ph === "E" ? EventType.CLOSE : EventType.OPEN;
-            const groupId = tid; // use tid as grouping for single line
-            const value = 0;
-            const newEvent = makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), endTime);
             this.onIncomingEvent?.(newEvent);
             this.incoming.push(newEvent);
 
@@ -101,6 +112,72 @@ export class Collector {
             this.cutoffTime = this.lastTimepointUs - minute; // keep last minute
             this.trimIncomingData(this.cutoffTime);
         };
+    }
+
+    /** @returns {TSEvent} */
+    #toEvent(data) {
+        // notice that the variables MUST correspond with the actual JSON field names here!
+        const { name, ph, pid, tid, ts, dur, count } = data;
+        const isDuration = ph === "X";
+        const endTime = isDuration ? ts + (dur ?? 0) : undefined;
+        const type = isDuration ? EventType.DURATION : ph === "E" ? EventType.CLOSE : EventType.OPEN;
+        const groupId = tid; // use tid as grouping for single line
+        const value = 0;
+        return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), endTime);
+    }
+
+    #handleReply(data) {
+        const request = this.pendingRequests.get(data.requestId);
+        if (!request) {
+            return;
+        }
+
+        if (data.type === "bounds") {
+            this.pendingRequests.delete(data.requestId);
+            request.resolve({ firstUs: data.firstUs, lastUs: data.lastUs });
+            return;
+        }
+
+        for (const raw of data.events) {
+            request.events.push(this.#toEvent(raw));
+        }
+        if (data.done) {
+            this.pendingRequests.delete(data.requestId);
+            if (data.truncated) {
+                console.warn("Range query was truncated by the server, only the newest events are included");
+            }
+            request.resolve(request.events);
+        }
+    }
+
+    #request(message) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            return Promise.reject(new Error("WebSocket is not connected"));
+        }
+        const requestId = ++this.lastRequestId;
+        return new Promise((resolve, reject) => {
+            this.pendingRequests.set(requestId, { events: [], resolve, reject });
+            this.ws.send(JSON.stringify({ ...message, requestId }));
+        });
+    }
+
+    /**
+     * Requests the events with startUs <= timestamp <= endUs from the server, oldest first.
+     * The events are not added to the buffer and do not trigger 'onIncomingEvent'.
+     * @returns {Promise<TSEvent[]>}
+     */
+    query(startUs, endUs) {
+        // JSON has no Infinity, null means unbounded
+        const bound = (us) => Number.isFinite(us) ? us : null;
+        return this.#request({ action: "query", startUs: bound(startUs), endUs: bound(endUs) });
+    }
+
+    /**
+     * The timestamps of the oldest and newest event the server has, null when it has none.
+     * @returns {Promise<{firstUs: number | null, lastUs: number | null}>}
+     */
+    bounds() {
+        return this.#request({ action: "bounds" });
     }
 
     clear() {
@@ -126,24 +203,28 @@ export class Collector {
         // re-start receiving data
     }
 
-    reset() {
-        this.lastTimepointUs = 0;
-        this.lastSteadyTimepointUs = 0;
+    // Refills the buffer with the last minute the server has.
+    async reset() {
+        const { lastUs } = await this.bounds();
+        if (lastUs === null) {
+            return;
+        }
+
+        // live events that arrive while waiting for the reply are kept
+        const keepFromSequence = this.incoming.pushCount;
+        const minute = 60 * 1e6; // us
+        const events = await this.query(lastUs - minute, lastUs);
+        const view = this.incoming.viewFrom(keepFromSequence);
+        for (let i = 0; i < view.length; ++i) {
+            events.push(view.at(i));
+        }
+
         this.clear();
-
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            throw new Error("Cannot reset: WebSocket is not connected");
+        for (const event of events) {
+            this.incoming.push(event);
+            this.lastTimepointUs = Math.max(event.end_time ?? event.timestamp, this.lastTimepointUs);
         }
-
-        // if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        //     this.ws.send(JSON.stringify({ type: "control", action: "reset" }));
-        // }
-
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const minus10minutesUs = this.estimatedNowUs() - (10 * 60 * 1e6)
-            this.ws.send(JSON.stringify({ type: "control", action: "request", timeUs: minus10minutesUs }));
-        }
-
+        this.lastSteadyTimepointUs = performance.now() * 1000;
     }
 
     asTime(msTime) {

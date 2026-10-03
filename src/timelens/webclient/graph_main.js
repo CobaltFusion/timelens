@@ -36,8 +36,10 @@ class Main {
         this.resetButton = document.createElement("button");
         this.resetButton.classList.add("control-button");
         this.resetButton.textContent = "Reset";
-        this.resetButton.title = "Replay the last 10 minutes of recorded data";
-        this.resetButton.addEventListener("click", () => this.collector.reset());
+        this.resetButton.title = "Reload the last minute of recorded data from the server";
+        this.resetButton.addEventListener("click", () => {
+            this.collector.reset().catch(error => console.error("Reset failed:", error));
+        });
         topPanel.appendChild(this.resetButton);
 
         this.clearButton = document.createElement("button");
@@ -204,11 +206,11 @@ class Main {
         };
     }
 
-    // empties the shared buffer and the copies kept by stopped or panned/zoomed graphs
+    // empties the shared buffer and the data stopped or panned/zoomed graphs fetched from the server
     clearAll() {
         this.collector.clear();
         for (const widget of this.widgets) {
-            widget.component.clearCopies();
+            widget.component.clearFetched();
         }
     }
 

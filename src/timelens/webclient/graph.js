@@ -2,15 +2,6 @@ import { EventType, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
-// deep copy of 'data', which has 'length' and 'at(i)', into an array
-function copyEvents(data) {
-    const copy = new Array(data?.length ?? 0);
-    for (let i = 0; i < copy.length; ++i) {
-        copy[i] = { ...data.at(i) };
-    }
-    return copy;
-}
-
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -37,8 +28,10 @@ export class Graph {
         this.onStatusChanged = null;
 
         // Manual view (pan/zoom with the keyboard): while active, incoming events are
-        // ignored and the graph shows a snapshot of the data until resume() is called.
-        this.manualView = null;     // { data, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
+        // ignored and the graph shows events fetched from the server until resume() is called.
+        // { data, fetchedStartUs, fetchedEndUs, generation, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
+        this.manualView = null;
+        this.manualFetchGeneration = 0;     // replies to older fetches are ignored
 
         this.triggerSource.onStatusChanged = () => {
             this.onStatusChanged?.();
@@ -481,10 +474,11 @@ export class Graph {
         }
     }
 
-    // drops the events this graph keeps apart from the shared buffer
-    clearCopies() {
-        this.triggerSource.clearCopy();
+    // drops the events this graph fetched from the server
+    clearFetched() {
+        this.triggerSource.clearFetched();
         if (this.manualView) {
+            ++this.manualFetchGeneration;
             this.manualView.data = [];
         }
     }
@@ -510,6 +504,7 @@ export class Graph {
 
     single() {
         this.manualView = null;
+        ++this.manualFetchGeneration;
         this.triggerSource.single();
         this.onStatusChanged?.();
     }
@@ -529,21 +524,57 @@ export class Graph {
         return view.baseStepUs * Math.pow(2, exponent);
     }
 
-    // Freeze the current view on a snapshot of the data, so it can be panned and zoomed.
+    // Freeze the current view, so it can be panned and zoomed. The shown events are
+    // fetched from the server, until they arrive the current data is shown.
     #enterManualView() {
         if (this.manualView || this.graphWidthUs <= 0) {
             return;
         }
 
         this.manualView = {
-            data: copyEvents(this.triggerSource.getAllData()),
+            // not a copy, only shown until the fetch below replaces it
+            data: this.triggerSource.getAllData(),
+            fetchedStartUs: 0,
+            fetchedEndUs: 0,
             startUs: this.startPointUs,
             widthUs: this.graphWidthUs,
             zeroPointUs: this.startPointUs + this.zeroShiftUs,
             nowUs: this.collector.estimatedNowUs(),
             baseStepUs: this.getGridStepUs()
         };
+        this.#fetchManualView();
         this.onStatusChanged?.();
+    }
+
+    // Requests the visible range plus one width on each side, the margin leaves room to pan
+    // and finds the start of events that began before the view.
+    #fetchManualView() {
+        const view = this.manualView;
+        if (!view) {
+            return;
+        }
+        const generation = ++this.manualFetchGeneration;
+        view.fetchedStartUs = view.startUs - view.widthUs;
+        view.fetchedEndUs = view.startUs + 2 * view.widthUs;
+
+        this.collector.query(view.fetchedStartUs, view.fetchedEndUs)
+            .then(events => {
+                if (generation === this.manualFetchGeneration && this.manualView === view) {
+                    view.data = events;
+                }
+            })
+            .catch(error => console.error("Fetching the manual view failed:", error));
+    }
+
+    // fetch again when the visible range is no longer inside the fetched range
+    #updateManualViewData() {
+        const view = this.manualView;
+        if (!view) {
+            return;
+        }
+        if (view.startUs < view.fetchedStartUs || view.startUs + view.widthUs > view.fetchedEndUs) {
+            this.#fetchManualView();
+        }
     }
 
     // Pan by a fraction of the visible width, negative is to the left.
@@ -551,6 +582,7 @@ export class Graph {
         this.#enterManualView();
         if (this.manualView) {
             this.manualView.startUs += fraction * this.manualView.widthUs;
+            this.#updateManualViewData();
         }
     }
 
@@ -576,18 +608,20 @@ export class Graph {
         }
 
         const minWidthUs = 10;
-        const maxWidthUs = 60 * 1e6;    // the collector keeps the last minute
+        const maxWidthUs = 10 * 60 * 1e6;   // the data is fetched from the server, which keeps more history
         const newWidthUs = Math.min(maxWidthUs, Math.max(minWidthUs, view.widthUs * factor));
 
         const anchor = this.graphWidthPx > 0 ? Math.min(1, Math.max(0, anchorX / this.graphWidthPx)) : 0.5;
         const anchorUs = view.startUs + anchor * view.widthUs;
         view.startUs = anchorUs - anchor * newWidthUs;
         view.widthUs = newWidthUs;
+        this.#updateManualViewData();
     }
 
     // Leave the manual view and continue showing incoming events.
     resume() {
         this.manualView = null;
+        ++this.manualFetchGeneration;
         if (!this.triggerSource.isRunning()) {
             this.triggerSource.toggleRunning();     // notifies onStatusChanged
         }

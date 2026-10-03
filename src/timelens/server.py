@@ -9,10 +9,15 @@ from pathlib import Path
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from timelens.event_store import EventStore
 from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
 
 logger = logging.getLogger(__name__)
+
+# Range replies are sent in chunks of this many events, up to a total of 'QUERY_LIMIT'.
+QUERY_CHUNK_SIZE = 10_000
+QUERY_LIMIT = 500_000
 
 
 class Server:
@@ -20,7 +25,7 @@ class Server:
         self.clients = set()
         self.watcher = None
         self.peer_discovery = None
-        self.startTimeUs = 0
+        self.store = EventStore()
         self.count = 0
 
         self.app = FastAPI(lifespan=self.lifespan)
@@ -59,10 +64,7 @@ class Server:
         self.count = self.count + 1
         evt["count"] = self.count
 
-        ts = evt["ts"]
-        if ts < self.startTimeUs:
-            return
-
+        self.store.add(evt)
         await self.broadcast(evt)
 
     async def broadcast(self, message):
@@ -101,15 +103,40 @@ class Server:
         finally:
             await self.watcher.stop()
 
-    async def handle_reset(self):
-        logger.warning("handle_reset restart!")
-        self.startTimeUs = 0
-        await self.watcher.restart()
+    # Sends the stored events with startUs <= ts <= endUs to 'websocket' only, in chunks.
+    # The last chunk has 'done' set, it is also sent when there are no events.
+    async def handle_query(self, websocket, msg):
+        request_id = msg.get("requestId")
+        start_us = msg.get("startUs")
+        end_us = msg.get("endUs")
+        start_us = float("-inf") if start_us is None else start_us
+        end_us = float("inf") if end_us is None else end_us
 
-    async def handle_request(self, timeUs):
-        logger.warning(f"handle_request, timeUs: {timeUs}")
-        self.startTimeUs = timeUs
-        await self.watcher.restart()
+        events, truncated = self.store.query(start_us, end_us, QUERY_LIMIT)
+
+        offset = 0
+        while True:
+            chunk = events[offset:offset + QUERY_CHUNK_SIZE]
+            offset += len(chunk)
+            done = offset >= len(events)
+            await websocket.send_text(json.dumps({
+                "type": "range",
+                "requestId": request_id,
+                "events": chunk,
+                "done": done,
+                "truncated": truncated,
+            }))
+            if done:
+                break
+
+    async def handle_bounds(self, websocket, msg):
+        bounds = self.store.bounds()
+        await websocket.send_text(json.dumps({
+            "type": "bounds",
+            "requestId": msg.get("requestId"),
+            "firstUs": bounds[0] if bounds else None,
+            "lastUs": bounds[1] if bounds else None,
+        }))
 
     async def websocket_endpoint(self, websocket: WebSocket):
 
@@ -125,12 +152,13 @@ class Server:
                 except json.JSONDecodeError:
                     continue
 
-                if msg.get("action") == "reset":
-                    await self.handle_reset()
+                action = msg.get("action")
 
-                if msg.get("action") == "request":
-                    timeUs = msg.get("timeUs")
-                    await self.handle_request(timeUs)
+                if action == "query":
+                    await self.handle_query(websocket, msg)
+
+                if action == "bounds":
+                    await self.handle_bounds(websocket, msg)
 
         except WebSocketDisconnect:
             self.clients.remove(websocket)
