@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 # Spans that began more than this before the newest span are dropped.
 DEFAULT_RETENTION_US = 30 * 60 * 1_000_000
 
+# Queries leave out open spans that began more than this before the newest event, like the
+# webclient's buffer, which keeps the last minute. A span that never ends would otherwise be shown forever.
+DEFAULT_OPEN_HISTORY_US = 60 * 1_000_000
+
 RISING = "rising"     # the begin of a span
 FALLING = "falling"   # the end of a span
 
@@ -24,9 +28,11 @@ class SpanStore:
     A span is a dict: id, name, cat, pid, tid, source, count, ts (begin), end (None while open).
     """
 
-    def __init__(self, retention_us=DEFAULT_RETENTION_US):
+    def __init__(self, retention_us=DEFAULT_RETENTION_US, open_history_us=DEFAULT_OPEN_HISTORY_US):
         self.retention_us = retention_us
+        self.open_history_us = open_history_us
         self.max_duration_us = 0
+        self.newest_us = float("-inf")    # the latest begin or end time added
         self._begin: list[float] = []   # parallel to '_spans', used for bisect
         self._spans: list[dict] = []
         self._open: dict[tuple, list[dict]] = {}    # (source, pid, tid) -> stack of open spans
@@ -41,6 +47,7 @@ class SpanStore:
         ph = evt.get("ph")
         ts = evt["ts"]
         thread = (evt.get("source"), evt.get("pid"), evt.get("tid"))
+        self.newest_us = max(self.newest_us, ts)
 
         if ph == "E":
             span = self._pop_open(thread, evt.get("name"))
@@ -55,6 +62,7 @@ class SpanStore:
 
         if ph == "X":
             span["end"] = ts + (evt.get("dur") or 0)
+            self.newest_us = max(self.newest_us, span["end"])
             self._closed(span)
             return span, [(RISING, ts), (FALLING, span["end"])]
 
@@ -62,19 +70,24 @@ class SpanStore:
         self._open.setdefault(thread, []).append(span)
         return span, [(RISING, ts)]
 
-    # Returns (spans, truncated), the spans that overlap [start_us, end_us], open spans
-    # included, ordered by begin. When there are more than 'limit', the newest are returned.
+    # Returns (spans, truncated), the spans that overlap [start_us, end_us], ordered by begin.
+    # Open spans are included, unless they began more than 'open_history_us' before the newest event.
+    # When there are more than 'limit', the newest are returned.
     def query(self, start_us, end_us, limit=None):
         earliest_us = start_us - self.max_duration_us
         begin = bisect.bisect_left(self._begin, earliest_us)
         end = bisect.bisect_right(self._begin, end_us)
+        open_cutoff_us = self.newest_us - self.open_history_us
 
         # open spans can be longer than 'max_duration_us', those are not in the slice
         spans = sorted(
-            (span for stack in self._open.values() for span in stack if span["ts"] < earliest_us),
+            (span for stack in self._open.values() for span in stack if open_cutoff_us <= span["ts"] < earliest_us),
             key=lambda span: span["ts"],
         )
-        spans.extend(span for span in self._spans[begin:end] if span["end"] is None or span["end"] >= start_us)
+        spans.extend(
+            span for span in self._spans[begin:end]
+            if (span["ts"] >= open_cutoff_us if span["end"] is None else span["end"] >= start_us)
+        )
 
         truncated = False
         if limit is not None and len(spans) > limit:
@@ -146,6 +159,7 @@ class SpanStore:
         self._spans.clear()
         self._open.clear()
         self.max_duration_us = 0
+        self.newest_us = float("-inf")
 
     def _insert(self, evt):
         ts = evt["ts"]

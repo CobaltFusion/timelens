@@ -136,3 +136,22 @@ def test_retention_drops_old_spans():
     # trimming happens in batches, but never keeps more than ~10% expired spans
     assert first >= 99 - 10 - len(store) // 10
     assert len(store) < 100
+
+
+def test_query_leaves_out_old_open_spans():
+    store = SpanStore(open_history_us=100)
+    store.add(evt("B", "stale", 10, tid=1))
+    store.add(evt("B", "recent", 950, tid=2))
+    store.add(evt("B", "a", 900, tid=3))
+    store.add(evt("E", "a", 1000, tid=3))
+
+    # 'stale' began more than 100 before the newest event (1000)
+    assert spans_of(store) == [("a", 900, 1000), ("recent", 950, None)]
+    assert spans_of(store, 990, 1000) == [("a", 900, 1000), ("recent", 950, None)]
+
+
+def test_old_closed_spans_stay_in_query():
+    store = make_store(evt("B", "long", 10), evt("E", "long", 1000), retention_us=10_000)
+    store.open_history_us = 100
+
+    assert spans_of(store, 990, 1000) == [("long", 10, 1000)]
