@@ -70,6 +70,8 @@ export class BarStack {
         this.beginTime = Infinity;
         this.hover = null;   // the hover shows the offset from the zero-point
         this.durationStats = new Map();   // name -> { count, min, max, mean, m2 }, filled by the caller
+        this.areaWidthPx = undefined;
+        this.areaHeightPx = undefined;
     }
 
     getLine(id) {

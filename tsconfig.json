@@ -9,7 +9,8 @@
             "DOM"
         ],
         "module": "ESNext",
-        "moduleResolution": "Bundler"
+        "moduleResolution": "Bundler",
+        "noImplicitAny": false,
     },
     "include": [
         "src/**/*.js"

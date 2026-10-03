@@ -8,14 +8,14 @@ const maxBufferedEvents = 1 << 18;
 
 /**
  * @param {string} name
- * @param {EventTypeValue} type
+ * @param {import("./globals.js").EventTypeValue} type
  * @param {number} timestamp
  * @param {number} groupId
  * @param {number} value
  * @param {number} count
  * @param {number} processId
  * @param {number} receivedMs  browser wall time (ms since the unix epoch) the message was received
- * @returns {TSEvent}
+ * @returns {import("./globals.js").TSEvent}
  */
 function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined, id = undefined, color = undefined) {
     return {
@@ -113,7 +113,7 @@ export class Collector {
         };
     }
 
-    /** @returns {TSEvent} */
+    /** @returns {import("./globals.js").TSEvent} */
     #toEvent(span) {
         // notice that the variables MUST correspond with the actual JSON field names here!
         const { id, name, pid, tid, ts, end, count, color } = span;

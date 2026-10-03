@@ -1,5 +1,6 @@
 const ASSERTIONS_ENABLED = true
 
+// @ts-ignore
 export function assert(condition, messageFn) {
     if (!ASSERTIONS_ENABLED) return;
 

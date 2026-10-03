@@ -18,6 +18,7 @@ export class AudioAlerts {
         this.activeVoices = 0;
         this.maxRandomVoices = 4;   // random sounds are skipped while this many sounds are playing
 
+        /** @type {OscillatorType[]} */
         this.types = ["sine", "square", "sawtooth", "triangle"];
 
         this.notes = [
@@ -43,6 +44,12 @@ export class AudioAlerts {
         this.beep(1300, 0.0, 0.05, "square");
     }
 
+    /**
+     * @param {OscillatorType} [type]
+     * @param {number} frequency
+     * @param {number} startTime
+     * @param {number} duration
+     */
     beep(frequency, startTime, duration, type = "sine") {
         // while muted the context is suspended, scheduled sounds would all play at once on unmute
         if (!this.audioEnabled) {
@@ -91,6 +98,9 @@ export class AudioAlerts {
         return duration;
     }
 
+    /**
+     * @param {string} name
+     */
     playPseudoRandomSound(name) {
         // with many events at once, more sounds only turn into noise
         if (this.activeVoices >= this.maxRandomVoices) {
