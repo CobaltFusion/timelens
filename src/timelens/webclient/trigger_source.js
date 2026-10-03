@@ -1,42 +1,46 @@
 import { EventType, TriggerMode, TriggerResult, TriggerState } from "./globals.js";
 
-function containsIgnoreCaseWildcard(text, search) {
-    const lowerText = text.toLowerCase();
+// Returns a function that tests a text against 'search', case-insensitive, '*' matches anything.
+// The search word is prepared once, so testing only lowercases the text.
+function makeWildcardMatcher(search) {
     const lowerSearch = search.toLowerCase();
 
     if (!lowerSearch.includes("*")) {
-        return lowerText.includes(lowerSearch);
+        return text => text.toLowerCase().includes(lowerSearch);
     }
 
     const parts = lowerSearch.split("*");
     const startsWithWildcard = lowerSearch.startsWith("*");
     const endsWithWildcard = lowerSearch.endsWith("*");
 
-    let position = 0;
+    return text => {
+        const lowerText = text.toLowerCase();
+        let position = 0;
 
-    for (const part of parts) {
-        if (!part) {
-            continue;
+        for (const part of parts) {
+            if (!part) {
+                continue;
+            }
+
+            const found = lowerText.indexOf(part, position);
+
+            if (found === -1) {
+                return false;
+            }
+
+            position = found + part.length;
         }
 
-        const found = lowerText.indexOf(part, position);
-
-        if (found === -1) {
+        if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
             return false;
         }
 
-        position = found + part.length;
-    }
+        if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
+            return false;
+        }
 
-    if (!startsWithWildcard && !lowerText.startsWith(parts[0])) {
-        return false;
-    }
-
-    if (!endsWithWildcard && !lowerText.endsWith(parts[parts.length - 1])) {
-        return false;
-    }
-
-    return true;
+        return true;
+    };
 }
 
 export class TriggerSource {
@@ -48,11 +52,15 @@ export class TriggerSource {
         this.data = null;
         this.displayStartPointUs = 0;
         this.searchStartPointUs = 0;      // after 'clear()' we do not include the whole buffer anymore.
+        this.searchStartSequence = 0;     // the same point as a sequence number in the collector's buffer
+        this.scannedSequence = 0;         // while running, events before this sequence number were searched for the trigger
+        this.stoppedDataScanned = false;  // while stopped, the copy in 'this.data' was searched for the trigger
         this.triggerFoundTimeUs = 0;
         this.preTriggerUs = -10000; // default to -10ms
         this.singleRecordUs = 10 * 1e6;  // a single trigger records up to 10s after the trigger
         this.historyBeforeSearchUs = 60 * 1e6;  // a stopped capture keeps up to a minute before 'searchStartPointUs'
         this.triggerWord = "";
+        this.triggerMatcher = makeWildcardMatcher("");
         this.dataLength = 0;
         this.onStatusChanged = null;
     }
@@ -67,6 +75,7 @@ export class TriggerSource {
 
     setTriggerWord(value) {
         this.triggerWord = value;
+        this.triggerMatcher = makeWildcardMatcher(value);
         this.#determineTriggerMode(TriggerMode.AUTO);
     }
 
@@ -80,6 +89,10 @@ export class TriggerSource {
             this.triggerState = TriggerState.Idle;
         }
         this.triggerResult = TriggerResult.None;
+        this.triggerFoundTimeUs = 0;
+        // search everything again
+        this.scannedSequence = 0;
+        this.stoppedDataScanned = false;
         this.onStatusChanged?.();
     }
 
@@ -124,11 +137,13 @@ export class TriggerSource {
         this.data = this.collector.data()
             .filter(event => event.timestamp >= beginUs && event.timestamp <= endUs)
             .map(event => ({ ...event }));
+        this.stoppedDataScanned = false;
         this.#setRunning(false);
     }
 
     clear() {
         this.searchStartPointUs = this.collector.getLastTimepointUs();
+        this.searchStartSequence = this.collector.data().pushCount;
     }
 
     // drops the copy that is shown while stopped
@@ -173,52 +188,71 @@ export class TriggerSource {
         }
     }
 
-    #isTrigger(event, triggerWord) {
-        return event.type === EventType.OPEN && containsIgnoreCaseWildcard(event.name, triggerWord);
+    #isTrigger(event) {
+        return event.type === EventType.OPEN && this.triggerMatcher(event.name);
     }
 
-    findLastTriggerIndex(data, triggerWord) {
-        const index = data.findLastIndex(event => this.#isTrigger(event, triggerWord));
-        return index >= 0 ? index : undefined;
-    }
+    // Searches only the events that were not searched before, 'data' has 'length' and 'at(i)'.
+    // Single waits for the _next_ trigger, auto follows the latest one.
+    // Returns the trigger event, or undefined if none of the new events is a trigger.
+    #findNewTrigger(data) {
+        let from;
+        if (this.running) {
+            from = Math.max(0, this.scannedSequence - data.firstSequence);
+            this.scannedSequence = data.firstSequence + data.length;
+        }
+        else {
+            from = this.stoppedDataScanned ? data.length : 0;
+            this.stoppedDataScanned = true;
+        }
 
-    findFirstTriggerIndex(data, triggerWord) {
-        const index = data.findIndex(event => this.#isTrigger(event, triggerWord));
-        return index >= 0 ? index : undefined;
+        if (this.triggerMode === TriggerMode.SINGLE) {
+            for (let i = from; i < data.length; ++i) {
+                const event = data.at(i);
+                if (this.#isTrigger(event)) {
+                    return event;
+                }
+            }
+            return undefined;
+        }
+
+        for (let i = data.length - 1; i >= from; --i) {
+            const event = data.at(i);
+            if (this.#isTrigger(event)) {
+                return event;
+            }
+        }
+        return undefined;
     }
 
     // set this.displayStartPointUs to where we want to start the display of data
     updateStartPoint(freedisplayStartPointUs) {
-
-
         if (this.triggerMode === TriggerMode.FREE) {
             this.displayStartPointUs = freedisplayStartPointUs;
             return this.displayStartPointUs;
         }
 
-        const data = this.#getBufferDataFrom(0);
+        const data = this.#getInternalDataBuffer();
         this.dataLength = data.length;
         if (this.dataLength === 0) {
             return 0;
         }
 
         if (this.triggerState === TriggerState.Waiting) {
-            // single waits for the _next_ trigger, auto follows the latest one
-            const triggerIndex = this.triggerMode === TriggerMode.SINGLE
-                ? this.findFirstTriggerIndex(data, this.triggerWord)
-                : this.findLastTriggerIndex(data, this.triggerWord);
-            if (triggerIndex === undefined) {
-                // trigger specified, but not found.
-                this.triggerFoundTimeUs = 0;
+            const trigger = this.#findNewTrigger(data);
+            if (trigger !== undefined) {
+                this.triggerFoundTimeUs = trigger.timestamp;
+                if (this.triggerMode === TriggerMode.SINGLE) {
+                    this.triggerState = TriggerState.Recording;     // stop looking for triggers
+                }
+                if (this.triggerResult !== TriggerResult.Found) {
+                    this.triggerResult = TriggerResult.Found;
+                    this.onStatusChanged?.();
+                }
+            }
+            else if (this.triggerResult !== TriggerResult.Found) {
+                // trigger specified, but not found (yet).
                 return 0;
-            }
-            this.triggerFoundTimeUs = data[triggerIndex].timestamp;
-            if (this.triggerMode === TriggerMode.SINGLE) {
-                this.triggerState = TriggerState.Recording;     // stop looking for triggers
-            }
-            if (this.triggerResult !== TriggerResult.Found) {
-                this.triggerResult = TriggerResult.Found;
-                this.onStatusChanged?.();
             }
         }
 
@@ -245,18 +279,11 @@ export class TriggerSource {
         return this.#getInternalDataBuffer();
     }
 
-    // return all data from 'timePoint' and after
-    #getBufferDataFrom(timePoint) {
-        return this.#getInternalDataBuffer().filter(
-            message => message.timestamp >= timePoint
-        );
-    }
-
+    // Returns something with 'length' and 'at(i)', not a copy: while running a view on the
+    // collector's buffer from the search start point onwards, while stopped the copy taken at stop.
     #getInternalDataBuffer() {
         if (this.running) {
-            return this.collector.data().filter(
-                message => message.timestamp >= this.searchStartPointUs
-            );
+            return this.collector.data().viewFrom(this.searchStartSequence);
         }
         // if not running, return the last copy in the internal data buffer
         return this.data;
