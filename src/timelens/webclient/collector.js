@@ -17,11 +17,12 @@ const maxBufferedEvents = 1 << 18;
  * @param {number} receivedMs  browser wall time (ms since the unix epoch) the message was received
  * @returns {TSEvent}
  */
-function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs) {
+function makeEvent(name, type, timestamp, groupId, value, count, processId, receivedMs, endTime = undefined) {
     return {
         name: name,
         type: type,
         timestamp: timestamp,     // microseconds (µs)
+        end_time: endTime,        // microseconds (µs), only for DURATION events
         groupId: groupId,
         value: value,
         count: count,
@@ -42,6 +43,10 @@ function makeEvent(name, type, timestamp, groupId, value, count, processId, rece
  *
  * For complete events:
  *   ph != 'E'  -> `ts` is the event start time.
+ *
+ * For complete events with a duration:
+ *   ph == 'X'  -> `ts` is the start time and `dur` the duration, this becomes
+ *                 one DURATION event with `end_time` = `ts` + `dur`.
  *
  * For end events:
  *   ph == 'E'  -> the incoming `ts` is interpreted as the end time (`te`),
@@ -76,17 +81,19 @@ export class Collector {
             performanceMonitor.countWebSocketMessage();
             const data = JSON.parse(event.data);
             // notice that the variables MUST correspond with the actual JSON field names here!
-            const { name, cat, ph, pid, tid, ts, count } = data;
+            const { name, cat, ph, pid, tid, ts, dur, count } = data;
+            const isDuration = ph === "X";
+            const endTime = isDuration ? ts + (dur ?? 0) : undefined;
 
             // timestamp never go back in time _within one logfile_ or
             // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
-            this.lastTimepointUs = Math.max(ts, this.lastTimepointUs);
+            this.lastTimepointUs = Math.max(endTime ?? ts, this.lastTimepointUs);
             this.lastSteadyTimepointUs = performance.now() * 1000;
 
-            const type = ph === "E" ? EventType.CLOSE : EventType.OPEN;
+            const type = isDuration ? EventType.DURATION : ph === "E" ? EventType.CLOSE : EventType.OPEN;
             const groupId = tid; // use tid as grouping for single line
             const value = 0;
-            const newEvent = makeEvent(name, type, ts, groupId, value, count, pid, Date.now());
+            const newEvent = makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), endTime);
             this.onIncomingEvent?.(newEvent);
             this.incoming.push(newEvent);
 
@@ -146,20 +153,6 @@ export class Collector {
     estimatedNowUs() {
         const nowUs = performance.now() * 1000;
         return this.lastTimepointUs + (nowUs - this.lastSteadyTimepointUs);
-    }
-
-    dummy() {
-        this.incoming.push(makeEvent("capture_image", EventType.DURATION, this.asTime(10), 0, 0));
-        this.incoming.push(makeEvent("process_image", EventType.OPEN, this.asTime(13), 0, 0, 0));
-        this.incoming.push(makeEvent("set_outputs", EventType.DURATION, this.asTime(15), this.asTime(40), 0, 0));
-        this.incoming.push(makeEvent("process_image", EventType.CLOSE, this.asTime(0), this.asTime(20), 0, 0)); // intentionally out-of-order
-        //this.incoming.push(makeEvent("cycle", EventType.CLOSE, this.asTime(0), this.asTime(500), 0 ,0)); // intentionally omitted
-
-        // let t = 0;
-        // for (let i = 0; i < 20; ++i) {
-        //     const duration = randomNote(t); // randomNote returns its duration
-        //     t += duration;
-        // }
     }
 
     // drops the oldest events up to the first one at or after 'cutoffTime', nothing is copied

@@ -470,6 +470,8 @@ export class Graph {
                 );
 
                 openEvents.delete(event.name);
+            } else if (event.type === EventType.DURATION) {
+                longestEventUs = Math.max(longestEventUs, (event.end_time ?? event.timestamp) - event.timestamp);
             }
         }
 
@@ -714,8 +716,9 @@ export class Graph {
                 group = { openMap: new Map(), lastEndTime: 0 };
                 groups.set(event.groupId, group);
             }
-            if (event.timestamp > group.lastEndTime) {
-                group.lastEndTime = event.timestamp;
+            const eventEndUs = event.end_time ?? event.timestamp;
+            if (eventEndUs > group.lastEndTime) {
+                group.lastEndTime = eventEndUs;
             }
 
             if (event.type === EventType.OPEN) {

@@ -108,15 +108,22 @@ export class EventAnalyzer {
             this.openSince.set(openKey, event.timestamp);
             return null;
         }
-        if (event.type !== EventType.CLOSE) {
+        let begin;
+        let end = event.timestamp;
+        if (event.type === EventType.DURATION) {
+            begin = event.timestamp;
+            end = event.end_time ?? event.timestamp;
+        }
+        else if (event.type === EventType.CLOSE) {
+            begin = this.openSince.get(openKey);
+            if (begin === undefined) {
+                return null;
+            }
+            this.openSince.delete(openKey);
+        }
+        else {
             return null;
         }
-
-        const begin = this.openSince.get(openKey);
-        if (begin === undefined) {
-            return null;
-        }
-        this.openSince.delete(openKey);
 
         let stats = this.durations.get(event.name);
         if (stats === undefined) {
@@ -124,7 +131,7 @@ export class EventAnalyzer {
             this.durations.set(event.name, stats);
         }
 
-        const duration = logTime(event.timestamp - begin);
+        const duration = logTime(end - begin);
         let anomaly = null;
         if (stats.count >= this.minSamples) {
             const score = stats.score(duration, this.floor);
