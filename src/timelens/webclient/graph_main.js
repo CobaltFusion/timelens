@@ -398,6 +398,39 @@ class Main {
             graph.single();
         });
         controls.appendChild(singleButton);
+
+        const triggerStatus = document.createElement("span");
+        triggerStatus.classList.add("trigger-status");
+        controls.appendChild(triggerStatus);
+
+        const updateTriggerStatus = () => {
+            const status = graph.getTriggerStatus();
+            triggerStatus.textContent = status ?? "";
+            triggerStatus.classList.toggle("waiting", status === "Wait");
+            triggerStatus.classList.toggle("triggered", status === "Triggered");
+            triggerStatus.classList.toggle("auto", status === "Auto");
+            updateRecordingProgress();
+        };
+
+        // while a single capture records, the background fills up until recording stops
+        let progressFrame = null;
+        const updateRecordingProgress = () => {
+            const progress = graph.getRecordingProgress();
+            triggerStatus.classList.toggle("recording", progress !== null);
+            triggerStatus.style.setProperty("--recording-progress", `${(progress ?? 0) * 100}%`);
+            if (progress !== null && progressFrame === null) {
+                progressFrame = requestAnimationFrame(() => {
+                    progressFrame = null;
+                    updateRecordingProgress();
+                });
+            }
+        };
+        const notifyStatusChanged = graph.onStatusChanged;
+        graph.onStatusChanged = () => {
+            notifyStatusChanged();
+            updateTriggerStatus();
+        };
+        updateTriggerStatus();
     }
 
     addScope() {
