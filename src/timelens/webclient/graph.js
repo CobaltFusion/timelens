@@ -32,7 +32,7 @@ export class Graph {
 
         // Manual view (pan/zoom with the keyboard): while active, incoming events are
         // ignored and the graph shows events fetched from the server until resume() is called.
-        // { data, fetchedStartUs, fetchedEndUs, generation, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
+        // { data, statsRange, fetchedStartUs, fetchedEndUs, generation, startUs, widthUs, zeroPointUs, nowUs, baseStepUs }
         this.manualView = null;
         this.manualFetchGeneration = 0;     // replies to older fetches are ignored
 
@@ -471,13 +471,14 @@ export class Graph {
 
     // Requests the duration statistics of the shown data range. While following live data at
     // most every 'statsIntervalMs', while stopped or panned/zoomed only when the range changes.
+    // A manual view keeps the range the live view had when it was entered, so the statistics stay the same.
     #updateStats() {
         if (!this.collector.isConnected()) {
             return;
         }
 
         const view = this.manualView;
-        const range = view ? { beginUs: view.fetchedStartUs, endUs: view.fetchedEndUs } : this.triggerSource.getDataRangeUs();
+        const range = view ? view.statsRange : this.triggerSource.getDataRangeUs();
         const key = `${range.beginUs}:${range.endUs}`;
         const nowMs = performance.now();
 
@@ -566,9 +567,14 @@ export class Graph {
             return;
         }
 
+        // the data range of the live view, up to now, spans that arrive later are not included
+        const dataRange = this.triggerSource.getDataRangeUs();
+        const statsRange = { beginUs: dataRange.beginUs, endUs: Math.min(dataRange.endUs, this.collector.getLastTimepointUs()) };
+
         this.manualView = {
             // not a copy, only shown until the fetch below replaces it
             data: this.triggerSource.getAllData(),
+            statsRange: statsRange,
             fetchedStartUs: 0,
             fetchedEndUs: 0,
             startUs: this.startPointUs,

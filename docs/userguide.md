@@ -98,9 +98,33 @@ On a touch screen, drag to pan and pinch to zoom.
 
 ### Measuring
 
-- **Hover** over an event to see its duration, plus the minimum, maximum, average and standard deviation of all events with the same name.
+- **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)).
 - **Drag** across the graph to measure the time between two points.
 - Hold **Shift** while dragging to snap the cursor to the begin or end of the event under the mouse.
+
+### Statistics
+
+The hover tooltip shows duration statistics for the name of the event under the mouse:
+
+| Line | Meaning |
+|---|---|
+| `samples` | How many events with this name were counted |
+| `min` / `max` | The shortest and longest duration |
+| `avg` | The average duration |
+| `stddev` | The sample standard deviation of the durations, `-` when there is only one sample |
+
+How they are counted:
+
+- Events are matched on their exact name, across all rows (`tid`s) and all log files.
+- Only completed events count. An event that is still open is not included until its end arrives.
+- An event counts when it **begins** inside the data range of the graph. Its duration is its end minus its begin.
+- The server calculates the statistics, so they cover all events it has, not only what the graph shows.
+
+The data range depends on the state of the graph:
+
+- **Running:** the last minute, or the time since **SINGLE** was pressed if that is shorter. The statistics update about once per second. **Clear** does not reset them, because it only clears the browser and the server still has the events.
+- **Stopped, panned or zoomed:** the range the running graph had at the moment it was frozen. They stay the same while you pan and zoom, so they match what you saw just before stopping.
+- **After a SINGLE capture stops:** the captured range.
 
 ### Layout
 
