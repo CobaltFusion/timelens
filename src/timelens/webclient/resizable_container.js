@@ -1,6 +1,7 @@
 ﻿import { performanceMonitor } from "./singletons.js";
 
 // at most one container is selected at a time
+/** @type {ResizableContainer | null} */
 let selectedContainer = null;
 
 /**
@@ -65,6 +66,7 @@ export class ResizableContainer {
         return { width: this.container.style.width, height: this.container.style.height };
     }
 
+    /** @param {{ width?: string, height?: string }} size */
     setSize({ width = "", height = "" }) {
         this.container.style.width = width;
         this.container.style.height = height;
@@ -84,6 +86,7 @@ export class ResizableContainer {
         return selectedContainer === this;
     }
 
+    /** @returns {ResizableContainer | null} */
     static getSelected() {
         return selectedContainer;
     }

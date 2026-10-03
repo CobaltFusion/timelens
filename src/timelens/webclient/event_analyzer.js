@@ -38,6 +38,14 @@ export const AnomalyKind = Object.freeze({
 });
 
 /**
+ * @typedef {Object} Anomaly
+ * @property {string} key
+ * @property {string} name
+ * @property {string} kind      one of 'AnomalyKind'
+ * @property {number} score     >= the threshold, how unusual it is in standard deviations
+ */
+
+/**
  * Learns what is normal per message type (name + open/close): the interval between
  * messages and the duration from open to close, and reports what is far from normal.
  */
@@ -59,6 +67,7 @@ export class EventAnalyzer {
 
     // Returns null for a normal message, otherwise { key, name, kind, score }, where
     // score >= threshold tells how unusual it is.
+    /** @returns {Anomaly | null} */
     observe(event) {
         ++this.messageCount;
         const key = EventAnalyzer.keyOf(event);
@@ -71,6 +80,7 @@ export class EventAnalyzer {
         return anomaly;
     }
 
+    /** @returns {Anomaly | null} */
     #observeInterval(key, event) {
         const info = this.types.get(key);
         if (info === undefined) {
@@ -102,6 +112,7 @@ export class EventAnalyzer {
         return anomaly;
     }
 
+    /** @returns {Anomaly | null} */
     #observeDuration(event) {
         const openKey = `${event.groupId}:${event.name}`;
         if (event.type === EventType.OPEN) {

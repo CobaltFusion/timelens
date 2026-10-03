@@ -545,6 +545,7 @@ class Main {
     }
 
     // 'settings' is one graph of a profile, the controls are created afterwards so they show its values
+    /** @param {({ width?: string, height?: string } & Partial<ReturnType<Graph["getSettings"]>>) | null} [settings] */
     addScope(settings = null) {
         const graphPanel = requireElement("id_graph_panel");
         const graph = new Graph(this.collector);

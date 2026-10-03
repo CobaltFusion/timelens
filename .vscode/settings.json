@@ -8,5 +8,6 @@
         "editorWarning.foreground": "#ff9900",
         "editorWarning.border": "#ff9900"
     },
-    "js/ts.validate.enabled": true
+    "js/ts.validate.enabled": true,
+    "files.eol": "\n"
 }
