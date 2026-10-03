@@ -146,10 +146,26 @@ def play_sequence(counter: int, steps: list[tuple[str, str, float]], fixed: bool
     scheduler.play()
 
 
+def print_summary(steps: list[tuple[str, str, float]], args: argparse.Namespace) -> None:
+    """Print the events that will be written, with their offsets and durations."""
+    name_width = max(len("name"), *(len(name) for name, _, _ in steps))
+    category_width = max(len("category"), *(len(category) for _, category, _ in steps))
+
+    print(f"Writing to {LOG_FILE}")
+    print(f"Timing: {args.timing}, prefix: {'yes' if args.prefix else 'no'}, loop: {'yes' if args.loop else 'no'}")
+    print(f"  {'name':<{name_width}}  {'category':<{category_width}}  {'start':>10}  {'duration':>10}")
+    start_ms = 0.0
+    for name, category, duration_ms in steps:
+        print(f"  {name:<{name_width}}  {category:<{category_width}}  {start_ms:>7.1f} ms  {duration_ms:>7.1f} ms")
+        start_ms += duration_ms
+    print(f"  total: {len(steps)} events, {start_ms:.1f} ms")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate telemetry events for testing. Repeat -n/-c/-d to describe a sequence of back-to-back events. "
-                    f"Without arguments, runs: {' '.join(DEFAULT_ARGS)}")
+        description="Generate telemetry events for testing. Repeat -n/-c/-d to describe a sequence of back-to-back events.",
+        epilog=f"example (also the default when run without arguments):\n  %(prog)s {' '.join(DEFAULT_ARGS)}",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-n", "--name", action="append", required=True, help="Name of the telemetry event (repeatable).")
     parser.add_argument("-c", "--category", action="append", required=True,
                         help="Telemetry category (repeatable; give once to apply to all events).")
@@ -164,7 +180,11 @@ def main() -> None:
                              "computed from the requested durations.")
     parser.set_defaults(timing="real")
     parser.add_argument("-p", "--prefix", action="store_true", help="Prefix event names with the invocation counter.")
-    args = parser.parse_args(sys.argv[1:] or DEFAULT_ARGS)
+    if len(sys.argv) > 1:
+        args = parser.parse_args()
+    else:
+        print(f"No arguments given, using defaults: {' '.join(DEFAULT_ARGS)}")
+        args = parser.parse_args(DEFAULT_ARGS)
 
     count = len(args.name)
 
@@ -180,6 +200,8 @@ def main() -> None:
     steps = list(zip(args.name, categories, durations))
 
     fixed = args.timing == "fixed"
+
+    print_summary(steps, args)
 
     def action(counter):
         play_sequence(counter, steps, fixed, args.prefix)

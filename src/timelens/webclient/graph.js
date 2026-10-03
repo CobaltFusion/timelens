@@ -682,6 +682,23 @@ export class Graph {
         const isVisible = (startUs, endUs) => endUs >= this.startPointUs && startUs <= graphEndUs;
         const groups = new Map();   // groupId -> { openMap, lastEndTime }
 
+        // Duration statistics per event name, over all closed events in the data (not just the visible ones).
+        const stats = bars.durationStats;
+        const addSample = (name, durationUs) => {
+            let s = stats.get(name);
+            if (!s) {
+                s = { count: 0, min: Infinity, max: -Infinity, mean: 0, m2: 0 };
+                stats.set(name, s);
+            }
+            // Welford's online algorithm, numerically stable for mean and variance.
+            s.count += 1;
+            const delta = durationUs - s.mean;
+            s.mean += delta / s.count;
+            s.m2 += delta * (durationUs - s.mean);
+            if (durationUs < s.min) s.min = durationUs;
+            if (durationUs > s.max) s.max = durationUs;
+        };
+
         for (let i = 0; i < data.length; ++i) {
             const event = data.at(i);
             let group = groups.get(event.groupId);
@@ -701,6 +718,7 @@ export class Graph {
                 const start_event = group.openMap.get(event.name);
                 if (!start_event) continue;
                 group.openMap.delete(event.name);
+                addSample(event.name, event.timestamp - start_event.timestamp);
 
                 if (isVisible(start_event.timestamp, event.timestamp)) {
                     const closedEvent = {
@@ -712,8 +730,11 @@ export class Graph {
                 }
             }
 
-            if (event.type === EventType.DURATION && isVisible(event.timestamp, event.end_time ?? event.timestamp)) {
-                bars.getLine(event.groupId).closedEvents.push(event);
+            if (event.type === EventType.DURATION) {
+                addSample(event.name, (event.end_time ?? event.timestamp) - event.timestamp);
+                if (isVisible(event.timestamp, event.end_time ?? event.timestamp)) {
+                    bars.getLine(event.groupId).closedEvents.push(event);
+                }
             }
         }
 
