@@ -14,6 +14,9 @@ class Line {
 
         this.lastEndTime = 0;
 
+        /** @type {number | undefined} the pid of the first event of this row, the row itself is a tid */
+        this.processId = undefined;
+
         // End time of the event currently occupying each lane.
         this.lanes = [];
 

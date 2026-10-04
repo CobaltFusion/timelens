@@ -121,6 +121,12 @@ Panning or zooming freezes the graph on its current data until you press `q` or 
 
 On a touch screen, drag to pan and pinch to zoom.
 
+### Rows and their names
+
+Every thread (`tid`) has a row in the graph, and events of the same thread that overlap are drawn under each other in that row. The column left of the graph names the row: `process / thread`, with the names that the log files give with their [metadata lines](#names-of-processes-and-threads). Without a name the pid or tid is shown instead, for example `pylon_gevmgr / 1029844`. When a label does not fit in the column, the process name is shortened first, so the thread name stays readable. A row that is cut off at the bottom of the graph keeps its label in the part that is visible.
+
+The column is 160 pixels wide and is left out when the graph is narrower than about 420 pixels, to leave room for the graph itself.
+
 ### Measuring
 
 - **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)).

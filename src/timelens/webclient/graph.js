@@ -5,6 +5,43 @@ import { TriggerSource } from "./trigger_source.js";
 // While a graph follows live data, its duration statistics are requested this often.
 const statsIntervalMs = 1000;
 
+// The column left of the graph area that names the process and thread of every row, it is left out of a canvas
+// that is narrower than this.
+const rowLabelWidthPx = 160;
+const minimumWidthForRowLabelsPx = 420;
+
+/**
+ * The label of a row: "process / thread". When it is too wide the process name is shortened first, with an
+ * ellipsis, and then the thread name, so the most specific part stays readable.
+ * @param {(text: string) => number} measure  the width of a text
+ * @param {string} process
+ * @param {string} thread
+ * @param {number} maxWidth
+ */
+export function fitRowLabel(measure, process, thread, maxWidth) {
+    const label = (p, t) => `${p} / ${t}`;
+    if (measure(label(process, thread)) <= maxWidth) {
+        return label(process, thread);
+    }
+
+    // keep at least the first character of the process name
+    for (let length = process.length - 1; length >= 1; --length) {
+        const text = label(process.slice(0, length) + "…", thread);
+        if (measure(text) <= maxWidth) {
+            return text;
+        }
+    }
+
+    const shortProcess = label(process.slice(0, 1) + "…", "");
+    for (let length = thread.length; length >= 0; --length) {
+        const text = shortProcess + thread.slice(0, length) + (length < thread.length ? "…" : "");
+        if (measure(text) <= maxWidth) {
+            return text;
+        }
+    }
+    return "";
+}
+
 /**
  * Moves the start of a frozen view when the pre-trigger time changes, the way a live view does: the zero
  * point and the right edge stay where they are, and the left edge moves with the pre-trigger time (-10 ms
@@ -29,6 +66,8 @@ export class Graph {
         this.mouseX = 0;
         this.mouseY = 0;
         this.marginPx = 8;          // invisible margin around the graph area, holds the zero-point markers
+        this.rowLabelWidthPx = 0;   // width of the column with the names of the rows, left of the margin, set per frame
+        this.lastBars = null;       // the rows of the last frame, with their positions
         this.graphWidthPx = 0;      // size of the graph area, excluding the margin
         this.graphHeightPx = 0;
         this.zeroShiftUs = 0;
@@ -173,7 +212,7 @@ export class Graph {
 
     // mouse position in graph area coordinates, (0, 0) is the top-left of the graph area
     #toGraphX(e) {
-        return e.clientX - this.canvas.getBoundingClientRect().left - this.marginPx;
+        return e.clientX - this.canvas.getBoundingClientRect().left - this.rowLabelWidthPx - this.marginPx;
     }
 
     #toGraphY(e) {
@@ -755,12 +794,13 @@ export class Graph {
         const canvasHeightPx = this.canvas.height / dpr;
         ctx.clearRect(0, 0, canvasWidthPx, canvasHeightPx);
 
-        this.graphWidthPx = Math.max(0, canvasWidthPx - 2 * this.marginPx);
+        this.rowLabelWidthPx = canvasWidthPx >= minimumWidthForRowLabelsPx ? rowLabelWidthPx : 0;
+        this.graphWidthPx = Math.max(0, canvasWidthPx - this.rowLabelWidthPx - 2 * this.marginPx);
         this.graphHeightPx = Math.max(0, canvasHeightPx - 2 * this.marginPx);
 
         // everything is drawn in graph area coordinates
         ctx.save();
-        ctx.translate(this.marginPx, this.marginPx);
+        ctx.translate(this.rowLabelWidthPx + this.marginPx, this.marginPx);
         this.drawGraphArea(ctx);
 
         // the graph itself is clipped to the graph area
@@ -776,7 +816,51 @@ export class Graph {
         this.drawCursor(ctx);
         ctx.restore();
 
+        this.drawRowLabels(ctx);
         this.drawZeroMarkers(ctx);
+        ctx.restore();
+    }
+
+    // The name of the process and thread of a row, or their ids when the log files do not name them.
+    // A row is a tid, its pid is the one of its first event.
+    #rowNames(processId, threadId) {
+        const process = this.collector.getProcessName(processId) ?? String(processId ?? "-");
+        const thread = this.collector.getThreadName(processId, threadId) ?? String(threadId ?? "-");
+        return { process, thread };
+    }
+
+    // The column left of the graph area, in graph area coordinates: one label per row, in the row.
+    drawRowLabels(ctx) {
+        const bars = this.lastBars;
+        if (!bars || this.rowLabelWidthPx <= 0) {
+            return;
+        }
+
+        const padding = 4;
+        const rightX = -this.marginPx - padding;                            // against the graph area
+        const leftX = -(this.rowLabelWidthPx + this.marginPx) + padding;
+        const width = rightX - leftX;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(leftX, 0, width, this.graphHeightPx);                       // a row that is cut off does not spill over
+        ctx.clip();
+        ctx.font = "12px monospace";
+        ctx.fillStyle = "#8ea1bd";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        for (const [threadId, line] of bars.lines) {
+            // the middle of the visible part of the row, a row has a lane per overlap and can be cut off at the bottom
+            const top = line.y;
+            const bottom = Math.min(line.y + line.getHeight(), this.graphHeightPx);
+            if (bottom - top < 8) {
+                continue;
+            }
+
+            const { process, thread } = this.#rowNames(line.processId, threadId);
+            const text = fitRowLabel(t => ctx.measureText(t).width, process, thread, width);
+            ctx.fillText(text, rightX, (top + bottom) / 2);
+        }
         ctx.restore();
     }
 
@@ -819,6 +903,7 @@ export class Graph {
 
         this.#updateStats();
 
+        this.lastBars = null;
         if (data.length === 0) {
             return;
         }
@@ -836,6 +921,7 @@ export class Graph {
             zeroPointUs
         );
         bars.areaWidthPx = this.graphWidthPx;
+        this.lastBars = bars;
         bars.areaHeightPx = this.graphHeightPx;
 
         bars.durationStats = this.durationStats;
@@ -851,7 +937,7 @@ export class Graph {
             const event = data.at(i);
             let group = groups.get(event.groupId);
             if (!group) {
-                group = { openEvents: [], lastEndTime: 0 };
+                group = { openEvents: [], lastEndTime: 0, processId: event.processId };
                 groups.set(event.groupId, group);
             }
             const eventEndUs = event.end_time ?? event.timestamp;
@@ -876,6 +962,7 @@ export class Graph {
             }
 
             const line = bars.getLine(groupId);
+            line.processId = group.processId;
             line.lastEndTime = group.lastEndTime;
             for (const event of group.openEvents) {
                 line.openMap.set(event.name, event);
