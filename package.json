@@ -2,6 +2,7 @@
   "name": "TimeLens",
   "version": "1.0.0",
   "description": "TimeLens is a web-based oscilloscope-style telemetry visualizer for exploring and analyzing time-series logs as interactive signals.",
+  "type": "module",
   "main": "client.js",
   "scripts": {
     "build": "esbuild src/main.js --bundle --outfile=dist/app.js --minify",
