@@ -4,7 +4,6 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
@@ -14,6 +13,7 @@ from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
 from timelens.span_store import RISING, SpanStore, make_duration_test
+from timelens.vson import LOG_DIRECTORIES, default_log_directory, parse_line
 from timelens.wildcard import make_wildcard_matcher
 
 logger = logging.getLogger(__name__)
@@ -60,17 +60,14 @@ class Server:
 
     async def handle_line(self, line, path):
 
-        if line.startswith("["):
-            line = line[1:]
-
-        if line.endswith(",\n"):
-            line = line[:-2]
-
         try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
+            evt = parse_line(line)
+        except ValueError:
             logger.error("line error: %s", line)
             return
+
+        if evt is None:
+            return  # an empty line or a bracket
 
         evt["source"] = os.path.basename(path)
 
@@ -161,10 +158,9 @@ class Server:
     @asynccontextmanager
     async def lifespan(self, app):
 
-        path = Path("/tmp/logs/telemetry")
-        if not path.is_dir():
-            logger.warning("Path missing: %s", path)
-            path = Path("c:/temp/logs/telemetry")
+        if not LOG_DIRECTORIES[0].is_dir():
+            logger.warning("Path missing: %s", LOG_DIRECTORIES[0])
+        path = default_log_directory()
 
         logger.warning("Monitoring path: %s", path)
 

@@ -199,3 +199,31 @@ For example, these rules show only the events of `pylon_gevmgr` and those with `
 Press **Apply filters** to send the rules to the server. The graphs are then filled again with the filtered events, including stopped graphs. When a rule is invalid, for example a regular expression with an error, the window says which rule is wrong and the previous filters stay active. **Remove all** removes every rule and applies that right away, so all events are shown again.
 
 The filters are part of the profile. **Save** and **Save as default** apply the filters first, so a profile always holds the filters you see. Loading a profile replaces the filters; a profile without filters shows all events.
+
+## Command line summary
+
+`python -m timelens.summary` prints a statistical summary of the events in the log files, without the server or a browser. It reads the same files as the server (the folder in [Where the data comes from](#where-the-data-comes-from)) but reads each file **once, entirely**, where the server only reads the last 30 minutes of a file. Run it from the project folder with the virtual environment of the project, for example `venv\Scripts\python -m timelens.summary`.
+
+The events are paired into spans as in the graphs: a begin (`B`) with its end (`E`), or a complete event (`X`). The spans are grouped by the combination of **name, pid and tid**, and for every group the table shows:
+
+| Column | Meaning |
+|---|---|
+| `count` | How many spans the group has |
+| `total` | The sum of their durations |
+| `min`, `mean`, `max` | The shortest, average and longest duration |
+| `p50`, `p95`, `p99` | Percentiles of the durations: half, 95% and 99% of the spans are shorter than this |
+| `stddev` | The sample standard deviation, `-` for a single span |
+| `open` | Begins that have no end, for example from an event that was still running when the file ended |
+
+```
+python -m timelens.summary [path ...] [--name PATTERN] [--sort total|count|mean|max|name] [--top N]
+                           [--format table|csv|json] [--no-percentiles] [--quiet]
+```
+
+- **path:** one or more `*.vson` files, or folders with them. Without a path the folder of the server is used.
+- **--name:** only groups whose name matches, with the wildcards of the trigger word (case-insensitive, `*` matches any text).
+- **--sort, --top:** the biggest first, by the total time by default, and optionally only the first N groups.
+- **--format:** `csv` and `json` give the durations in microseconds, to use in a spreadsheet or a script. The totals line then goes to the error output, so the data stays clean.
+- **--no-percentiles:** the percentiles need 8 bytes of memory per event, a file with hundreds of millions of events does not fit in memory with them.
+
+A line that is not a JSON object is skipped and counted below the table, as are events without a time and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
