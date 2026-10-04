@@ -1,5 +1,8 @@
 ﻿:root {
     color-scheme: dark;
+    /* the space around the page, also between the top bar and the graphs, so the top bar has the same
+       space above and below it */
+    --page-padding: 1rem;
     --background: #070b14;
     --panel: rgba(14, 22, 38, 0.84);
     --panel-border: rgba(113, 151, 205, 0.3);
@@ -20,7 +23,7 @@
 body {
     min-height: 100vh;
     margin: 0;
-    padding: clamp(1rem, 3vw, 1rem);
+    padding: var(--page-padding);
     background:
         radial-gradient(circle at 12% 0%,
             rgba(42, 116, 184, 0.22),
@@ -40,7 +43,7 @@ body {
     flex-wrap: wrap;
     align-items: center;
     position: relative;
-    margin: 0 0 1.25rem;
+    margin: 0 0 var(--page-padding);
     padding-left: 1rem;
     gap: 0.65rem;
     color: var(--muted);
@@ -613,19 +616,21 @@ button:focus-visible {
     stroke: var(--accent);
 }
 
-/* The buttons and the text inputs of a graph's control bar all have the same height. The value is
-   the height the inputs always had, the buttons used to be taller. */
-.control-panel {
+/* The buttons and the text inputs of a graph's control bar, and the buttons of the top bar, all have
+   the same height. The value is the height the inputs always had, the buttons used to be taller. */
+:root {
     --control-height: 1.75rem;
 }
 
 .control-panel .control-button,
-.control-panel .control-input {
+.control-panel .control-input,
+.top-panel .control-button {
     height: var(--control-height);
     min-height: 0;
 }
 
-.control-panel .control-button {
+.control-panel .control-button,
+.top-panel .control-button {
     padding-top: 0;
     padding-bottom: 0;
 }
