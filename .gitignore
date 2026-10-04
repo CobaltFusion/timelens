@@ -4,3 +4,4 @@ venv/
 build/
 node_modules/
 aid*
+dist/
