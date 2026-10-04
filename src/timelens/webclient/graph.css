@@ -206,6 +206,40 @@ button:focus-visible {
     outline-color: var(--panel-border-selected);
 }
 
+/* The grip in the bottom right corner to resize the container with: three diagonal lines. */
+.resizable-container-grip {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    width: 14px;
+    height: 14px;
+    border-radius: 0 0 8px 0;
+    background: linear-gradient(135deg,
+            transparent 0 44%, var(--accent) 44% 52%,
+            transparent 52% 60%, var(--accent) 60% 68%,
+            transparent 68% 76%, var(--accent) 76% 84%,
+            transparent 84%);
+    cursor: nwse-resize;
+    opacity: 0.55;
+    touch-action: none;     /* a drag on the grip is not a scroll of the page */
+    transition: opacity 0.16s;
+}
+
+/* The grip is small, so the part of the corner that responds to a mouse or a finger reaches further than what is drawn. */
+.resizable-container-grip::before {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: 0;
+    bottom: 0;
+    content: "";
+}
+
+.resizable-container-grip:hover {
+    opacity: 1;
+}
+
 .resizable-container-close {
     position: absolute;
     top: 0;
@@ -237,7 +271,7 @@ button:focus-visible {
        canvas keeps a margin of 8px around the graph area ('marginPx' in graph.js), of which the 1px border
        of the graph area is the last pixel, so 7px of it is empty. */
     padding-top: 7px;
-    resize: both;
+    resize: none;       /* the grip of the container resizes it, see '.resizable-container-grip' */
     border-color: var(--panel-border);
     background: var(--panel);
     box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.24);

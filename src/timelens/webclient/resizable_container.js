@@ -27,6 +27,7 @@ export class ResizableContainer {
         // created here and put together by '_createContainer()', so they are never undefined
         this.container = document.createElement("div");
         this.closeButton = document.createElement("button");
+        this.grip = document.createElement("div");
         this.resizeObserver = new ResizeObserver(() => this.resize());
 
         this._createContainer();
@@ -46,12 +47,48 @@ export class ResizableContainer {
 
         this.closeButton.addEventListener("click", () => this.close());
 
+        // The grip in the bottom right corner, drag it to resize. The handle of the browser ('resize: both' in the css) is
+        // not there on iOS, and not under a finger either: this one works with a mouse, a pen and a touch screen.
+        this.grip.classList.add("resizable-container-grip");
+        this.grip.title = "Drag to resize this graph";
+        this.grip.addEventListener("pointerdown", (e) => this._startResize(e));
+
         // Assemble
         this.container.appendChild(this.closeButton);
+        this.container.appendChild(this.grip);
         this.component.mount(this.container);
         this.parent.appendChild(this.container);
         this.resizeObserver.observe(this.container);
         this.resize();
+    }
+
+    // Resizes the container while the pointer that started on the grip moves. The pointer is captured by the grip, so the
+    // moves keep coming when it is outside the grip, and outside the window.
+    _startResize(e) {
+        if (e.pointerType === "mouse" && e.button !== 0) {
+            return;     // only the main button
+        }
+        e.preventDefault();
+        e.stopPropagation();
+
+        const grip = this.grip;
+        grip.setPointerCapture(e.pointerId);
+
+        const start = { x: e.clientX, y: e.clientY, width: this.container.offsetWidth, height: this.container.offsetHeight };
+        const maxWidth = this.parent.clientWidth;       // not wider than the page, the css has the least size
+
+        const move = (/** @type {PointerEvent} */ m) => {
+            this.container.style.width = `${Math.min(maxWidth, Math.max(0, start.width + m.clientX - start.x))}px`;
+            this.container.style.height = `${Math.max(0, start.height + m.clientY - start.y)}px`;
+        };
+        const end = () => {
+            grip.removeEventListener("pointermove", move);
+            grip.removeEventListener("pointerup", end);
+            grip.removeEventListener("pointercancel", end);
+        };
+        grip.addEventListener("pointermove", move);
+        grip.addEventListener("pointerup", end);
+        grip.addEventListener("pointercancel", end);
     }
 
     close() {

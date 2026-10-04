@@ -167,7 +167,7 @@ The data range depends on the state of the graph:
 
 ### Layout
 
-Each graph panel can be resized. Remove a graph with the `x` in its corner.
+Each graph panel can be resized: drag the grip in its bottom right corner (three diagonal lines) with a mouse, a pen or a finger. A panel is at least 18 rem wide and 218 pixels high, and at most as wide as the page. The size is saved in a [profile](#profiles). Remove a graph with the `x` in its corner.
 
 ## Profiles
 
