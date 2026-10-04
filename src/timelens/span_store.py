@@ -18,6 +18,16 @@ RISING = "rising"     # the begin of a span
 FALLING = "falling"   # the end of a span
 
 
+# Returns a test for spans, true for a closed span whose duration is longer ('>') or shorter ('<')
+# than 'limit_us'. An open span has no duration yet, it never passes.
+def make_duration_test(op, limit_us):
+    if op == ">":
+        return lambda span: span["end"] is not None and span["end"] - span["ts"] > limit_us
+    if op == "<":
+        return lambda span: span["end"] is not None and span["end"] - span["ts"] < limit_us
+    raise ValueError(f"unknown duration comparison {op!r}, expected '>' or '<'")
+
+
 class SpanStore:
     """
     In-memory store of spans, sorted by their begin time 'ts' (µs).
@@ -128,9 +138,12 @@ class SpanStore:
 
     # The time of the first or last ('which') edge in [start_us, end_us] of a span whose
     # name matches, or None. A 'rising' edge is the begin, a 'falling' edge the end of a closed span.
-    def find(self, matcher, edge, start_us, end_us, which="last", accept=None):
+    # With 'duration' (see 'make_duration_test') only closed spans with a matching duration count,
+    # the time is still the begin or the end of the span.
+    def find(self, matcher, edge, start_us, end_us, which="last", accept=None, duration=None):
         def accepted(span):
-            return matcher(span["name"]) and (accept is None or accept(span))
+            return (matcher(span["name"]) and (accept is None or accept(span))
+                    and (duration is None or duration(span)))
 
         if edge == FALLING:
             begin = bisect.bisect_left(self._begin, start_us - self.max_duration_us)

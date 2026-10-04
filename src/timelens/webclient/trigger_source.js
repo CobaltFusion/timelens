@@ -26,6 +26,8 @@ export class TriggerSource {
         this.triggerWord = "";
         /** @type {typeof TriggerEdge[keyof typeof TriggerEdge]} */
         this.triggerEdge = TriggerEdge.RISING;
+        /** @type {import("./globals.js").TriggerDuration | null} */
+        this.triggerDuration = null;      // only events with this duration trigger, null for any duration
         this.onStatusChanged = null;
     }
 
@@ -49,6 +51,16 @@ export class TriggerSource {
 
     getTriggerEdge() {
         return this.triggerEdge;
+    }
+
+    /** @param {import("./globals.js").TriggerDuration | null} value */
+    setTriggerDuration(value) {
+        this.triggerDuration = value;
+        this.#determineTriggerMode(TriggerMode.AUTO);
+    }
+
+    getTriggerDuration() {
+        return this.triggerDuration;
     }
 
     #determineTriggerMode(triggerMode) {
@@ -82,15 +94,15 @@ export class TriggerSource {
         if (!this.running) {
             if (this.stoppedRange) {
                 const { beginUs, endUs } = this.stoppedRange;
-                this.collector.find(this.triggerWord, this.triggerEdge, beginUs, endUs, "last").then(onTrigger).catch(onError);
+                this.collector.find(this.triggerWord, this.triggerEdge, beginUs, endUs, "last", this.triggerDuration).then(onTrigger).catch(onError);
             }
             return;
         }
 
-        this.unwatchTrigger = this.collector.watchTrigger(this.triggerWord, this.triggerEdge, onTrigger);
+        this.unwatchTrigger = this.collector.watchTrigger(this.triggerWord, this.triggerEdge, onTrigger, this.triggerDuration);
         if (this.triggerMode === TriggerMode.AUTO) {
             const { beginUs } = this.getDataRangeUs();
-            this.collector.find(this.triggerWord, this.triggerEdge, beginUs, Infinity, "last").then(onTrigger).catch(onError);
+            this.collector.find(this.triggerWord, this.triggerEdge, beginUs, Infinity, "last", this.triggerDuration).then(onTrigger).catch(onError);
         }
     }
 

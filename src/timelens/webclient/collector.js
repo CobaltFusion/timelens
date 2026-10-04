@@ -65,7 +65,7 @@ export class Collector {
         this.lastRequestId = 0;
         this.pendingRequests = new Map();   // requestId -> { spans, resolve, reject }
         this.lastTriggerId = 0;
-        this.triggerWatches = new Map();    // triggerId -> { pattern, edge, callback(timeUs) }
+        this.triggerWatches = new Map();    // triggerId -> { pattern, edge, duration, callback(timeUs) }
         this.filterRules = [];              // the filter rules the server applies to everything it sends
 
         // this uses the 'host' where we are loading this application from
@@ -90,8 +90,8 @@ export class Collector {
                     .catch(error => console.error("Setting the filter failed:", error));
             }
             // watches that were started before the connection was open, e.g. from the default profile
-            for (const [triggerId, { pattern, edge }] of this.triggerWatches) {
-                this.#send({ action: "watch_trigger", triggerId, pattern, edge });
+            for (const [triggerId, { pattern, edge, duration }] of this.triggerWatches) {
+                this.#send({ action: "watch_trigger", triggerId, pattern, edge, duration });
             }
             this.reset().catch(error => console.error("Initial history request failed:", error));
         };
@@ -246,20 +246,23 @@ export class Collector {
      * 'pattern' ('*' matches anything), null if there is none.
      * @param {string} edge  TriggerEdge.RISING (begin) or TriggerEdge.FALLING (end)
      * @param {"first" | "last"} which
+     * @param {import("./globals.js").TriggerDuration | null} [duration]  only closed spans with this duration count
      * @returns {Promise<number | null>}
      */
-    find(pattern, edge, startUs, endUs, which) {
-        return this.#request({ action: "find", pattern, edge, which, ...this.#range(startUs, endUs) });
+    find(pattern, edge, startUs, endUs, which, duration = null) {
+        return this.#request({ action: "find", pattern, edge, which, duration, ...this.#range(startUs, endUs) });
     }
 
     /**
      * Calls 'callback(timeUs)' for every new edge of a span whose name matches 'pattern'.
+     * With a 'duration' only spans that have closed with that duration trigger, at their begin or end.
+     * @param {import("./globals.js").TriggerDuration | null} [duration]
      * @returns {() => void} stops watching
      */
-    watchTrigger(pattern, edge, callback) {
+    watchTrigger(pattern, edge, callback, duration = null) {
         const triggerId = ++this.lastTriggerId;
-        this.triggerWatches.set(triggerId, { pattern, edge, callback });
-        this.#send({ action: "watch_trigger", triggerId, pattern, edge });
+        this.triggerWatches.set(triggerId, { pattern, edge, duration, callback });
+        this.#send({ action: "watch_trigger", triggerId, pattern, edge, duration });
 
         return () => {
             if (this.triggerWatches.delete(triggerId)) {

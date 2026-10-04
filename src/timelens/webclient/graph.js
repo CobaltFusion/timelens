@@ -1,4 +1,4 @@
-import { EventType, TriggerEdge, roundUpNice } from "./globals.js";
+import { EventType, TriggerEdge, isTriggerDuration, roundUpNice } from "./globals.js";
 import { BarStack } from "./barstack.js";
 import { TriggerSource } from "./trigger_source.js";
 
@@ -426,6 +426,15 @@ export class Graph {
         return this.triggerSource.getTriggerEdge();
     }
 
+    /** @param {import("./globals.js").TriggerDuration | null} duration */
+    setTriggerDuration(duration) {
+        this.triggerSource.setTriggerDuration(duration);
+    }
+
+    getTriggerDuration() {
+        return this.triggerSource.getTriggerDuration();
+    }
+
     getTriggerStatus() {
         return this.triggerSource.getTriggerStatus();
     }
@@ -455,6 +464,7 @@ export class Graph {
         return {
             triggerWord: this.getTriggerWord(),
             triggerEdge: this.getTriggerEdge(),
+            triggerDuration: this.getTriggerDuration(),
             preTriggerMs: this.getPreTriggerMs(),
             graphWidthMs: this.getGraphWidthMs()
         };
@@ -467,6 +477,10 @@ export class Graph {
         }
         if (Object.values(TriggerEdge).includes(settings?.triggerEdge)) {
             this.setTriggerEdge(settings.triggerEdge);
+        }
+        // a profile without a duration, null or a missing value, means any duration
+        if (isTriggerDuration(settings?.triggerDuration)) {
+            this.setTriggerDuration(settings.triggerDuration);
         }
         // the PreTrigger control only allows values <= 0
         if (Number.isFinite(settings?.preTriggerMs) && settings.preTriggerMs <= 0) {

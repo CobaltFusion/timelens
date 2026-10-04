@@ -66,6 +66,17 @@ Use the falling edge when you are interested in what happens *after* an event fi
 
 Changing the edge starts the search for a trigger over again, in Auto mode.
 
+### Trigger duration
+
+The **Duration** controls, next to the edge button, limit the trigger to events of a certain length: click the comparison button to cycle through `any`, `<` (shorter than) and `>` (longer than), type a number, and click the unit button to cycle through `us`, `ms` and `s`. Like the edge button, they show the current choice and move to the next one when clicked. For example, trigger word `test` with `< 100 us` triggers only on `test` events that took less than 100 microseconds, and `name` with `> 5 ms` only on `name` events longer than 5 milliseconds. With `any`, the default, events trigger whatever their duration and the number is disabled; it keeps its value, so it is still there when you switch back to `<` or `>`. A `<` or `>` with an empty number also means any duration.
+
+Things to know:
+
+- The duration of an event is only known when it has ended, so a trigger with a duration waits for the event to finish. An event that is still open never triggers.
+- The trigger point is still the edge you chose: the **begin** of the matching event with the rising edge, its **end** with the falling edge. The graph is shown around that point, so with the rising edge it looks back to the start of the long (or short) event.
+- Events of exactly the given duration do not match, `>` and `<` are strict.
+- Changing the duration starts the search for a trigger over again, in Auto mode.
+
 ### PreTrigger
 
 Sets how much time is shown **before** the trigger point, in milliseconds. A negative value such as `-10 ms` places the trigger 10 ms from the left edge of the graph.
@@ -138,7 +149,7 @@ A profile saves your graphs so you can get them back later. **Settings** in the 
 A profile contains:
 
 - the graphs, in their order on the screen,
-- per graph: the trigger word, trigger edge, PreTrigger, View width and the panel size if you resized it,
+- per graph: the trigger word, trigger edge, trigger duration, PreTrigger, View width and the panel size if you resized it,
 - the [filters](#filters).
 
 It does not contain audio, the signature sound, the health indicator mode, or whether a graph is running or stopped.

@@ -2,7 +2,9 @@
 
 import math
 
-from timelens.span_store import FALLING, RISING, SpanStore
+import pytest
+
+from timelens.span_store import FALLING, RISING, SpanStore, make_duration_test
 from timelens.wildcard import make_wildcard_matcher
 
 INF = float("inf")
@@ -189,3 +191,41 @@ def test_find_with_accept():
     assert store.find(any_name, RISING, -INF, INF, "last", accept=not_b) == 10
     assert store.find(any_name, FALLING, -INF, INF, "last", accept=not_b) == 15
     assert store.find(any_name, RISING, -INF, INF, "last") == 20
+
+
+def test_duration_test():
+    longer = make_duration_test(">", 100)
+    shorter = make_duration_test("<", 100)
+    closed = {"ts": 10, "end": 160}     # 150 long
+    open_span = {"ts": 10, "end": None}
+
+    assert longer(closed) and not shorter(closed)
+    assert not make_duration_test(">", 150)(closed) and not make_duration_test("<", 150)(closed)    # not equal
+    assert not longer(open_span) and not shorter(open_span)     # an open span has no duration yet
+    with pytest.raises(ValueError):
+        make_duration_test("=", 1)
+
+
+def test_find_with_duration_returns_the_begin_or_end_of_a_matching_span():
+    store = make_store(
+        evt("X", "a", 100, dur=50),     # 100 .. 150
+        evt("X", "a", 300, dur=500),    # 300 .. 800
+        evt("X", "a", 1000, dur=20),    # 1000 .. 1020
+        evt("B", "a", 2000),            # still open
+    )
+    name = make_wildcard_matcher("a")
+
+    longer = make_duration_test(">", 100)
+    assert store.find(name, RISING, -INF, INF, "last", duration=longer) == 300
+    assert store.find(name, FALLING, -INF, INF, "last", duration=longer) == 800
+
+    shorter = make_duration_test("<", 100)
+    assert store.find(name, RISING, -INF, INF, "first", duration=shorter) == 100
+    assert store.find(name, RISING, -INF, INF, "last", duration=shorter) == 1000
+    assert store.find(name, FALLING, -INF, INF, "last", duration=shorter) == 1020
+
+    # without a duration the open span counts for the rising edge
+    assert store.find(name, RISING, -INF, INF, "last") == 2000
+    assert store.find(name, RISING, -INF, INF, "last", duration=make_duration_test(">", 0)) == 1000
+
+    assert store.find(name, RISING, -INF, INF, "last", duration=make_duration_test(">", 10_000)) is None

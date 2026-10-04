@@ -393,6 +393,93 @@ class Main {
         updateEdgeButton();
     }
 
+    // Only events that are longer (>) or shorter (<) than a duration trigger, the comparison and the unit
+    // are buttons that cycle through their choices, like the edge button. The comparison can also be
+    // 'any', then the events trigger whatever their duration and the number is disabled. The duration is known when an event has ended, so these triggers fire at the end of
+    // the event, at its begin or its end time, depending on the edge.
+    addDurationControls(controls, graph) {
+        const units = [{ label: "us", us: 1 }, { label: "ms", us: 1e3 }, { label: "s", us: 1e6 }];
+        const duration = graph.getTriggerDuration();
+        // shown in the largest unit that gives a whole number, ms for an empty value
+        const unit = duration
+            ? [...units].reverse().find(candidate => duration.us >= candidate.us && duration.us % candidate.us === 0) ?? units[0]
+            : units[1];
+
+        const label = document.createElement("label");
+        label.textContent = "Duration:";
+        const title = "Only trigger on events longer (>) or shorter (<) than this duration, leave it empty for any duration. " +
+            "Triggers on the begin or end of the event, which is known when the event has ended";
+        label.title = title;
+        controls.appendChild(label);
+
+        // a button that shows one of 'choices' and moves on to the next one when it is clicked
+        const addCycleButton = (choices, startIndex, onChange) => {
+            let index = startIndex;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.classList.add("control-button", "duration-button");
+            const show = () => {
+                const choice = choices[index];
+                button.textContent = choice.label;
+                button.title = `${choice.title} (click for ${choices[(index + 1) % choices.length].label})`;
+                button.setAttribute("aria-label", choice.title);
+            };
+            button.addEventListener("click", () => {
+                index = (index + 1) % choices.length;
+                show();
+                onChange();
+            });
+            show();
+            return { button, current: () => choices[index] };
+        };
+
+        /** @type {Array<{ label: string, value: ">" | "<" | null, title: string }>} */
+        const ops = [
+            { label: "any", value: null, title: "Trigger on events of any duration" },
+            { label: "<", value: "<", title: "Trigger on events shorter than the duration" },
+            { label: ">", value: ">", title: "Trigger on events longer than the duration" }
+        ];
+        const opControl = addCycleButton(ops, Math.max(0, ops.findIndex(op => op.value === (duration?.op ?? null))), () => update());
+
+        const valueInput = document.createElement("input");
+        valueInput.type = "number";
+        valueInput.min = "0";
+        valueInput.step = "any";
+        valueInput.classList.add("control-input", "numeric-control-input");
+        valueInput.title = title;
+        valueInput.value = duration ? String(duration.us / unit.us) : "";
+
+        const unitControl = addCycleButton(
+            units.map(candidate => ({ ...candidate, title: `The duration is in ${candidate.label === "us" ? "microseconds" : candidate.label === "ms" ? "milliseconds" : "seconds"}` })),
+            units.indexOf(unit),
+            () => update());
+
+        // the number is only used with '<' or '>', it keeps its value while it is disabled
+        const syncValueInput = () => {
+            const isAny = opControl.current().value === null;
+            valueInput.disabled = isAny;
+            valueInput.placeholder = isAny ? "any" : "duration";
+        };
+
+        const update = () => {
+            syncValueInput();
+            const op = opControl.current().value;
+            const value = valueInput.value.trim() === "" ? NaN : Number(valueInput.value);
+            /** @type {import("./globals.js").TriggerDuration | null} */
+            const newDuration = op !== null && Number.isFinite(value) && value >= 0
+                ? { op, us: Math.round(value * unitControl.current().us * 1000) / 1000 }
+                : null;
+            // no change when e.g. the comparison of an empty number is changed, that would restart the trigger search
+            if (JSON.stringify(newDuration) !== JSON.stringify(graph.getTriggerDuration())) {
+                graph.setTriggerDuration(newDuration);
+            }
+        };
+        valueInput.addEventListener("input", update);
+        syncValueInput();
+
+        controls.append(opControl.button, valueInput, unitControl.button);
+    }
+
     addControls(controls, graph) {
         const triggerWordLabel = document.createElement("label");
         triggerWordLabel.textContent = "Trigger word: ";
@@ -415,6 +502,7 @@ class Main {
         controls.appendChild(triggerWordLabel);
 
         this.addEdgeControlButton(controls, graph);
+        this.addDurationControls(controls, graph);
 
         const preTriggerLabel = document.createElement("label");
         preTriggerLabel.textContent = "PreTrigger:";

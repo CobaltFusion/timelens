@@ -13,7 +13,7 @@ from timelens.event_filter import EventFilter
 from timelens.logwatcher import LogWatcher
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
-from timelens.span_store import SpanStore
+from timelens.span_store import RISING, SpanStore, make_duration_test
 from timelens.wildcard import make_wildcard_matcher
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class Server:
         self.peer_discovery = None
         self.store = SpanStore()
         self.profiles = ProfileStore()
-        self.watches = {}   # websocket -> {triggerId: (matcher, edge)}
+        self.watches = {}   # websocket -> {triggerId: (matcher, edge, duration test or None)}
         self.filters = {}   # websocket -> EventFilter, clients without a filter get every span
         self.count = 0
 
@@ -97,14 +97,24 @@ class Server:
 
     # Sends a 'trigger' message for each edge that matches a watch of a client.
     # Spans the filter of the client rejects do not trigger.
+    # A watch with a duration only triggers when the span has closed with a matching duration, the
+    # time is then the begin ('rising') or the end ('falling') of the span.
     async def notify_triggers(self, span, edges):
         for websocket, watches in list(self.watches.items()):
             if self.filtered(websocket, span) is None:
                 continue
-            for trigger_id, (matcher, watched_edge) in list(watches.items()):
-                for edge, time_us in edges:
-                    if edge != watched_edge or not matcher(span["name"]):
-                        continue
+            for trigger_id, (matcher, watched_edge, duration_test) in list(watches.items()):
+                if not matcher(span["name"]):
+                    continue
+
+                if duration_test is None:
+                    times = [time_us for edge, time_us in edges if edge == watched_edge]
+                elif duration_test(span):
+                    times = [span["ts"] if watched_edge == RISING else span["end"]]
+                else:
+                    times = []
+
+                for time_us in times:
                     try:
                         await websocket.send_text(json.dumps({
                             "type": "trigger",
@@ -169,6 +179,18 @@ class Server:
         finally:
             await self.watcher.stop()
 
+    # The test for the 'duration' of a trigger request, {op: '>' or '<', us: number}, None without a
+    # valid duration.
+    @staticmethod
+    def duration_test_of(msg):
+        duration = msg.get("duration")
+        if not isinstance(duration, dict):
+            return None
+        op, limit_us = duration.get("op"), duration.get("us")
+        if op not in (">", "<") or isinstance(limit_us, bool) or not isinstance(limit_us, (int, float))                 or not limit_us >= 0:
+            return None
+        return make_duration_test(op, limit_us)
+
     # 'startUs'/'endUs' of a request, a missing or null bound is unbounded
     @staticmethod
     def range_of(msg):
@@ -224,7 +246,7 @@ class Server:
         start_us, end_us = self.range_of(msg)
         matcher = make_wildcard_matcher(msg.get("pattern") or "")
         time_us = self.store.find(matcher, msg.get("edge"), start_us, end_us, msg.get("which", "last"),
-                                  accept=self.accept_of(websocket))
+                                  accept=self.accept_of(websocket), duration=self.duration_test_of(msg))
         await websocket.send_text(json.dumps({
             "type": "found",
             "requestId": msg.get("requestId"),
@@ -254,7 +276,8 @@ class Server:
     # From now on, a 'trigger' message is sent for every edge that matches 'pattern'.
     def handle_watch_trigger(self, websocket, msg):
         matcher = make_wildcard_matcher(msg.get("pattern") or "")
-        self.watches.setdefault(websocket, {})[msg.get("triggerId")] = (matcher, msg.get("edge"))
+        self.watches.setdefault(websocket, {})[msg.get("triggerId")] = (
+            matcher, msg.get("edge"), self.duration_test_of(msg))
 
     def handle_unwatch_trigger(self, websocket, msg):
         watches = self.watches.get(websocket)

@@ -586,3 +586,10 @@ button:focus-visible {
     padding-top: 0.75rem;
     border-top: 1px solid var(--panel-border);
 }
+
+/* the comparison and unit buttons of the trigger duration, a fixed width so the row does not jump while cycling */
+.control-panel .duration-button {
+    min-width: 2.6rem;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+}

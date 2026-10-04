@@ -61,6 +61,20 @@ export const TriggerEdge = Object.freeze({
     FALLING: "falling"   // trigger on the end of an event
 });
 
+/**
+ * A condition on the duration of the events a trigger fires on, only closed events have a duration.
+ * @typedef {Object} TriggerDuration
+ * @property {">" | "<"} op     longer or shorter than 'us'
+ * @property {number} us        microseconds
+ */
+
+/** @returns {value is TriggerDuration} */
+export function isTriggerDuration(value) {
+    return typeof value === "object" && value !== null
+        && (value.op === ">" || value.op === "<")
+        && Number.isFinite(value.us) && value.us >= 0;
+}
+
 export const TriggerResult = Object.freeze({
     None: "None",
     Found: "Found"
