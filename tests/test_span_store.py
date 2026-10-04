@@ -229,3 +229,26 @@ def test_find_with_duration_returns_the_begin_or_end_of_a_matching_span():
     assert store.find(name, RISING, -INF, INF, "last", duration=make_duration_test(">", 0)) == 1000
 
     assert store.find(name, RISING, -INF, INF, "last", duration=make_duration_test(">", 10_000)) is None
+
+
+@pytest.mark.parametrize("phase", ["C", "i", "I", "b", "e", "n", "s", "t", "f", "P", "O", "N", "D", "R", "", None])
+def test_other_phases_are_ignored(phase):
+    store = SpanStore()
+
+    assert store.add(evt(phase, "counter", 100)) == (None, [])
+    assert len(store) == 0
+    assert store.bounds() is None
+    assert store.newest_us == -INF      # an event that is ignored does not count as the newest event
+    assert spans_of(store) == []
+
+
+def test_an_event_that_is_ignored_needs_no_time_and_does_not_disturb_the_spans_around_it():
+    store = SpanStore()
+    store.add(evt("B", "a", 10))
+
+    assert store.add({"name": "x", "ph": "C", "args": {"value": 5}}) == (None, [])      # no 'ts'
+    assert store.add({"name": "y"}) == (None, [])                                      # no phase either
+    assert store.add(evt("i", "a", 15)) == (None, [])                                  # an instant with the name of the open span
+    store.add(evt("E", "a", 20))
+
+    assert spans_of(store) == [("a", 10, 20)]

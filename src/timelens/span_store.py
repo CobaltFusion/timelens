@@ -16,6 +16,10 @@ DEFAULT_RETENTION_US = 30 * 60 * 1_000_000
 # webclient's buffer, which keeps the last minute. A span that never ends would otherwise be shown forever.
 DEFAULT_OPEN_HISTORY_US = 60 * 1_000_000
 
+# The phases of the events that are used: begin, end and complete (a begin and an end in one event).
+# Metadata ('M') gives names, see 'names.py', and the other phases are ignored.
+SPAN_PHASES = ("B", "E", "X")
+
 RISING = "rising"     # the begin of a span
 FALLING = "falling"   # the end of a span
 
@@ -60,6 +64,9 @@ class SpanStore:
             return None, []     # the name of a process or thread, not an event, see 'names.py'
 
         ph = evt.get("ph")
+        if ph not in SPAN_PHASES:
+            return None, []     # counters ('C'), instants ('i') and the like are not used, they are ignored
+
         ts = evt["ts"]
         thread = (evt.get("source"), evt.get("pid"), evt.get("tid"))
         self.newest_us = max(self.newest_us, ts)
@@ -81,7 +88,7 @@ class SpanStore:
             self._closed(span)
             return span, [(RISING, ts), (FALLING, span["end"])]
 
-        # 'B', and like before, any other phase opens a span
+        # 'B' opens a span
         self._open.setdefault(thread, []).append(span)
         return span, [(RISING, ts)]
 

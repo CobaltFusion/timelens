@@ -167,7 +167,7 @@ def test_pairs_the_same_spans_as_the_span_store():
     names = ["a", "b", "c", ""]
     events = []
     for i in range(3000):
-        ph = rng.choice("BBEEX")
+        ph = rng.choice("BBEEXiC")
         e = evt(ph, rng.choice(names), i * 10 + rng.randrange(10), pid=rng.choice([1, 2]), tid=rng.choice([1, 2, 3]),
                 source=rng.choice(["x.vson", "y.vson"]))
         if ph == "X":
@@ -272,3 +272,51 @@ def test_errors(tmp_path):
 
     code, out, err = run(str(tmp_path))      # an empty folder
     assert code == 1 and "no '*.vson' files found" in err
+
+
+# ---- events of other phases are ignored
+
+OTHER_PHASES = ["C", "i", "I", "b", "e", "n", "P"]
+
+
+def test_the_pairer_ignores_other_phases():
+    pairer = Pairer()
+
+    assert all(pairer.add({"ph": phase, "name": "x", "ts": 5, "pid": 1, "tid": 1}) is None for phase in OTHER_PHASES)
+    assert list(pairer.open_spans()) == []          # they do not open a span, an instant is not a begin
+    assert pairer.add({"ph": "i", "name": "a", "ts": 7, "pid": 1, "tid": 1, "source": "a"}) is None
+    assert pairer.unmatched_ends == 0
+
+
+def test_the_summary_counts_the_events_that_it_ignores():
+    summarizer = summarize(
+        evt("B", "a", 0), evt("C", "counter", 3), evt("i", "a", 5), evt("E", "a", 10),
+        {"ph": "C", "name": "no time"},
+    )
+
+    assert [r["name"] for r in summarizer.rows()] == ["a"]
+    assert row_of(summarizer, "a")["total_us"] == 10 and row_of(summarizer, "a")["open"] == 0
+    assert summarizer.ignored_events == 3
+    assert summarizer.events == 2           # the begin and the end
+    assert summarizer.events_without_time == 0
+
+
+def test_the_command_line_says_how_many_events_were_ignored(tmp_path):
+    write_log(tmp_path / "a.vson", [
+        evt("B", "load", 0), evt("C", "memory", 10, args={"bytes": 5}), evt("i", "mark", 20),
+        evt("E", "load", 100), evt("C", "memory", 110),
+    ])
+
+    code, out, err = run(str(tmp_path), "--quiet")
+    assert code == 0
+    assert "3 events of other types than B, E and X ignored" in out
+    assert [line.split()[0] for line in out.splitlines()[2:3]] == ["load"]
+    assert "memory" not in out and "mark" not in out.split("events from")[0]       # no group for them
+
+    data = json.loads(run(str(tmp_path), "--format", "json")[1])
+    assert data["ignored_events"] == 3 and data["events"] == 2
+    assert [g["name"] for g in data["groups"]] == ["load"]
+
+    # nothing ignored: nothing is said
+    write_log(tmp_path / "a.vson", [evt("B", "load", 0), evt("E", "load", 100)])
+    assert "ignored" not in run(str(tmp_path), "--quiet")[1]

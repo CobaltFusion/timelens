@@ -23,6 +23,8 @@ Each line is a JSON event in the Chrome trace format. TimeLens uses `ph: "B"` as
 {"name": "Serialize", "ph": "E", "pid": 1027810, "tid": 1027810, "ts": 6383938379112 },
 ```
 
+Only the phases `B`, `E` and `X` (below) are events for TimeLens, and `M` (metadata, see [Names of processes and threads](#names-of-processes-and-threads)). Lines with another phase, like counters (`"ph": "C"`) and instants (`"ph": "i"`), are ignored: they are not drawn, do not trigger and are not counted in the statistics.
+
 An event can also be written as a single line, a *complete event* with `ph: "X"`. Its `ts` is the begin and `dur` the duration, both in microseconds. TimeLens draws it the same way as a `B`/`E` pair:
 
 ```json
@@ -251,7 +253,7 @@ python -m timelens.summary [path ...] [--name PATTERN] [--sort total|count|mean|
 - **--format:** `csv` and `json` give the durations in microseconds, to use in a spreadsheet or a script. The totals line then goes to the error output, so the data stays clean.
 - **--no-percentiles:** the percentiles need 8 bytes of memory per event, a file with hundreds of millions of events does not fit in memory with them.
 
-Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
+Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time, events of another phase than `B`, `E` and `X`, and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
 
 ## Speed test
 

@@ -24,6 +24,7 @@ from array import array
 from pathlib import Path
 
 from timelens.names import is_metadata
+from timelens.span_store import SPAN_PHASES
 from timelens.vson import default_log_directory, find_log_files, parse_line
 from timelens.wildcard import make_wildcard_matcher
 
@@ -39,8 +40,8 @@ class Pairer:
     """
     Pairs the events of a log file into closed spans, the way 'SpanStore' does, without keeping them:
     'B' opens a span, the next 'E' on the same thread closes the innermost open span with its name
-    (or the innermost one if the 'E' has no name), 'X' is a complete span with a duration, and any
-    other phase opens a span. A thread is the combination of file, pid and tid.
+    (or the innermost one if the 'E' has no name), and 'X' is a complete span with a duration.
+    Other phases are ignored. A thread is the combination of file, pid and tid.
     """
 
     def __init__(self):
@@ -53,6 +54,9 @@ class Pairer:
             return None     # the name of a process or thread, not an event
 
         ph = evt.get("ph")
+        if ph not in SPAN_PHASES:
+            return None     # counters ('C'), instants ('i') and the like are not used
+
         ts = evt["ts"]
         thread = (evt.get("source"), evt.get("pid"), evt.get("tid"))
 
@@ -159,10 +163,14 @@ class Summarizer:
         self.events = 0
         self.skipped_lines = 0          # lines that are not a JSON object
         self.events_without_time = 0    # events without a numeric 'ts'
+        self.ignored_events = 0         # events of another phase than B, E and X, like counters and instants
 
     def add_event(self, evt):
         if is_metadata(evt):
             return      # not an event: the names of processes and threads, they are not summarized
+        if evt.get("ph") not in SPAN_PHASES:
+            self.ignored_events += 1
+            return
 
         ts = evt.get("ts")
         if not is_number(ts):
@@ -285,6 +293,8 @@ def footer(summarizer, shown, total):
         parts.append(f"{summarizer.skipped_lines:,} lines skipped")
     if summarizer.events_without_time:
         parts.append(f"{summarizer.events_without_time:,} events without a time ignored")
+    if summarizer.ignored_events:
+        parts.append(f"{summarizer.ignored_events:,} events of other types than B, E and X ignored")
     if summarizer.unmatched_ends:
         parts.append(f"{summarizer.unmatched_ends:,} end events without a begin ignored")
     return ", ".join(parts)
@@ -379,7 +389,8 @@ def main(argv=None, stdout=None, stderr=None):
     if args.format == "json":
         json.dump({"files": [str(path) for path in files], "events": summarizer.events, "groups": rows,
                    "skipped_lines": summarizer.skipped_lines, "unmatched_ends": summarizer.unmatched_ends,
-                   "events_without_time": summarizer.events_without_time}, stdout, indent=2)
+                   "events_without_time": summarizer.events_without_time,
+                   "ignored_events": summarizer.ignored_events}, stdout, indent=2)
         stdout.write("\n")
         print(footer(summarizer, len(rows), total), file=stderr)
     elif args.format == "csv":

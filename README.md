@@ -17,7 +17,7 @@ This file describes what is implemented, and how each part is known to work. The
 - 🌐 Web-based interface
   - Lightweight client, accessible from any modern browser
 - 🧠 Structured log interpretation
-  - Works with semi-structured telemetry (timestamps, subprocesses, events, counters)
+  - Works with semi-structured telemetry (timestamps, subprocesses, events, counters) (counters are not yet implemented)
 - 📊 Event frequency/shape visualization (Working prototype)
   - Identify spikes, anomalies, and system behavior patterns
 
@@ -45,7 +45,7 @@ A log line looks like this (the file is a JSON array that is never closed, every
 
 ## Limits
 
-- Only `B`, `E`, `X` and `M` events are used. Other phases, like counters (`C`) and instants (`i`), are read like a begin and stay open.
+- Only `B`, `E`, `X` and `M` events are used. Events of other phases, like counters (`C`) and instants (`i`), are ignored.
 - For a big file the server only reads the last 30 minutes, plus the metadata lines at the start. The command line summary reads everything.
 - The browser keeps the last minute of events, the server the last 30 minutes, in memory. The server has no data of its own: after a restart it reads the files again.
 - On Windows the server keeps the log files open, so they cannot be deleted while it runs.

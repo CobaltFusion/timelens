@@ -14,7 +14,7 @@ from timelens.logwatcher import LogWatcher
 from timelens.names import Names, is_metadata
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
-from timelens.span_store import RISING, SpanStore, make_duration_test
+from timelens.span_store import RISING, SPAN_PHASES, SpanStore, make_duration_test
 from timelens.vson import LOG_DIRECTORIES, default_log_directory, parse_line
 from timelens.wildcard import make_wildcard_matcher
 
@@ -87,6 +87,10 @@ class Server:
             change = self.names.add(evt)
             if change is not None:
                 await self.broadcast_message(Names.message(change))
+            return
+
+        # only begin, end and complete events are used, counters, instants and the like are ignored
+        if evt.get("ph") not in SPAN_PHASES:
             return
 
         evt["source"] = os.path.basename(path)
