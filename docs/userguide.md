@@ -79,7 +79,7 @@ Things to know:
 
 ### PreTrigger
 
-Sets how much time is shown **before** the trigger point, in milliseconds. A negative value such as `-10 ms` places the trigger 10 ms from the left edge of the graph.
+Sets how much time is shown **before** the trigger point, in milliseconds. A negative value such as `-10 ms` places the trigger 10 ms from the left edge of the graph. It also works on a stopped graph: the zero point and the right edge stay where they are and the left edge moves, so the view gets longer or shorter.
 
 ### View
 

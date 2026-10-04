@@ -5,6 +5,20 @@ import { TriggerSource } from "./trigger_source.js";
 // While a graph follows live data, its duration statistics are requested this often.
 const statsIntervalMs = 1000;
 
+/**
+ * Moves the start of a frozen view when the pre-trigger time changes, the way a live view does: the zero
+ * point and the right edge stay where they are, and the left edge moves with the pre-trigger time (-10 ms
+ * starts the view 10 ms before the zero point), so the view gets longer or shorter. The view keeps at
+ * least a width of 1 us.
+ * @param {{ startUs: number, widthUs: number }} view
+ * @param {number} deltaUs  the new pre-trigger time minus the previous one
+ */
+export function movePreTriggerOfView(view, deltaUs) {
+    const rightUs = view.startUs + view.widthUs;
+    view.startUs = Math.min(view.startUs + deltaUs, rightUs - 1);
+    view.widthUs = rightUs - view.startUs;
+}
+
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -456,7 +470,14 @@ export class Graph {
     }
 
     setPreTrigger(milliseconds) {
+        const previousUs = this.triggerSource.getPreTriggerUs();
         this.triggerSource.setPreTriggerUs(milliseconds * 1000);
+
+        // a frozen view does not follow the trigger source, so its start moves here
+        if (this.manualView) {
+            movePreTriggerOfView(this.manualView, milliseconds * 1000 - previousUs);
+            this.#updateManualViewData();
+        }
     }
 
     // the settings that are saved in a profile
