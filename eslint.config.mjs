@@ -5,7 +5,8 @@ export default [
   {
     ignores: [
       "node_modules/**",
-      "venv/**"
+      "venv/**",
+      "dist/**"     // the output of obfuscate.bat, generated code
     ]
   },
   js.configs.recommended,
