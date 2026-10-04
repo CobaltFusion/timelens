@@ -297,11 +297,17 @@ export class BarStack {
             this.ctx.fillRect(x1, y, width, line.height);
         }
 
+        // A bar can start before the left edge or end after the right edge of the graph, only the part
+        // that is visible can show text: it is measured and centered within that part.
+        const visibleX1 = Math.max(x1, 0);
+        const visibleX2 = Math.min(x2, this.areaWidthPx ?? Infinity);
+        const visibleWidth = visibleX2 - visibleX1;
+
         if (getSettings().isDebuggingEnabled()) {
-            this.drawTextOnBar(`${event.count} = ${event.name}`, x1, width, y, line.height, durationUs);
+            this.drawTextOnBar(`${event.count} = ${event.name}`, visibleX1, visibleWidth, y, line.height, durationUs);
         }
         else {
-            this.drawTextOnBar(`${event.name}`, x1, width, y, line.height, durationUs);
+            this.drawTextOnBar(`${event.name}`, visibleX1, visibleWidth, y, line.height, durationUs);
         }
 
         const isHovered =
