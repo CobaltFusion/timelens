@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from timelens.event_filter import EventFilter
 from timelens.logwatcher import LogWatcher
+from timelens.names import Names, is_metadata
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
 from timelens.span_store import RISING, SpanStore, make_duration_test
@@ -33,6 +34,7 @@ class Server:
         self.peer_discovery = None
         self.store = SpanStore()
         self.profiles = ProfileStore()
+        self.names = Names()    # names of processes and threads, from the metadata events
         self.watches = {}   # websocket -> {triggerId: (matcher, edge, duration test or None)}
         self.filters = {}   # websocket -> EventFilter, clients without a filter get every span
         self.count = 0
@@ -68,6 +70,13 @@ class Server:
 
         if evt is None:
             return  # an empty line or a bracket
+
+        # the name of a process or thread is not an event, the clients get it to show it with the events
+        if is_metadata(evt):
+            change = self.names.add(evt)
+            if change is not None:
+                await self.broadcast_message(Names.message(change))
+            return
 
         evt["source"] = os.path.basename(path)
 
@@ -144,6 +153,16 @@ class Server:
 
         for ws in dead:
             self.forget(ws)
+
+    # Sends 'message' as it is to every client, for messages that are the same for all of them.
+    async def broadcast_message(self, message):
+        data = json.dumps(message)
+        for ws in list(self.clients):
+            try:
+                await ws.send_text(data)
+            except Exception:
+                logger.exception("Failed to send to WebSocket")
+                self.forget(ws)
 
     def forget(self, websocket):
         self.clients.discard(websocket)
@@ -284,6 +303,9 @@ class Server:
 
         await websocket.accept()
         self.clients.add(websocket)
+
+        # the names of the processes and threads that are known, later ones are broadcast
+        await websocket.send_text(json.dumps(self.names.snapshot()))
 
         try:
             while True:

@@ -31,6 +31,19 @@ An event can also be written as a single line, a *complete event* with `ph: "X"`
 
 The browser keeps the last minute of events.
 
+### Names of processes and threads
+
+A line with `"ph": "M"` (or `"cat": "__metadata"`) is not an event: it gives a name to a process or a thread. `process_name` names the `pid` and `thread_name` names the `tid`, in `args.name`:
+
+```json
+{ "args": {"name": "pylon_gevmgr"}, "name": "process_name", "cat": "__metadata", "ph": "M", "pid": 1028534, "tid": 0, "ts": 0 },
+{ "args": {"name": "worker 1"}, "name": "thread_name", "cat": "__metadata", "ph": "M", "pid": 1028534, "tid": 7, "ts": 0 },
+```
+
+The names are shown behind the pid and tid in the hover of an event, for example `pid: 1028534 (pylon_gevmgr)` and `tid: 7 (worker 1)`. They are not drawn as events and not counted in the statistics. A thread name belongs to the pid and tid together, a process name to the pid in all files. If a name is given again, the last one is used, and other kinds of metadata (like `process_sort_index`) are ignored.
+
+A program writes its names at the start of its file. For a very large file the server only reads the end, but it also reads the metadata lines at the start of the file (up to the first line that is an event), so the names are not lost. A name that is written later in a large file, before the part that is read, is not found.
+
 ## The top bar
 
 | Control | What it does |
@@ -226,4 +239,4 @@ python -m timelens.summary [path ...] [--name PATTERN] [--sort total|count|mean|
 - **--format:** `csv` and `json` give the durations in microseconds, to use in a spreadsheet or a script. The totals line then goes to the error output, so the data stays clean.
 - **--no-percentiles:** the percentiles need 8 bytes of memory per event, a file with hundreds of millions of events does not fit in memory with them.
 
-A line that is not a JSON object is skipped and counted below the table, as are events without a time and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
+Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.

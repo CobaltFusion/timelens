@@ -839,6 +839,7 @@ export class Graph {
         bars.areaHeightPx = this.graphHeightPx;
 
         bars.durationStats = this.durationStats;
+        bars.names = this.collector;
 
         // The server pairs the begin and end of an event into one span, so this only sorts the
         // spans per thread. Only spans that overlap the view are added to the bars, so threads and

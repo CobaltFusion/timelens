@@ -70,6 +70,8 @@ export class BarStack {
         this.beginTime = Infinity;
         this.hover = null;   // the hover shows the offset from the zero-point
         this.durationStats = new Map();   // name -> { count, min, max, mean, m2 }, filled by the caller
+        /** @type {{ getProcessName(pid: number): string | undefined, getThreadName(pid: number, tid: number): string | undefined }} */
+        this.names = { getProcessName: () => undefined, getThreadName: () => undefined };   // filled by the caller
         this.areaWidthPx = undefined;
         this.areaHeightPx = undefined;
     }
@@ -204,6 +206,11 @@ export class BarStack {
         );
     }
 
+    // " (name)" to show behind a pid or tid, nothing without a name
+    nameSuffix(name) {
+        return name ? ` (${name})` : "";
+    }
+
     drawTooltip(hover) {
         const event = hover.event;
         const offsetMs = (event.timestamp - this.zeroPointUs) / 1000;
@@ -215,8 +222,8 @@ export class BarStack {
             { text: `offset:   ${offsetMs.toFixed(3)} ms`, ...textFont },
             { text: `duration: ${this.formatDuration(hover.durationUs)}${event.type === EventType.OPEN ? " (open)" : ""}`, ...textFont },
             { text: `received: ${this.formatWallTime(event.receivedMs)}`, ...textFont },
-            { text: `pid:      ${event.processId ?? "-"}`, ...textFont },
-            { text: `tid:      ${event.groupId ?? "-"}`, ...textFont }
+            { text: `pid:      ${event.processId ?? "-"}${this.nameSuffix(this.names.getProcessName(event.processId))}`, ...textFont },
+            { text: `tid:      ${event.groupId ?? "-"}${this.nameSuffix(this.names.getThreadName(event.processId, event.groupId))}`, ...textFont }
         ];
 
         const stats = this.durationStats.get(event.name);

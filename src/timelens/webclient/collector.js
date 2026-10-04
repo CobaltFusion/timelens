@@ -67,6 +67,8 @@ export class Collector {
         this.lastTriggerId = 0;
         this.triggerWatches = new Map();    // triggerId -> { pattern, edge, duration, callback(timeUs) }
         this.filterRules = [];              // the filter rules the server applies to everything it sends
+        this.processNames = new Map();      // pid -> name, from the metadata events of the log files
+        this.threadNames = new Map();       // "pid:tid" -> name
 
         // this uses the 'host' where we are loading this application from
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -106,6 +108,18 @@ export class Collector {
                     return;
                 case "trigger":
                     this.triggerWatches.get(data.triggerId)?.callback(data.timeUs);
+                    return;
+                case "names":       // all names the server knows, sent when the connection opens
+                    this.processNames = new Map(data.processes);
+                    this.threadNames = new Map(data.threads.map(([pid, tid, name]) => [`${pid}:${tid}`, name]));
+                    return;
+                case "name":        // a name that is new or has changed
+                    if (data.kind === "process") {
+                        this.processNames.set(data.pid, data.name);
+                    }
+                    else {
+                        this.threadNames.set(`${data.pid}:${data.tid}`, data.name);
+                    }
                     return;
                 default:
                     this.#handleReply(data);
@@ -282,6 +296,16 @@ export class Collector {
             await this.#request({ action: "set_filter", rules });
         }
         this.filterRules = rules;
+    }
+
+    /** The name of a process, from the 'process_name' metadata event of the log files, undefined if it has none. */
+    getProcessName(pid) {
+        return this.processNames.get(pid);
+    }
+
+    /** The name of a thread, from the 'thread_name' metadata event of the log files, undefined if it has none. */
+    getThreadName(pid, tid) {
+        return this.threadNames.get(`${pid}:${tid}`);
     }
 
     /**

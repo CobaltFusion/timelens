@@ -10,6 +10,9 @@ from pathlib import Path
 
 from watchfiles import awatch
 
+from timelens.names import is_metadata
+from timelens.vson import parse_line
+
 logger = logging.getLogger(__name__)
 
 # An existing file is read from about 'history_us' before its newest event, the start is
@@ -18,6 +21,9 @@ TAIL_STEP_BYTES = 1 << 20
 
 # Same as the retention of the span store.
 DEFAULT_HISTORY_US = 30 * 60 * 1_000_000
+
+# At most this many lines at the start of a file are looked at for metadata, see '_metadata_head()'.
+MAX_HEAD_LINES = 1000
 
 
 # The 'ts' of a line of a log file, None if it has none or is not a complete event.
@@ -161,11 +167,35 @@ class LogWatcher:
                     return found[0]
             return 0
 
+    # The metadata lines (names of the process and its threads) a program writes at the start of its file, up
+    # to the first line that is an event. They are needed when the start of a big file is skipped.
+    @staticmethod
+    def _metadata_head(path):
+        lines = []
+        with path.open("r", encoding="utf8", errors="replace") as f:
+            for _ in range(MAX_HEAD_LINES):
+                line = f.readline()
+                if not line:
+                    break
+                try:
+                    evt = parse_line(line)
+                except ValueError:
+                    break
+                if evt is None:
+                    continue    # a bracket or an empty line
+                if not is_metadata(evt):
+                    break
+                lines.append(line)
+        return lines
+
     async def _tail_file(self, path):
         try:
             offset = self._tail_offset(path)
             if offset > 0:
                 logger.info("Skipping the first %d bytes of %s", offset, path)
+                # the skipped part has the names of the process and threads, keep those
+                for line in self._metadata_head(path):
+                    await self.callback(line, str(path))
 
             with path.open("r", encoding="utf8") as f:
                 # 'offset' is at the start of a line, so it is also a valid position in text mode

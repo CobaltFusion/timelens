@@ -23,6 +23,7 @@ import time
 from array import array
 from pathlib import Path
 
+from timelens.names import is_metadata
 from timelens.vson import default_log_directory, find_log_files, parse_line
 from timelens.wildcard import make_wildcard_matcher
 
@@ -48,6 +49,9 @@ class Pairer:
 
     # Returns (name, pid, tid, begin, end) when the event closes a span, otherwise None.
     def add(self, evt):
+        if is_metadata(evt):
+            return None     # the name of a process or thread, not an event
+
         ph = evt.get("ph")
         ts = evt["ts"]
         thread = (evt.get("source"), evt.get("pid"), evt.get("tid"))
@@ -157,6 +161,9 @@ class Summarizer:
         self.events_without_time = 0    # events without a numeric 'ts'
 
     def add_event(self, evt):
+        if is_metadata(evt):
+            return      # not an event: the names of processes and threads, they are not summarized
+
         ts = evt.get("ts")
         if not is_number(ts):
             self.events_without_time += 1

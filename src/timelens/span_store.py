@@ -5,6 +5,8 @@ from __future__ import annotations
 import bisect
 import logging
 
+from timelens.names import is_metadata
+
 logger = logging.getLogger(__name__)
 
 # Spans that began more than this before the newest span are dropped.
@@ -54,6 +56,9 @@ class SpanStore:
     # Adds a raw event. Returns (span, edges), the new or closed span and the
     # [(edge, time_us)] it caused. An 'E' without an open span returns (None, []).
     def add(self, evt):
+        if is_metadata(evt):
+            return None, []     # the name of a process or thread, not an event, see 'names.py'
+
         ph = evt.get("ph")
         ts = evt["ts"]
         thread = (evt.get("source"), evt.get("pid"), evt.get("tid"))
