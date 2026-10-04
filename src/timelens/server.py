@@ -5,9 +5,10 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, Response
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from timelens import speedtest
 from timelens.event_filter import EventFilter
 from timelens.logwatcher import LogWatcher
 from timelens.names import Names, is_metadata
@@ -41,9 +42,16 @@ class Server:
 
         self.app = FastAPI(lifespan=self.lifespan)
 
+        # one middleware for all headers, every middleware copies the chunks of the streaming responses
         @self.app.middleware("http")
-        async def disable_cache(request: Request, call_next):
-            response = await call_next(request)
+        async def add_headers(request: Request, call_next):
+            # the browser asks what a page from another origin may do with the speed test before it uploads
+            if request.method == "OPTIONS" and request.url.path.startswith(speedtest.PATH_PREFIX):
+                response = Response(status_code=204)
+            else:
+                response = await call_next(request)
+            response.headers.update(speedtest.cors_headers(request.url.path, request.method))
+
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
@@ -58,6 +66,9 @@ class Server:
         self.app.get("/api/profiles/{name}")(self.get_profile)
         self.app.put("/api/profiles/{name}")(self.put_profile)
         self.app.delete("/api/profiles/{name}")(self.delete_profile)
+        self.app.get("/api/speedtest/ping")(self.speedtest_ping)
+        self.app.get("/api/speedtest/download")(self.speedtest_download)
+        self.app.post("/api/speedtest/upload")(self.speedtest_upload)
         self.app.mount("/", StaticFiles(directory="webclient", html=True), name="webclient")
 
     async def handle_line(self, line, path):
@@ -349,6 +360,29 @@ class Server:
     async def servers(self):
         peers = await self.peer_discovery.discover()
         return JSONResponse({"servers": peers})
+
+    # The speed test: the page of any machine measures the latency and the bandwidth to this server.
+
+    async def speedtest_ping(self):
+        return Response(status_code=204)
+
+    # exactly 'bytes' bytes of random data
+    async def speedtest_download(self, size: str | None = Query(None, alias="bytes")):
+        try:
+            total = speedtest.parse_bytes(size)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+
+        return StreamingResponse(speedtest.download_chunks(total), media_type="application/octet-stream",
+                                 headers={"Content-Length": str(total)})
+
+    # reads the whole body and tells how many bytes it had
+    async def speedtest_upload(self, request: Request):
+        try:
+            count = await speedtest.count_upload(request.stream())
+        except speedtest.TooLarge as exc:
+            return JSONResponse({"error": str(exc)}, status_code=413)
+        return JSONResponse({"bytes": count})
 
     async def list_profiles(self):
         return JSONResponse({"profiles": self.profiles.list(), "default": DEFAULT_PROFILE})

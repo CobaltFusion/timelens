@@ -1,0 +1,134 @@
+/* The speed test page, the colors and the base styles are those of index.css */
+
+.actions {
+    display: flex;
+    gap: .5rem;
+    margin: 0 0 1rem;
+}
+
+.button {
+    padding: .4rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: .4rem;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    font-size: .85rem;
+    transition: .15s;
+}
+
+.button:hover:not(:disabled) {
+    background: var(--hover);
+    border-color: var(--accent);
+}
+
+.button:disabled {
+    cursor: default;
+    opacity: .45;
+}
+
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border);
+    border-radius: .6rem;
+    background: var(--card);
+    overflow: hidden;
+}
+
+th,
+td {
+    padding: .6rem .8rem;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+th {
+    color: var(--muted);
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+/* the second row of the header, the three parts of the latency */
+thead tr+tr th {
+    padding-top: 0;
+}
+
+.left {
+    text-align: left;
+}
+
+/* the server that the page was opened for, by the link in the server list */
+tr.selected>td {
+    background: var(--hover);
+}
+
+tr.selected>td:first-child {
+    box-shadow: inset 3px 0 var(--accent);
+}
+
+/* 'Keep running until Stop', next to the buttons */
+.keep {
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    margin-left: .5rem;
+    color: var(--muted);
+    font-size: .85rem;
+    cursor: pointer;
+}
+
+.keep input {
+    accent-color: var(--accent);
+}
+
+/* the guess of the line: its name, and the part of it that the speeds use */
+td.line .guess {
+    display: block;
+    font-weight: 650;
+}
+
+td.line .share {
+    display: block;
+    color: var(--muted);
+    font: .8rem monospace;
+}
+
+td.number {
+    font: .9rem monospace;
+}
+
+td.status {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+td.status.failed {
+    color: var(--error);
+}
+
+td .name,
+td .value {
+    display: block;
+}
+
+.note {
+    margin: 1rem 0 0;
+    font-size: .85rem;
+}
+
+@media (max-width: 700px) {
+    table {
+        display: block;
+        overflow-x: auto;
+    }
+}

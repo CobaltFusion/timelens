@@ -2,6 +2,9 @@ import { assert } from "./assertions.js";
 import { EventType } from "./globals.js";
 import { getSettings } from "./globals.js";
 
+// An event that has not ended is drawn as long as this fraction of the time that it is estimated to be open.
+const openEventFraction = 0.5;
+
 class Line {
     constructor(y) {
         this.y = y;
@@ -291,9 +294,13 @@ export class BarStack {
 
         const color = event.color ?? getColor(event.name);
         if (event.type === EventType.OPEN) {
-            x2 = Math.round((this.endPointUs - this.startPointUs) * this.scale);
+            // The event grows up to the estimated time, but is drawn only half as long: the end of an
+            // event can arrive late, and a bar that is drawn too long would shrink when it does.
+            const estimatedUs = Math.max(0, this.endPointUs - event.timestamp);
+            const barEndUs = event.timestamp + estimatedUs * openEventFraction;
+            x2 = Math.round((barEndUs - this.startPointUs) * this.scale);
             width = x2 - x1;
-            durationUs = this.endPointUs - event.timestamp;
+            durationUs = estimatedUs;       // the hover shows how long it has been open, as far as we know
             const gradient = this.ctx.createLinearGradient(x1, 0, x2, 0);
             gradient.addColorStop(0, color);
             gradient.addColorStop(0.75, color);

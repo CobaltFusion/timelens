@@ -127,6 +127,12 @@ Every thread (`tid`) has a row in the graph, and events of the same thread that 
 
 The column is 160 pixels wide and is left out when the graph is narrower than about 420 pixels, to leave room for the graph itself.
 
+### Events that have not ended
+
+An event that has begun but has not ended yet grows in the graph, with a fading end. Its length is estimated from the time of the last event that arrived plus the time that has passed since, and the bar is drawn only **half** as long as that estimate. The end of an event can arrive late, and a bar that is drawn too long would shrink when it does. When the end arrives, the bar gets its real length. The hover of an event that is still open shows the full estimate and `(open)`.
+
+An event that has been open for a long time is therefore drawn only up to half of the time it has been open, so one that has been open for more than twice the width of the graph is no longer in the view.
+
 ### Measuring
 
 - **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)).
@@ -246,3 +252,44 @@ python -m timelens.summary [path ...] [--name PATTERN] [--sort total|count|mean|
 - **--no-percentiles:** the percentiles need 8 bytes of memory per event, a file with hundreds of millions of events does not fit in memory with them.
 
 Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
+
+## Speed test
+
+The speed test measures the **latency** and the **bandwidth** between this browser and a TimeLens server, for example to see whether the network is good enough to follow a server on another machine.
+
+The page (`speedtest.html`) lists **all** the servers that were discovered. **Speed test** at the end of a server's row in the server list (`index.html`) opens the page with that server highlighted (`speedtest.html?server=address:port`), so you can test it right away with its own **Test** button. If that server was not discovered, it is added to the table, so it can be tested too.
+
+Nothing is sent until you press a button: **Test all** starts every server in the table at the same time, **Test** on a row starts that server alone, and **Stop** (or **Stop** on a row) ends the tests that are running. A server that cannot be reached shows `no answer from the server` and does not stop the others.
+
+For every server the table shows:
+
+| Column | Meaning |
+|---|---|
+| Latency **min**, **avg**, **max** | The shortest, average and longest round trip, in milliseconds, of small requests that are made one after the other. A test makes 20 of them, and a first request that opens the connection is not counted. |
+| **Download** | MB/s from the server to this browser. |
+| **Upload** | MB/s from this browser to the server. |
+| **Line speed (guess)** | A guess of the speed of the network connection, and how much of it the download and the upload use. See below. |
+
+A megabyte (MB) is 1024 × 1024 bytes, so 100 MB/s is a little more than 800 megabit/s.
+
+### One test
+
+A server is measured in three steps, one after the other, so they do not disturb each other: the latency, then the download, then the upload. The download and the upload start with 1 MB, and the next ones are sized from the speed of the one before, until one takes about one and a half seconds. The speed of that last one is shown. A request is never more than 256 MB, so on a very fast network that is the most that is sent. On a fast network, a test sends hundreds of megabytes in each direction.
+
+### Keep running until Stop
+
+With **Keep running until Stop** ticked, **Test** and **Test all** do not stop after one round: they go on, round after round, until you press **Stop**. A round is five round trips while the line is quiet, then a download of about a second, then an upload of about a second. The table shows the **average of the last 20 seconds**, so you see the speed and the latency change when something else uses the connection, and an old measurement goes out of the average after 20 seconds. The status shows how much of the 20 seconds has been measured yet (`running, average of the last 14 s`). A speed is the bytes of all the runs in the last 20 seconds divided by the time of all those runs. The latency min, avg and max are those of the round trips in the last 20 seconds. After **Stop** the last values stay in the table. The box can only be changed while nothing runs.
+
+### Line speed (guess)
+
+From the best speed that was measured, the page guesses the speed of the network connection: **10 Mbps**, **100 Mbps**, **1 Gbps**, **2.5 Gbps**, **5 Gbps** or **10 Gbps**. It takes the slowest of these that can carry the best of the download and the upload speed. A line cannot carry data at its full speed, because the headers of TCP, IP and Ethernet take about 5%, so a line carries at most 94.9% of its speed as data: about 113 MB/s for 1 Gbps, 11.3 MB/s for 100 Mbps. A speed above that of 10 Gbps is shown as `> 10 Gbps`: the server is probably on the computer of the browser, where the data does not go through a network.
+
+Under the guess are the percentages of the download and the upload, **of the speed of the line**: with the guess `1 Gbps`, a download of 100 MB/s shows `down 84%`, because 100 MB/s is 839 Mbit/s of 1000 Mbit/s. Hover over it to see the speed that the guess is made from and the highest MB/s of that line. While a test keeps running, the guess is made from the best average of the last 20 seconds that was measured, and the percentages are of the current averages.
+
+It is a guess. The best speed can be low for another reason than the line: a slow computer or server (the server of TimeLens itself delivers about 260 MB/s), other traffic on the connection, or servers that are tested at the same time and share it. The line then looks slower than it is. The page can only see how much was carried, not how much the line could carry: when the best speed is 50 MB/s (419 Mbit/s) on a line of 10 Gbps, the guess is 1 Gbps. Test one server at a time for the best guess.
+
+### Several servers
+
+Servers that are tested at the same time share the connection of this computer, so each of them shows less than it would alone: to measure the maximum speed to a server, test that server alone. The latency of the servers that run together can also be a little higher, for the same reason.
+
+The test is between **this browser** and the server: the page asks the server directly, also when the server is on another machine, and not through the server that served the page.

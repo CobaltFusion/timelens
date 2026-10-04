@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TimeLens Speed Test</title>
+
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="speedtest.css">
+</head>
+
+<body>
+    <main>
+        <header>
+            <p id="id_timelens">
+                TimeLens
+            </p>
+            <a class="header-link" href="index.html" title="Back to the servers that were discovered">Server list</a>
+        </header>
+
+        <p>Latency and bandwidth between this browser and the servers. A megabyte (MB) is 1024 &times; 1024 bytes.</p>
+
+        <div class="actions">
+            <button id="id_test_all" class="button"
+                title="Test all servers at the same time">Test all</button>
+            <button id="id_stop" class="button" title="Stop the tests that are running" disabled>Stop</button>
+            <label class="keep"
+                title="Keep testing until Stop is pressed. The results are then the average of the last 20 seconds">
+                <input type="checkbox" id="id_keep_running"> Keep running until Stop
+            </label>
+        </div>
+
+        <div id="id_message" class="empty">Discovering servers...</div>
+
+        <table id="id_results" hidden>
+            <thead>
+                <tr>
+                    <th rowspan="2" class="left">Server</th>
+                    <th colspan="3" title="The round trip of small requests: 20 for one test, those of the last 20 seconds when it keeps running">Latency (ms)</th>
+                    <th rowspan="2" title="From the server to this browser. The average of the last 20 seconds when it keeps running">Download (MB/s)</th>
+                    <th rowspan="2" title="From this browser to the server. The average of the last 20 seconds when it keeps running">Upload (MB/s)</th>
+                    <th rowspan="2" class="left"
+                        title="A guess of the speed of the network connection from the best speed, and the part of that speed that the download and the upload use">
+                        Line speed (guess)</th>
+                    <th rowspan="2" class="left">Status</th>
+                    <th rowspan="2"></th>
+                </tr>
+                <tr>
+                    <th title="The fastest of the requests">min</th>
+                    <th title="The average of the requests">avg</th>
+                    <th title="The slowest of the requests">max</th>
+                </tr>
+            </thead>
+            <tbody id="id_servers"></tbody>
+        </table>
+
+        <p class="note">Servers that are tested at the same time share the connection of this computer. To measure the
+            maximum speed to one server, test that server alone.</p>
+        <p class="note">With <em>Keep running until Stop</em> the results are the average of the last 20 seconds. The line
+            speed is a guess from the best speed that was measured, so a slow computer or server, or other traffic,
+            makes the line look slower than it is.</p>
+    </main>
+
+    <script type="module" src="speedtest.js"></script>
+</body>
+
+</html>
