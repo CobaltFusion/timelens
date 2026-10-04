@@ -593,3 +593,17 @@ button:focus-visible {
     padding-right: 0.5rem;
     padding-left: 0.5rem;
 }
+
+/* The edge button: the signal is dimmed, the edge and its arrow head are in the accent color */
+.edge-icon .edge-signal {
+    opacity: 0.55;
+}
+
+.edge-icon .edge-line {
+    stroke: var(--accent);
+}
+
+.edge-icon .edge-head {
+    fill: var(--accent);
+    stroke: var(--accent);
+}

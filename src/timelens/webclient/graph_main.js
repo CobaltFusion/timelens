@@ -335,18 +335,22 @@ class Main {
                 value: TriggerEdge.RISING,
                 label: "Rising edge",
                 icon: `
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M2 17 H8 V7 H22"
+                    <svg class="edge-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path class="edge-signal" d="M2 19 H9 V5 H22"
                               fill="none"
                               stroke="currentColor"
                               stroke-width="2"
                               stroke-linecap="round"
                               stroke-linejoin="round"/>
-                        <path d="M6 10 L8 7 L10 10"
+                        <path class="edge-line" d="M9 19 V8"
                               fill="none"
                               stroke="currentColor"
-                              stroke-width="1.5"
-                              stroke-linecap="round"
+                              stroke-width="3"
+                              stroke-linecap="round"/>
+                        <path class="edge-head" d="M9 2.5 L4.5 9.5 H13.5 Z"
+                              fill="currentColor"
+                              stroke="currentColor"
+                              stroke-width="1"
                               stroke-linejoin="round"/>
                     </svg>
                 `
@@ -355,18 +359,22 @@ class Main {
                 value: TriggerEdge.FALLING,
                 label: "Falling edge",
                 icon: `
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M2 7 H8 V17 H22"
+                    <svg class="edge-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path class="edge-signal" d="M2 5 H9 V19 H22"
                               fill="none"
                               stroke="currentColor"
                               stroke-width="2"
                               stroke-linecap="round"
                               stroke-linejoin="round"/>
-                        <path d="M6 14 L8 17 L10 14"
+                        <path class="edge-line" d="M9 5 V16"
                               fill="none"
                               stroke="currentColor"
-                              stroke-width="1.5"
-                              stroke-linecap="round"
+                              stroke-width="3"
+                              stroke-linecap="round"/>
+                        <path class="edge-head" d="M9 21.5 L4.5 14.5 H13.5 Z"
+                              fill="currentColor"
+                              stroke="currentColor"
+                              stroke-width="1"
                               stroke-linejoin="round"/>
                     </svg>
                 `
