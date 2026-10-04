@@ -24,6 +24,7 @@ body {
     min-height: 100vh;
     margin: 0;
     padding: var(--page-padding);
+    padding-top: var(--top-bar-space);
     background:
         radial-gradient(circle at 12% 0%,
             rgba(42, 116, 184, 0.22),
@@ -43,7 +44,7 @@ body {
     flex-wrap: wrap;
     align-items: center;
     position: relative;
-    margin: 0 0 var(--page-padding);
+    margin: 0 0 var(--top-bar-space);
     padding-left: 1rem;
     gap: 0.65rem;
     color: var(--muted);
@@ -410,7 +411,7 @@ button:focus-visible {
 
 .traffic-indication {
     width: 160px;
-    height: 36px;
+    height: var(--indicator-height);
     display: block;
     box-sizing: border-box;
     color: var(--accent);
@@ -434,7 +435,7 @@ button:focus-visible {
 
 .health-indication {
     width: 160px;
-    height: 36px;
+    height: var(--indicator-height);
     display: block;
     cursor: pointer;
     box-sizing: border-box;
@@ -620,6 +621,18 @@ button:focus-visible {
    the same height. The value is the height the inputs always had, the buttons used to be taller. */
 :root {
     --control-height: 1.75rem;
+
+    /* the height of the traffic and health indicators of the top bar, 'Connected' and 'Server list' match it */
+    --indicator-height: 36px;
+
+    /* From the outer edge of a graph's container to its first controls: the border (1px), the top
+       padding of the container (7px) and the padding of the control bar. */
+    --control-inset: calc(8px + 0.4rem);
+
+    /* The space above and below the top bar. The buttons of the top bar are centered in a row as high as
+       the indicators, so with this space they are as far from the top of the screen, and from the first
+       graph, as the buttons of a control bar are from the top of its container. */
+    --top-bar-space: calc(var(--control-inset) - (var(--indicator-height) - var(--control-height)) / 2);
 }
 
 .control-panel .control-button,
@@ -631,6 +644,19 @@ button:focus-visible {
 
 .control-panel .control-button,
 .top-panel .control-button {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* 'Connected' and 'Server list' are as high as the indicators next to them */
+.top-panel .connection-status {
+    height: var(--indicator-height);
+}
+
+.top-panel .home-link {
+    display: flex;
+    align-items: center;
+    height: var(--indicator-height);
     padding-top: 0;
     padding-bottom: 0;
 }
