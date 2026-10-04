@@ -99,7 +99,8 @@ body {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.65rem;
-    margin-bottom: 0.4rem;
+    /* no gap here: the graph canvas has its own margin, see '.graph-panel>.resizable-container' */
+    margin-bottom: 0;
     padding: 0.4rem;
     background: var(--panel);
     box-shadow:
@@ -228,6 +229,10 @@ button:focus-visible {
     min-width: 18rem;
     min-height: 218px;
     padding: 0.45rem;
+    /* The space between the border and the controls is the same as between the controls and the graph. The
+       canvas keeps a margin of 8px around the graph area ('marginPx' in graph.js), of which the 1px border
+       of the graph area is the last pixel, so 7px of it is empty. */
+    padding-top: 7px;
     resize: both;
     border-color: var(--panel-border);
     background: var(--panel);
@@ -606,4 +611,21 @@ button:focus-visible {
 .edge-icon .edge-head {
     fill: var(--accent);
     stroke: var(--accent);
+}
+
+/* The buttons and the text inputs of a graph's control bar all have the same height. The value is
+   the height the inputs always had, the buttons used to be taller. */
+.control-panel {
+    --control-height: 1.75rem;
+}
+
+.control-panel .control-button,
+.control-panel .control-input {
+    height: var(--control-height);
+    min-height: 0;
+}
+
+.control-panel .control-button {
+    padding-top: 0;
+    padding-bottom: 0;
 }
