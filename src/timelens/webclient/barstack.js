@@ -232,11 +232,13 @@ export class BarStack {
             { text: `tid:      ${event.groupId ?? "-"}${this.nameSuffix(this.names.getThreadName(event.processId, event.groupId))}`, ...textFont }
         ];
 
+        // the statistics of all events with this name, apart from the other lines: see below
+        const statLines = [];
         const stats = this.durationStats.get(event.name);
         if (stats && stats.count > 0) {
             // sample standard deviation, undefined for a single sample
             const stddev = stats.count > 1 ? this.formatDuration(Math.sqrt(stats.m2 / (stats.count - 1))) : "-";
-            lines.push(
+            statLines.push(
                 { text: `samples:  ${stats.count}`, ...textFont },
                 { text: `min:      ${this.formatDuration(stats.min)}`, ...textFont },
                 { text: `max:      ${this.formatDuration(stats.max)}`, ...textFont },
@@ -245,20 +247,28 @@ export class BarStack {
             );
         }
 
-        // Measure text size
         const padding = 8;
-        const textWidth = Math.max(...lines.map(line => {
+        const columnGap = 16;
+        const dpr = window.devicePixelRatio || 1;
+        const canvasWidth = this.areaWidthPx ?? this.ctx.canvas.width / dpr;
+        const canvasHeight = this.areaHeightPx ?? this.ctx.canvas.height / dpr;
+
+        const heightOf = (/** @type {Array<{height: number}>} */ column) => column.reduce((height, line) => height + line.height, 0);
+        const widthOf = (/** @type {Array<{font: string, text: string}>} */ column) => Math.max(...column.map(line => {
             this.ctx.font = line.font;
             return this.ctx.measureText(line.text).width;
         }));
 
-        const tooltipWidth = textWidth + padding * 2;
-        const tooltipHeight = lines.reduce((height, line) => height + line.height, 0) + padding;
+        // The statistics are the last lines, a tooltip that does not fit in the graph is cut off at the bottom and they
+        // would be gone: then they get a column of their own, next to the other lines.
+        const oneColumn = [...lines, ...statLines];
+        const columns = heightOf(oneColumn) + padding <= canvasHeight || statLines.length === 0 ? [oneColumn] : [lines, statLines];
+
+        const columnWidths = columns.map(widthOf);
+        const tooltipWidth = columnWidths.reduce((sum, width) => sum + width, 0) + columnGap * (columns.length - 1) + padding * 2;
+        const tooltipHeight = Math.max(...columns.map(heightOf)) + padding;
 
         // Position near the mouse, but keep the tooltip inside the graph.
-        const dpr = window.devicePixelRatio || 1;
-        const canvasWidth = this.areaWidthPx ?? this.ctx.canvas.width / dpr;
-        const canvasHeight = this.areaHeightPx ?? this.ctx.canvas.height / dpr;
 
         const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
         const ty = Math.max(0, Math.min(this.mouseY - 24, canvasHeight - tooltipHeight));
@@ -275,12 +285,16 @@ export class BarStack {
         this.ctx.fillStyle = "#00ff88";
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "middle";
-        let lineY = ty + padding / 2;
-        for (const line of lines) {
-            this.ctx.font = line.font;
-            this.ctx.fillText(line.text, tx + padding, lineY + line.height / 2);
-            lineY += line.height;
-        }
+        let columnX = tx + padding;
+        columns.forEach((column, index) => {
+            let lineY = ty + padding / 2;
+            for (const line of column) {
+                this.ctx.font = line.font;
+                this.ctx.fillText(line.text, columnX, lineY + line.height / 2);
+                lineY += line.height;
+            }
+            columnX += columnWidths[index] + columnGap;
+        });
     }
 
     // Draws the bar with its text, and remembers it for the tooltip if the mouse is over it.

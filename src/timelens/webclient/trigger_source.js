@@ -167,8 +167,19 @@ export class TriggerSource {
         if (!this.running && this.stoppedRange) {
             return this.stoppedRange;
         }
-        const bufferBeginUs = this.collector.getLastTimepointUs() - this.bufferedHistoryUs;
-        return { beginUs: Math.max(this.searchStartPointUs, bufferBeginUs), endUs: Infinity };
+
+        // From the oldest event that the graph holds. The events of log files can have different clocks, then the
+        // newest time of all events is not a time of the events that are shown, and the statistics of what is shown
+        // would be those of other events. This looks at every event, so it is not for every frame.
+        const data = this.#getInternalDataBuffer();
+        let beginUs = Infinity;
+        for (let i = 0; i < data.length; ++i) {
+            beginUs = Math.min(beginUs, data.at(i).timestamp);
+        }
+        if (beginUs === Infinity) {
+            beginUs = Math.max(this.searchStartPointUs, this.collector.getLastTimepointUs() - this.bufferedHistoryUs);
+        }
+        return { beginUs, endUs: Infinity };
     }
 
     // stops collecting, events after 'endUs' are not included, nor events more than

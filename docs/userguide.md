@@ -137,7 +137,7 @@ An event that has been open for a long time is therefore drawn only up to half o
 
 ### Measuring
 
-- **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)).
+- **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)). The statistics are the last lines of the hover. When the graph is too short for all the lines (less than about 200 pixels), the statistics are shown in a second column next to the other lines, so they are not cut off.
 - **Drag** across the graph to measure the time between two points.
 - Hold **Shift** while dragging to snap the cursor to the begin or end of the event under the mouse.
 
@@ -161,7 +161,7 @@ How they are counted:
 
 The data range depends on the state of the graph:
 
-- **Running:** the last minute, or the time since **SINGLE** was pressed if that is shorter. The statistics update about once per second. **Clear** does not reset them, because it only clears the browser and the server still has the events.
+- **Running:** from the oldest event that the graph holds, which is about the last minute, or the time since **SINGLE** was pressed if that is shorter. It starts at the events that the graph holds, and not at a minute before the newest event of all: log files can have different clocks, and a view that is triggered on events of one clock then still has statistics of those events. The statistics update about once per second. **Clear** does not reset them, because it only clears the browser and the server still has the events.
 - **Stopped, panned or zoomed:** the range the running graph had at the moment it was frozen. They stay the same while you pan and zoom, so they match what you saw just before stopping.
 - **After a SINGLE capture stops:** the captured range.
 

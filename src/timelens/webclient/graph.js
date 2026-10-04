@@ -557,8 +557,7 @@ export class Graph {
 
     // Fits the view to the longest event in the buffered minute, the server finds it.
     async autoSet() {
-        const bufferedHistoryUs = 60 * 1e6;
-        const stats = await this.collector.stats(this.collector.getLastTimepointUs() - bufferedHistoryUs, Infinity);
+        const stats = await this.collector.stats(this.triggerSource.getDataRangeUs().beginUs, Infinity);
         let longestEventUs = 0;
         for (const s of stats.values()) {
             longestEventUs = Math.max(longestEventUs, s.max);
@@ -579,16 +578,17 @@ export class Graph {
         }
 
         const view = this.manualView;
-        const range = view ? view.statsRange : this.triggerSource.getDataRangeUs();
-        const key = `${range.beginUs}:${range.endUs}`;
         const nowMs = performance.now();
 
-        if (this.isRunning()) {
-            if (this.statsPending || nowMs - this.statsRequestedMs < statsIntervalMs) {
-                return;
-            }
+        // while following live data the range looks at all events that are held, that is done once per interval
+        const running = this.isRunning();
+        if (running && (this.statsPending || nowMs - this.statsRequestedMs < statsIntervalMs)) {
+            return;
         }
-        else if (key === this.statsRangeKey) {
+
+        const range = view ? view.statsRange : this.triggerSource.getDataRangeUs();
+        const key = `${range.beginUs}:${range.endUs}`;
+        if (!running && key === this.statsRangeKey) {
             return;
         }
 
