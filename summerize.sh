@@ -20,4 +20,4 @@ source venv/bin/activate
 cd "$SCRIPTDIR/src/timelens"
 echo "Moved to TimeLens directory: $PWD"
 
-./summary.py
+./summary.py "$@"
