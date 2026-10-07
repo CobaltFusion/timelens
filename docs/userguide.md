@@ -46,6 +46,16 @@ The names are shown behind the pid and tid in the hover of an event, for example
 
 A program writes its names at the start of its file. For a very large file the server only reads the end, but it also reads the metadata lines at the start of the file (up to the first line that is an event), so the names are not lost. A name that is written later in a large file, before the part that is read, is not found.
 
+### System telemetry of the server
+
+The server logs the cpu usage, ram usage and cpu temperature of its own machine, once a second, to `telemetry_timelens_<pid>.vson` in the folder it watches. Every sample is a counter event (`"ph": "C"`), with the process name `timelens server`:
+
+```json
+{"name": "system", "ph": "C", "pid": 1234, "tid": 0, "ts": 6383938378031, "args": {"cpu_percent": 12.5, "ram_percent": 41.0, "cpu_temp_c": 54.0}},
+```
+
+`cpu_temp_c` is left out when the temperature can not be read, like on Windows. Set the environment variable `TIMELENS_SYSTEM_INTERVAL` to another number of seconds, or to `0` to turn it off. The server reads the file like any other log, but does not show counters yet; the [command line summary](#command-line-summary) has statistics of them, and the file can be opened in Perfetto or `chrome://tracing`.
+
 ## The top bar
 
 | Control | What it does |
@@ -231,7 +241,7 @@ The filters are part of the profile. **Save** and **Save as default** apply the 
 
 `python -m timelens.summary` prints a statistical summary of the events in the log files, without the server or a browser. It reads the same files as the server (the folder in [Where the data comes from](#where-the-data-comes-from)) but reads each file **once, entirely**, where the server only reads the last 30 minutes of a file. Run it from the project folder with the virtual environment of the project, for example `venv\Scripts\python -m timelens.summary`.
 
-The events are paired into spans as in the graphs: a begin (`B`) with its end (`E`), or a complete event (`X`). The spans are grouped by the combination of **name, pid and tid**, and for every group the table shows:
+The events are paired into spans as in the graphs: a begin (`B`) with its end (`E`), or a complete event (`X`). The spans are grouped by the combination of **name, pid and tid**. The `process` and `thread` columns show the name of the process and thread when the log files give one (see [Names of processes and threads](#names-of-processes-and-threads)), otherwise the pid and tid. For every group the table shows:
 
 | Column | Meaning |
 |---|---|
@@ -242,18 +252,22 @@ The events are paired into spans as in the graphs: a begin (`B`) with its end (`
 | `stddev` | The sample standard deviation, `-` for a single span |
 | `open` | Begins that have no end, for example from an event that was still running when the file ended |
 
+Counter events (`C`, like the [system telemetry](#system-telemetry-of-the-server) of the server) have no duration; they are summarized in a second table, below the spans. Every numeric value in the `args` of a counter is a **series**, per counter name and pid, for example `system` / `cpu_percent` / `timelens server`. The table shows `count`, `min`, `mean`, `p50`, `p95`, `p99`, `max` and `stddev` of the values.
+
 ```
 python -m timelens.summary [path ...] [--name PATTERN] [--sort total|count|mean|max|name] [--top N]
-                           [--format table|csv|json] [--no-percentiles] [--quiet]
+                           [--skip N] [--skip-seconds S] [--format table|csv|json] [--no-percentiles] [--quiet]
 ```
 
 - **path:** one or more `*.vson` files, or folders with them. Without a path the folder of the server is used.
-- **--name:** only groups whose name matches, with the wildcards of the trigger word (case-insensitive, `*` matches any text).
-- **--sort, --top:** the biggest first, by the total time by default, and optionally only the first N groups.
-- **--format:** `csv` and `json` give the durations in microseconds, to use in a spreadsheet or a script. The totals line then goes to the error output, so the data stays clean.
+- **--name:** only groups whose name matches, with the wildcards of the trigger word (case-insensitive, `*` matches any text). A counter series matches by its counter name or its series name, so `cpu` shows `cpu_percent` and `cpu_temp_c`.
+- **--sort, --top:** the biggest first, by the total time by default, and optionally only the first N groups. They are for the spans, the counters are always sorted by name.
+- **--skip:** leaves out the first N spans of every group, and the first N values of every counter series, like the warming up of a program.
+- **--skip-seconds:** leaves out the spans that begin, and the counter values, in the first S seconds, counted from the first event of the first file.
+- **--format:** `csv` and `json` give the durations in microseconds, to use in a spreadsheet or a script. The totals line then goes to the error output, so the data stays clean. In `csv` the counters are a second table after an empty line, in `json` they are in `counters`.
 - **--no-percentiles:** the percentiles need 8 bytes of memory per event, a file with hundreds of millions of events does not fit in memory with them.
 
-Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time, events of another phase than `B`, `E` and `X`, and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
+Metadata lines (names of processes and threads) are not events and are left out. A line that is not a JSON object is skipped and counted below the table, as are events without a time, events of another phase than `B`, `E`, `X` and `C`, and end events without a begin. A file is read at about 20 MB per second, a percentage shows while it is read.
 
 ## Speed test
 

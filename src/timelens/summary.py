@@ -8,6 +8,9 @@ of name, pid and tid, and for every group the durations are summarized: count, t
 percentiles, max and standard deviation. The process and thread are shown by their name when the log
 files give one (a 'process_name' or 'thread_name' metadata event), otherwise by their number.
 
+The counter events ('C', like the cpu usage the server logs) are summarized the same way, per series: a
+numeric value in the 'args' of a counter of a process. A counter has no duration, so its values are used.
+
     python -m timelens.summary [path ...] [--sort total] [--top 20] [--name "proc*"] [--skip 5] [--skip-seconds 10] [--format csv]
 
 A path is a '*.vson' file or a folder with them, by default the folder the server watches.
@@ -28,6 +31,8 @@ from timelens.names import Names, is_metadata
 from timelens.span_store import SPAN_PHASES
 from timelens.vson import default_log_directory, find_log_files, parse_line
 from timelens.wildcard import make_wildcard_matcher
+
+COUNTER_PHASE = "C"
 
 # percentiles shown in the summary, they need the durations of a group in memory (8 bytes per event)
 PERCENTILES = (50, 95, 99)
@@ -121,7 +126,7 @@ def percentile(sorted_values, q):
 class GroupStats:
     """
     The durations (us) of the spans of one group, the mean and variance are updated per span. The first 'skip'
-    spans are not counted, like the warming up of a program.
+    spans are not counted, like the warming up of a program. Also used for the values of a counter series.
     """
 
     def __init__(self, keep_durations, skip=0):
@@ -169,10 +174,10 @@ class GroupStats:
 
 
 class Summarizer:
-    """Reads events and summarizes the spans per group: (name, pid, tid)."""
+    """Reads events and summarizes the spans per group: (name, pid, tid), and the counters per series: (name, key, pid)."""
 
-    # 'skip' is the number of spans at the start of every group that are not counted, and the spans that begin
-    # in the first 'skip_seconds' (from the first event of the first file) are not counted either
+    # 'skip' is the number of spans (or counter values) at the start of every group that are not counted, and
+    # those in the first 'skip_seconds' (from the first event of the first file) are not counted either
     def __init__(self, keep_durations=True, skip=0, skip_seconds=0):
         self.keep_durations = keep_durations
         self.skip = max(skip, 0)
@@ -182,17 +187,21 @@ class Summarizer:
         self.pairer = Pairer()
         self.names = Names()            # the names of the processes and threads, from the metadata events
         self.groups = {}
+        self.counters = {}              # (name, key, pid) -> GroupStats of the values
+        self.counter_events = 0
+        self.early_counter_events = 0   # counter events in the first 'skip_seconds'
         self.files = 0
         self.events = 0
         self.skipped_lines = 0          # lines that are not a JSON object
         self.events_without_time = 0    # events without a numeric 'ts'
-        self.ignored_events = 0         # events of another phase than B, E and X, like counters and instants
+        self.ignored_events = 0         # events of another phase than B, E, X and C, like instants
 
     def add_event(self, evt):
         if is_metadata(evt):
             self.names.add(evt)     # not an event: the name of a process or thread, used to show the groups
             return
-        if evt.get("ph") not in SPAN_PHASES:
+        ph = evt.get("ph")
+        if ph not in SPAN_PHASES and ph != COUNTER_PHASE:
             self.ignored_events += 1
             return
 
@@ -200,9 +209,13 @@ class Summarizer:
         if not is_number(ts):
             self.events_without_time += 1
             return
-        self.events += 1
         if self._start is None:
             self._start = ts
+
+        if ph == COUNTER_PHASE:
+            self._add_counter(evt, ts)
+            return
+        self.events += 1
 
         span = self.pairer.add(evt)
         if span is None:
@@ -234,6 +247,24 @@ class Summarizer:
                     evt["source"] = path.name       # like the server, a thread is per file
                     self.add_event(evt)
 
+    # Every numeric value in the 'args' of a counter event is a sample of its own series.
+    def _add_counter(self, evt, ts):
+        self.counter_events += 1
+        if self._is_early(ts):
+            self.early_counter_events += 1
+            return
+        args = evt.get("args")
+        if not isinstance(args, dict):
+            return
+        name, pid = evt.get("name", ""), evt.get("pid")
+        for key, value in args.items():
+            if is_number(value):
+                stats = self.counters.get((name, key, pid))
+                if stats is None:
+                    stats = GroupStats(self.keep_durations, self.skip)
+                    self.counters[(name, key, pid)] = stats
+                stats.add(value)
+
     # Call when all events are added: the spans that are still open are counted, and the percentiles are made.
     def finish(self):
         for name, pid, tid, begin in self.pairer.open_begins():
@@ -241,12 +272,16 @@ class Summarizer:
                 self.early_spans += 1
             else:
                 self._group((name, pid, tid)).open += 1
-        for stats in self.groups.values():
+        for stats in (*self.groups.values(), *self.counters.values()):
             stats.finish()
 
     @property
     def skipped_spans(self):
         return sum(stats.skipped for stats in self.groups.values())
+
+    @property
+    def skipped_counter_values(self):
+        return sum(stats.skipped for stats in self.counters.values())
 
     @property
     def unmatched_ends(self):
@@ -266,6 +301,20 @@ class Summarizer:
             row.update({"max_us": stats.max_us, "stddev_us": stats.stddev_us, "open": stats.open})
             rows.append(row)
         return rows
+
+    def counter_rows(self):
+        """One dict per counter series, the process is a name or a number."""
+        rows = []
+        for (name, key, pid), stats in self.counters.items():
+            row = {
+                "name": name, "series": key, "process": self.process_of(pid), "count": stats.count,
+                "min": stats.min_us, "mean": stats.mean_us if stats.count else None,
+            }
+            for q in PERCENTILES:
+                row[f"p{q}"] = stats.percentiles.get(q)
+            row.update({"max": stats.max_us, "stddev": stats.stddev_us})
+            rows.append(row)
+        return sorted(rows, key=lambda row: (str(row["name"]), str(row["series"]), str(row["process"])))
 
     # the name of a process, or its pid when it has no name
     def process_of(self, pid):
@@ -322,6 +371,34 @@ def render_table(rows, percentiles, micro="µ"):
         columns += [duration_column(f"p{q}", f"p{q}_us") for q in PERCENTILES]
     columns += [duration_column("max", "max_us"), duration_column("stddev", "stddev_us"), ("open", lambda r: str(r["open"]), ">")]
 
+    return layout_table(columns, rows)
+
+
+def format_value(value):
+    """A counter value, with up to two decimals."""
+    if value is None:
+        return "-"
+    return f"{value:,.2f}".rstrip("0").rstrip(".") if value != int(value) else f"{int(value):,}"
+
+
+def render_counter_table(rows, percentiles):
+    columns = [("counter", lambda r: "(no name)" if r["name"] in (None, "") else str(r["name"]), "<"),
+               ("series", lambda r: str(r["series"]), "<"),
+               ("process", lambda r: "-" if r["process"] is None else str(r["process"]), "<"),
+               ("count", lambda r: f"{r['count']:,}", ">")]
+
+    def value_column(key):
+        return (key, lambda r: format_value(r[key]), ">")
+
+    columns += [value_column("min"), value_column("mean")]
+    if percentiles:
+        columns += [value_column(f"p{q}") for q in PERCENTILES]
+    columns += [value_column("max"), value_column("stddev")]
+    return layout_table(columns, rows)
+
+
+# 'columns' are (header, getter of the text of a row, alignment)
+def layout_table(columns, rows):
     cells = [[getter(row) for _, getter, _ in columns] for row in rows]
     widths = [max([len(header)] + [len(line[i]) for line in cells]) for i, (header, _, _) in enumerate(columns)]
 
@@ -337,6 +414,12 @@ def footer(summarizer, shown, total):
     parts = [f"{summarizer.events:,} events from {summarizer.files} file(s) in {total:,} groups"]
     if shown < total:
         parts.append(f"{shown:,} shown")
+    if summarizer.counter_events:
+        parts.append(f"{summarizer.counter_events:,} counter events in {len(summarizer.counters):,} series")
+    if summarizer.early_counter_events:
+        parts.append(f"{summarizer.early_counter_events:,} counter events in the first {summarizer.skip_us / 1_000_000:g} s skipped")
+    if summarizer.skipped_counter_values:
+        parts.append(f"the first {summarizer.skip:,} values of every counter series skipped ({summarizer.skipped_counter_values:,} in all)")
     if summarizer.early_spans:
         parts.append(f"{summarizer.early_spans:,} spans in the first {summarizer.skip_us / 1_000_000:g} s skipped")
     if summarizer.skipped_spans:
@@ -346,7 +429,7 @@ def footer(summarizer, shown, total):
     if summarizer.events_without_time:
         parts.append(f"{summarizer.events_without_time:,} events without a time ignored")
     if summarizer.ignored_events:
-        parts.append(f"{summarizer.ignored_events:,} events of other types than B, E and X ignored")
+        parts.append(f"{summarizer.ignored_events:,} events of other types than B, E, X and C ignored")
     if summarizer.unmatched_ends:
         parts.append(f"{summarizer.unmatched_ends:,} end events without a begin ignored")
     return ", ".join(parts)
@@ -386,22 +469,24 @@ def build_parser():
         description="Summarizes the events of the log files per group of name, process and thread. The files "
                     "are read once, entirely. A process or thread is shown by its name if it has one.",
         epilog="The durations are of the spans the server makes of the events: a begin ('B') and its end ('E'), "
-               "or a complete event ('X'). 'open' counts the begins that have no end. The percentiles need "
+               "or a complete event ('X'). 'open' counts the begins that have no end. The counters ('C') are "
+               "summarized in a second table, per series: a numeric value in their 'args'. The percentiles need "
                "8 bytes of memory per event, use --no-percentiles for very large files.")
     parser.add_argument("paths", nargs="*", metavar="path",
                         help="'*.vson' files or folders with them, default: the folder the server watches")
     parser.add_argument("--name", metavar="PATTERN",
                         help="only groups whose name matches, case-insensitive, '*' matches any text, "
-                             "without '*' it matches anywhere in the name (like the trigger word)")
+                             "without '*' it matches anywhere in the name (like the trigger word), "
+                             "a counter series matches by its counter or series name")
     parser.add_argument("--sort", choices=["total", "count", "mean", "max", "name"], default="total",
-                        help="order of the groups, the biggest first (default: total)")
+                        help="order of the groups, the biggest first (default: total), counters are by name")
     parser.add_argument("--skip", type=int, default=0, metavar="N",
-                        help="omit the first N spans of every group, in the order of the log files, "
+                        help="omit the first N spans of every group (or values of every counter series), in the order of the log files, "
                              "like the warming up of a program (default: 0)")
     parser.add_argument("--skip-seconds", type=float, default=0, metavar="S",
-                        help="omit the spans that begin in the first S seconds, counted from the first event "
+                        help="omit the spans that begin (and counter values) in the first S seconds, counted from the first event "
                              "of the first log file (default: 0)")
-    parser.add_argument("--top", type=int, metavar="N", help="only show the first N groups")
+    parser.add_argument("--top", type=int, metavar="N", help="only show the first N groups (of spans)")
     parser.add_argument("--format", choices=["table", "csv", "json"], default="table",
                         help="csv and json have the durations in microseconds (default: table)")
     parser.add_argument("--no-percentiles", action="store_true", help="do not keep the durations to make percentiles")
@@ -436,9 +521,11 @@ def main(argv=None, stdout=None, stderr=None):
     summarizer.finish()
 
     rows = summarizer.rows()
+    counter_rows = summarizer.counter_rows()
     if args.name:
         matches = make_wildcard_matcher(args.name)
         rows = [row for row in rows if matches(str(row["name"]))]
+        counter_rows = [row for row in counter_rows if matches(str(row["name"])) or matches(str(row["series"]))]
     total = len(rows)
     rows = sort_rows(rows, args.sort)
     if args.top is not None:
@@ -446,8 +533,10 @@ def main(argv=None, stdout=None, stderr=None):
 
     if args.format == "json":
         json.dump({"files": [str(path) for path in files], "events": summarizer.events, "groups": rows,
+                   "counter_events": summarizer.counter_events, "counters": counter_rows,
                    "skipped_lines": summarizer.skipped_lines, "skipped_spans": summarizer.skipped_spans,
-                   "early_spans": summarizer.early_spans,
+                   "early_spans": summarizer.early_spans, "early_counter_events": summarizer.early_counter_events,
+                   "skipped_counter_values": summarizer.skipped_counter_values,
                    "unmatched_ends": summarizer.unmatched_ends,
                    "events_without_time": summarizer.events_without_time,
                    "ignored_events": summarizer.ignored_events}, stdout, indent=2)
@@ -458,13 +547,21 @@ def main(argv=None, stdout=None, stderr=None):
         writer = csv.DictWriter(stdout, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+        if counter_rows:
+            # a second table, after an empty line
+            stdout.write("\n")
+            writer = csv.DictWriter(stdout, fieldnames=list(counter_rows[0]), lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(counter_rows)
         print(footer(summarizer, len(rows), total), file=stderr)
     else:
         micro = "µ" if can_print("µ", stdout) else "u"
         if rows:
             print(render_table(rows, percentiles, micro), file=stdout)
-        else:
+        elif not counter_rows:
             print("no events", file=stdout)
+        if counter_rows:
+            print(("\n" if rows else "") + render_counter_table(counter_rows, percentiles), file=stdout)
         print("\n" + footer(summarizer, len(rows), total), file=stdout)
     return 0
 

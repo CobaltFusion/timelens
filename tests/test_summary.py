@@ -198,6 +198,67 @@ def test_skip_seconds_counts_from_the_first_event_of_the_first_file(tmp_path):
     assert "2 spans in the first 1.5 s skipped" in err
 
 
+def counter(ts, pid=1, name="system", **values):
+    return {"ph": "C", "name": name, "ts": ts, "pid": pid, "tid": 0, "args": values}
+
+
+def test_counters_are_summarized_per_series():
+    summarizer = summarize(
+        counter(0, cpu_percent=10, ram_percent=40.0, label="text"),     # 'label' is not a number
+        counter(1, cpu_percent=30, ram_percent=42.0),
+        counter(2, cpu_percent=20),
+        counter(0, pid=2, cpu_percent=90),
+        {"ph": "C", "name": "system", "ts": 3, "pid": 1, "tid": 0},     # no args
+        {"args": {"name": "server"}, "name": "process_name", "cat": "__metadata", "ph": "M", "pid": 1, "tid": 0, "ts": 0},
+    )
+    rows = {(r["series"], r["process"]): r for r in summarizer.counter_rows()}
+
+    assert set(rows) == {("cpu_percent", "server"), ("ram_percent", "server"), ("cpu_percent", 2)}
+    cpu = rows[("cpu_percent", "server")]
+    assert (cpu["name"], cpu["count"], cpu["min"], cpu["mean"], cpu["p50"], cpu["max"], cpu["stddev"]) == ("system", 3, 10, 20, 20, 30, 10)
+    assert rows[("ram_percent", "server")]["mean"] == 41
+    assert summarizer.counter_events == 5 and summarizer.events == 0 and summarizer.ignored_events == 0
+    assert summarizer.rows() == []
+
+
+def test_counters_skip_and_skip_seconds():
+    s = 1_000_000
+    events = [counter(0, cpu=1), counter(s, cpu=2), counter(2 * s, cpu=3), counter(3 * s, cpu=4)]
+
+    (row,) = summarize(*events, skip=1).counter_rows()
+    assert (row["count"], row["min"]) == (3, 2)
+
+    summarizer = summarize(*events, skip_seconds=1.5)
+    (row,) = summarizer.counter_rows()
+    assert (row["count"], row["min"]) == (2, 3)
+    assert summarizer.early_counter_events == 2
+
+
+def test_counters_on_the_command_line(tmp_path):
+    write_log(tmp_path / "a.vson", [
+        evt("X", "load", 0, dur=100),
+        counter(0, cpu_percent=12.5, ram_percent=40), counter(1, cpu_percent=37.5, ram_percent=40),
+    ])
+    code, out, err = run(str(tmp_path), "--quiet")
+    lines = out.splitlines()
+    counter_header = lines.index(next(line for line in lines if line.startswith("counter")))
+
+    assert lines[0].startswith("name")
+    assert lines[counter_header].split() == ["counter", "series", "process", "count", "min", "mean", "p50", "p95", "p99", "max", "stddev"]
+    cpu = next(line.split() for line in lines if "cpu_percent" in line)
+    assert cpu[:6] == ["system", "cpu_percent", "1", "2", "12.5", "25"]
+    assert "2 counter events in 2 series" in out
+
+    data = json.loads(run(str(tmp_path), "--format", "json", "--name", "cpu")[1])
+    assert [(c["series"], c["mean"]) for c in data["counters"]] == [("cpu_percent", 25)]
+    assert data["groups"] == [] and data["counter_events"] == 2
+
+    out = run(str(tmp_path), "--format", "csv")[1]
+    spans, counters = out.split("\n\n")
+    assert spans.startswith("name,process,thread,count")
+    assert counters.splitlines()[0].startswith("name,series,process,count,min,mean")
+
+
 def test_without_percentiles():
     row = row_of(summarize(evt("X", "a", 0, dur=5), keep_durations=False), "a")
     assert row["p50_us"] is None and row["total_us"] == 5
@@ -359,9 +420,10 @@ def test_the_summary_counts_the_events_that_it_ignores():
 
     assert [r["name"] for r in summarizer.rows()] == ["a"]
     assert row_of(summarizer, "a")["total_us"] == 10 and row_of(summarizer, "a")["open"] == 0
-    assert summarizer.ignored_events == 3
+    assert summarizer.ignored_events == 1   # the instant, a counter is summarized on its own
+    assert summarizer.counter_events == 1 and summarizer.counter_rows() == []      # it has no values
     assert summarizer.events == 2           # the begin and the end
-    assert summarizer.events_without_time == 0
+    assert summarizer.events_without_time == 1
 
 
 def test_the_command_line_says_how_many_events_were_ignored(tmp_path):
@@ -372,13 +434,14 @@ def test_the_command_line_says_how_many_events_were_ignored(tmp_path):
 
     code, out, err = run(str(tmp_path), "--quiet")
     assert code == 0
-    assert "3 events of other types than B, E and X ignored" in out
+    assert "1 events of other types than B, E, X and C ignored" in out
     assert [line.split()[0] for line in out.splitlines()[2:3]] == ["load"]
-    assert "memory" not in out and "mark" not in out.split("events from")[0]       # no group for them
+    assert "mark" not in out.split("events from")[0]        # no group for it
 
     data = json.loads(run(str(tmp_path), "--format", "json")[1])
-    assert data["ignored_events"] == 3 and data["events"] == 2
+    assert data["ignored_events"] == 1 and data["events"] == 2 and data["counter_events"] == 2
     assert [g["name"] for g in data["groups"]] == ["load"]
+    assert [(c["name"], c["series"], c["count"]) for c in data["counters"]] == [("memory", "bytes", 1)]
 
     # nothing ignored: nothing is said
     write_log(tmp_path / "a.vson", [evt("B", "load", 0), evt("E", "load", 100)])

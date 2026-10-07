@@ -15,6 +15,7 @@ from timelens.names import Names, is_metadata
 from timelens.peer_discovery import PeerDiscovery
 from timelens.profile_store import DEFAULT_PROFILE, ProfileStore
 from timelens.span_store import RISING, SPAN_PHASES, SpanStore, make_duration_test
+from timelens.system_monitor import SystemMonitor, interval_from_env
 from timelens.vson import LOG_DIRECTORIES, default_log_directory, parse_line
 from timelens.wildcard import make_wildcard_matcher
 
@@ -33,6 +34,7 @@ class Server:
         self.clients = set()
         self.watcher = None
         self.peer_discovery = None
+        self.system_monitor = None
         self.store = SpanStore()
         self.profiles = ProfileStore()
         self.names = Names()    # names of processes and threads, from the metadata events
@@ -204,9 +206,14 @@ class Server:
         self.peer_discovery = PeerDiscovery(http_port=8080)
         await self.peer_discovery.start()
 
+        # the cpu, ram and temperature of this machine, written to the watched folder, so read back like any log
+        self.system_monitor = SystemMonitor(path, interval_from_env())
+        await self.system_monitor.start()
+
         try:
             yield
         finally:
+            await self.system_monitor.stop()
             await self.watcher.stop()
 
     # The test for the 'duration' of a trigger request, {op: '>' or '<', us: number}, None without a
