@@ -25,7 +25,7 @@ def summarize(*events, **kwargs):
 
 
 def row_of(summarizer, name, pid=1, tid=1):
-    (row,) = [r for r in summarizer.rows() if (r["name"], r["pid"], r["tid"]) == (name, pid, tid)]
+    (row,) = [r for r in summarizer.rows() if (r["name"], r["process"], r["thread"]) == (name, pid, tid)]
     return row
 
 
@@ -219,7 +219,7 @@ def test_table(tmp_path):
     lines = out.splitlines()
 
     assert code == 0 and err == ""
-    assert lines[0].split() == ["name", "pid", "tid", "count", "total", "min", "mean", "p50", "p95", "p99", "max", "stddev", "open"]
+    assert lines[0].split() == ["name", "process", "thread", "count", "total", "min", "mean", "p50", "p95", "p99", "max", "stddev", "open"]
     by_name = {line.split()[0]: line.split() for line in lines[2:] if line and not line[0].isdigit()}
     assert by_name["save"][3:5] == ["1", "2.000"]               # the total is 2.000 ms
     assert by_name["load"][3] == "2" and by_name["load"][-1] == "0"
@@ -251,14 +251,27 @@ def test_csv_and_json(tmp_path):
     lines = out.splitlines()
 
     assert code == 0
-    assert lines[0].startswith("name,pid,tid,count,total_us,min_us,mean_us,p50_us")
+    assert lines[0].startswith("name,process,thread,count,total_us,min_us,mean_us,p50_us")
     assert lines[1].split(",")[:6] == ["load", "10", "1", "2", "400", "100"]
     assert "events from 2 file(s)" in err                       # the summary line is not in the data
 
     data = json.loads(run(logs, "--format", "json")[1])
     assert data["events"] == 7 and data["skipped_lines"] == 1 and data["unmatched_ends"] == 0
     save = [g for g in data["groups"] if g["name"] == "save"][0]
-    assert (save["pid"], save["tid"], save["count"], save["total_us"]) == (10, 2, 1, 2000)
+    assert (save["process"], save["thread"], save["count"], save["total_us"]) == (10, 2, 1, 2000)
+
+
+def test_process_and_thread_names(tmp_path):
+    # a name given by a metadata event replaces the number, also when it comes after the events
+    write_log(tmp_path / "a.vson", [
+        evt("X", "a", 0, pid=10, tid=1, dur=5), evt("X", "a", 0, pid=10, tid=2, dur=5), evt("X", "a", 0, pid=11, tid=1, dur=5),
+        {"ph": "M", "cat": "__metadata", "name": "process_name", "pid": 10, "tid": 0, "ts": 0, "args": {"name": "server"}},
+        {"ph": "M", "cat": "__metadata", "name": "thread_name", "pid": 10, "tid": 1, "ts": 0, "args": {"name": "main"}},
+    ])
+    data = json.loads(run(str(tmp_path), "--format", "json", "--sort", "name")[1])
+
+    assert [(g["process"], g["thread"]) for g in data["groups"]] == [(11, 1), ("server", 2), ("server", "main")]
+    assert data["events"] == 3
 
 
 def test_no_percentiles(tmp_path):

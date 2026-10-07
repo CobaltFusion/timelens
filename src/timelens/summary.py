@@ -5,7 +5,8 @@ A statistical summary of the events in the log files of the server, on the comma
 The files are read once, entirely (the server only reads the last 30 minutes of a file), and the begin
 and end events are paired into spans the way the server does. The spans are grouped by the combination
 of name, pid and tid, and for every group the durations are summarized: count, total, min, mean,
-percentiles, max and standard deviation.
+percentiles, max and standard deviation. The process and thread are shown by their name when the log
+files give one (a 'process_name' or 'thread_name' metadata event), otherwise by their number.
 
     python -m timelens.summary [path ...] [--sort total] [--top 20] [--name "proc*"] [--format csv]
 
@@ -23,7 +24,7 @@ import time
 from array import array
 from pathlib import Path
 
-from timelens.names import is_metadata
+from timelens.names import Names, is_metadata
 from timelens.span_store import SPAN_PHASES
 from timelens.vson import default_log_directory, find_log_files, parse_line
 from timelens.wildcard import make_wildcard_matcher
@@ -158,6 +159,7 @@ class Summarizer:
     def __init__(self, keep_durations=True):
         self.keep_durations = keep_durations
         self.pairer = Pairer()
+        self.names = Names()            # the names of the processes and threads, from the metadata events
         self.groups = {}
         self.files = 0
         self.events = 0
@@ -167,7 +169,8 @@ class Summarizer:
 
     def add_event(self, evt):
         if is_metadata(evt):
-            return      # not an event: the names of processes and threads, they are not summarized
+            self.names.add(evt)     # not an event: the name of a process or thread, used to show the groups
+            return
         if evt.get("ph") not in SPAN_PHASES:
             self.ignored_events += 1
             return
@@ -217,11 +220,11 @@ class Summarizer:
         return self.pairer.unmatched_ends
 
     def rows(self):
-        """One dict per group, the durations are in us."""
+        """One dict per group, the process and thread are a name or a number, the durations are in us."""
         rows = []
         for (name, pid, tid), stats in self.groups.items():
             row = {
-                "name": name, "pid": pid, "tid": tid, "count": stats.count,
+                "name": name, "process": self.process_of(pid), "thread": self.thread_of(pid, tid), "count": stats.count,
                 "total_us": stats.total_us if stats.count else None,
                 "min_us": stats.min_us, "mean_us": stats.mean_us if stats.count else None,
             }
@@ -230,6 +233,14 @@ class Summarizer:
             row.update({"max_us": stats.max_us, "stddev_us": stats.stddev_us, "open": stats.open})
             rows.append(row)
         return rows
+
+    # the name of a process, or its pid when it has no name
+    def process_of(self, pid):
+        return self.names.processes.get(pid, pid)
+
+    # the name of a thread, or its tid when it has no name
+    def thread_of(self, pid, tid):
+        return self.names.threads.get((pid, tid), tid)
 
     def _group(self, key):
         stats = self.groups.get(key)
@@ -252,7 +263,7 @@ def format_duration(duration_us, micro="µ"):
 
 
 def sort_rows(rows, sort):
-    by_name = lambda row: (str(row["name"]), str(row["pid"]), str(row["tid"]))
+    by_name = lambda row: (str(row["name"]), str(row["process"]), str(row["thread"]))
     if sort == "name":
         return sorted(rows, key=by_name)
     key = {"total": "total_us", "count": "count", "mean": "mean_us", "max": "max_us"}[sort]
@@ -262,8 +273,8 @@ def sort_rows(rows, sort):
 
 def render_table(rows, percentiles, micro="µ"):
     columns = [("name", lambda r: "(no name)" if r["name"] in (None, "") else str(r["name"]), "<"),
-               ("pid", lambda r: "-" if r["pid"] is None else str(r["pid"]), ">"),
-               ("tid", lambda r: "-" if r["tid"] is None else str(r["tid"]), ">"),
+               ("process", lambda r: "-" if r["process"] is None else str(r["process"]), "<"),
+               ("thread", lambda r: "-" if r["thread"] is None else str(r["thread"]), "<"),
                ("count", lambda r: f"{r['count']:,}", ">")]
 
     def duration_column(header, key):
@@ -331,8 +342,8 @@ def make_progress_reporter(stream, name):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="python -m timelens.summary",
-        description="Summarizes the events of the log files per group of name, pid and tid. The files are read "
-                    "once, entirely.",
+        description="Summarizes the events of the log files per group of name, process and thread. The files "
+                    "are read once, entirely. A process or thread is shown by its name if it has one.",
         epilog="The durations are of the spans the server makes of the events: a begin ('B') and its end ('E'), "
                "or a complete event ('X'). 'open' counts the begins that have no end. The percentiles need "
                "8 bytes of memory per event, use --no-percentiles for very large files.")
@@ -394,7 +405,7 @@ def main(argv=None, stdout=None, stderr=None):
         stdout.write("\n")
         print(footer(summarizer, len(rows), total), file=stderr)
     elif args.format == "csv":
-        fields = list(rows[0]) if rows else ["name", "pid", "tid", "count"]
+        fields = list(rows[0]) if rows else ["name", "process", "thread", "count"]
         writer = csv.DictWriter(stdout, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
