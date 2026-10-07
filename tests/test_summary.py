@@ -148,6 +148,56 @@ def test_an_end_before_its_begin_has_no_negative_duration():
     assert row_of(summarize(evt("B", "a", 100), evt("E", "a", 90)), "a")["total_us"] == 0
 
 
+def test_skip_the_first_spans_of_every_group():
+    summarizer = summarize(
+        evt("X", "a", 0, dur=1000), evt("X", "a", 0, dur=10), evt("X", "a", 0, dur=20),
+        evt("B", "b", 0), evt("E", "b", 500), evt("B", "b", 0),                     # one closed, one open
+        skip=1,
+    )
+    a = row_of(summarizer, "a")
+    assert (a["count"], a["total_us"], a["max_us"]) == (2, 30, 20)
+    b = row_of(summarizer, "b")
+    assert (b["count"], b["total_us"], b["open"]) == (0, None, 1)
+    assert summarizer.skipped_spans == 2
+
+
+def test_skip_on_the_command_line(tmp_path):
+    code, out, err = run(str(make_logs(tmp_path)), "--quiet", "--skip", "1", "--format", "json")
+    data = json.loads(out)
+    load = [g for g in data["groups"] if g["name"] == "load"][0]
+    assert (load["count"], load["total_us"]) == (1, 300)
+    assert data["skipped_spans"] == 3
+    assert "the first 1 spans of every group skipped (3 in all)" in err
+
+
+def test_skip_the_first_seconds():
+    s = 1_000_000
+    summarizer = summarize(
+        evt("X", "a", 0, dur=1000),                                     # the start of the file
+        evt("B", "b", s // 2), evt("X", "a", 2 * s, dur=10), evt("E", "b", 3 * s),     # 'b' begins too early
+        evt("B", "c", s // 2),                                          # open, begins too early
+        evt("B", "d", 2 * s),                                           # open
+        skip_seconds=1,
+    )
+    a = row_of(summarizer, "a")
+    assert (a["count"], a["total_us"]) == (1, 10)
+    assert {r["name"] for r in summarizer.rows()} == {"a", "d"}
+    assert row_of(summarizer, "d")["open"] == 1
+    assert summarizer.early_spans == 3
+
+
+def test_skip_seconds_counts_from_the_first_event_of_the_first_file(tmp_path):
+    s = 1_000_000
+    write_log(tmp_path / "a.vson", [evt("X", "x", 0, dur=1), evt("X", "x", 2 * s, dur=5)])
+    write_log(tmp_path / "b.vson", [evt("X", "x", s, dur=3), evt("X", "x", 12 * s, dur=7)])
+    code, out, err = run(str(tmp_path), "--skip-seconds", "1.5", "--format", "json")
+    data = json.loads(out)
+
+    assert [(g["count"], g["total_us"]) for g in data["groups"]] == [(2, 12)]
+    assert data["early_spans"] == 2
+    assert "2 spans in the first 1.5 s skipped" in err
+
+
 def test_without_percentiles():
     row = row_of(summarize(evt("X", "a", 0, dur=5), keep_durations=False), "a")
     assert row["p50_us"] is None and row["total_us"] == 5

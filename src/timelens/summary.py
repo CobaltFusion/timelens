@@ -8,7 +8,7 @@ of name, pid and tid, and for every group the durations are summarized: count, t
 percentiles, max and standard deviation. The process and thread are shown by their name when the log
 files give one (a 'process_name' or 'thread_name' metadata event), otherwise by their number.
 
-    python -m timelens.summary [path ...] [--sort total] [--top 20] [--name "proc*"] [--format csv]
+    python -m timelens.summary [path ...] [--sort total] [--top 20] [--name "proc*"] [--skip 5] [--skip-seconds 10] [--format csv]
 
 A path is a '*.vson' file or a folder with them, by default the folder the server watches.
 """
@@ -79,9 +79,14 @@ class Pairer:
 
     # (name, pid, tid) of every span that was opened and not closed
     def open_spans(self):
+        for name, pid, tid, _ in self.open_begins():
+            yield name, pid, tid
+
+    # (name, pid, tid, begin) of every span that was opened and not closed
+    def open_begins(self):
         for (_, pid, tid), stack in self._open.items():
-            for name, _ in stack:
-                yield name, pid, tid
+            for name, begin in stack:
+                yield name, pid, tid, begin
 
     def _pop_open(self, thread, name):
         stack = self._open.get(thread)
@@ -114,9 +119,14 @@ def percentile(sorted_values, q):
 
 
 class GroupStats:
-    """The durations (us) of the spans of one group, the mean and variance are updated per span."""
+    """
+    The durations (us) of the spans of one group, the mean and variance are updated per span. The first 'skip'
+    spans are not counted, like the warming up of a program.
+    """
 
-    def __init__(self, keep_durations):
+    def __init__(self, keep_durations, skip=0):
+        self.skip = skip            # spans that are still to be skipped
+        self.skipped = 0
         self.count = 0
         self.total_us = 0
         self.min_us = None
@@ -128,6 +138,11 @@ class GroupStats:
         self._durations = array("d") if keep_durations else None
 
     def add(self, duration_us):
+        if self.skip > 0:
+            self.skip -= 1
+            self.skipped += 1
+            return
+
         self.count += 1
         self.total_us += duration_us
         self.min_us = duration_us if self.min_us is None else min(self.min_us, duration_us)
@@ -156,8 +171,14 @@ class GroupStats:
 class Summarizer:
     """Reads events and summarizes the spans per group: (name, pid, tid)."""
 
-    def __init__(self, keep_durations=True):
+    # 'skip' is the number of spans at the start of every group that are not counted, and the spans that begin
+    # in the first 'skip_seconds' (from the first event of the first file) are not counted either
+    def __init__(self, keep_durations=True, skip=0, skip_seconds=0):
         self.keep_durations = keep_durations
+        self.skip = max(skip, 0)
+        self.skip_us = max(skip_seconds, 0) * 1_000_000
+        self.early_spans = 0            # spans that begin in the first 'skip_seconds'
+        self._start = None              # ts of the first event of the first file
         self.pairer = Pairer()
         self.names = Names()            # the names of the processes and threads, from the metadata events
         self.groups = {}
@@ -180,11 +201,16 @@ class Summarizer:
             self.events_without_time += 1
             return
         self.events += 1
+        if self._start is None:
+            self._start = ts
 
         span = self.pairer.add(evt)
         if span is None:
             return
         name, pid, tid, begin, end = span
+        if self._is_early(begin):
+            self.early_spans += 1
+            return
         self._group((name, pid, tid)).add(end - begin)
 
     # Reads all lines of a file. 'progress(read, size)' is called now and then, the sizes are in characters.
@@ -210,10 +236,17 @@ class Summarizer:
 
     # Call when all events are added: the spans that are still open are counted, and the percentiles are made.
     def finish(self):
-        for key in self.pairer.open_spans():
-            self._group(key).open += 1
+        for name, pid, tid, begin in self.pairer.open_begins():
+            if self._is_early(begin):
+                self.early_spans += 1
+            else:
+                self._group((name, pid, tid)).open += 1
         for stats in self.groups.values():
             stats.finish()
+
+    @property
+    def skipped_spans(self):
+        return sum(stats.skipped for stats in self.groups.values())
 
     @property
     def unmatched_ends(self):
@@ -242,10 +275,14 @@ class Summarizer:
     def thread_of(self, pid, tid):
         return self.names.threads.get((pid, tid), tid)
 
+    # whether a span that begins at 'begin' is in the first 'skip_seconds'
+    def _is_early(self, begin):
+        return self.skip_us > 0 and begin < self._start + self.skip_us
+
     def _group(self, key):
         stats = self.groups.get(key)
         if stats is None:
-            stats = GroupStats(self.keep_durations)
+            stats = GroupStats(self.keep_durations, self.skip)
             self.groups[key] = stats
         return stats
 
@@ -300,6 +337,10 @@ def footer(summarizer, shown, total):
     parts = [f"{summarizer.events:,} events from {summarizer.files} file(s) in {total:,} groups"]
     if shown < total:
         parts.append(f"{shown:,} shown")
+    if summarizer.early_spans:
+        parts.append(f"{summarizer.early_spans:,} spans in the first {summarizer.skip_us / 1_000_000:g} s skipped")
+    if summarizer.skipped_spans:
+        parts.append(f"the first {summarizer.skip:,} spans of every group skipped ({summarizer.skipped_spans:,} in all)")
     if summarizer.skipped_lines:
         parts.append(f"{summarizer.skipped_lines:,} lines skipped")
     if summarizer.events_without_time:
@@ -354,6 +395,12 @@ def build_parser():
                              "without '*' it matches anywhere in the name (like the trigger word)")
     parser.add_argument("--sort", choices=["total", "count", "mean", "max", "name"], default="total",
                         help="order of the groups, the biggest first (default: total)")
+    parser.add_argument("--skip", type=int, default=0, metavar="N",
+                        help="omit the first N spans of every group, in the order of the log files, "
+                             "like the warming up of a program (default: 0)")
+    parser.add_argument("--skip-seconds", type=float, default=0, metavar="S",
+                        help="omit the spans that begin in the first S seconds, counted from the first event "
+                             "of the first log file (default: 0)")
     parser.add_argument("--top", type=int, metavar="N", help="only show the first N groups")
     parser.add_argument("--format", choices=["table", "csv", "json"], default="table",
                         help="csv and json have the durations in microseconds (default: table)")
@@ -377,7 +424,7 @@ def main(argv=None, stdout=None, stderr=None):
         return 1
 
     percentiles = not args.no_percentiles
-    summarizer = Summarizer(keep_durations=percentiles)
+    summarizer = Summarizer(keep_durations=percentiles, skip=args.skip, skip_seconds=args.skip_seconds)
     show_progress = not args.quiet and getattr(stderr, "isatty", lambda: False)()
     for path in files:
         if show_progress:
@@ -399,7 +446,9 @@ def main(argv=None, stdout=None, stderr=None):
 
     if args.format == "json":
         json.dump({"files": [str(path) for path in files], "events": summarizer.events, "groups": rows,
-                   "skipped_lines": summarizer.skipped_lines, "unmatched_ends": summarizer.unmatched_ends,
+                   "skipped_lines": summarizer.skipped_lines, "skipped_spans": summarizer.skipped_spans,
+                   "early_spans": summarizer.early_spans,
+                   "unmatched_ends": summarizer.unmatched_ends,
                    "events_without_time": summarizer.events_without_time,
                    "ignored_events": summarizer.ignored_events}, stdout, indent=2)
         stdout.write("\n")
