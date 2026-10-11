@@ -1,6 +1,16 @@
 <img alt="TimeLens" src="art/timelens_logo.png" />
 
+# TimeLens — Real-Time Performance Analysis and Event Tracing
+
 TimeLens shows telemetry logs as signals on an oscilloscope-style timeline in the browser: every event is a bar from its begin to its end, you can trigger on an event, freeze the view, and measure timing.
+
+TimeLens is an open-source performance analysis and event-tracing tool for software developers. It collects and visualizes timestamped events to help investigate application behavior, timing, latency, and performance bottlenecks.
+
+Developed by Jan Wilmans (janwilmans), TimeLens combines a lightweight telemetry collector with a browser-based timeline visualization for exploring application execution over time.
+
+- Source code: https://github.com/CobaltFusion/timelens
+- Issues and bug reports: https://github.com/CobaltFusion/timelens/issues
+- Author: https://github.com/janwilmans
 
 This file describes what is implemented, and how each part is known to work. The [user guide](docs/userguide.md) explains how to use it.
 
