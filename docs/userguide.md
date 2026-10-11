@@ -148,6 +148,7 @@ An event that has been open for a long time is therefore drawn only up to half o
 ### Measuring
 
 - **Hover** over an event to see its duration, plus statistics of all events with the same name (see [Statistics](#statistics)). The statistics are the last lines of the hover. When the graph is too short for all the lines (less than about 200 pixels), the statistics are shown in a second column next to the other lines, so they are not cut off.
+- **Copy** the hover with the small copy icon in its top right corner: press it and the text of the hover (all its lines, including the statistics) is on the clipboard, as plain text. The icon shows a check mark when it worked and a cross when the browser did not allow it. The hover normally follows the mouse; while the mouse is inside it, or for a moment after it left the event, it stays where it is, so you can move to the icon. Over a page that is not `https` or `localhost` the browser has no clipboard for pages, and a hidden text box and the browser's copy command are used instead.
 - **Drag** across the graph to measure the time between two points.
 - Hold **Shift** while dragging to snap the cursor to the begin or end of the event under the mouse.
 

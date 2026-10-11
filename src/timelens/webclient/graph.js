@@ -1,9 +1,16 @@
 import { EventType, TriggerEdge, isTriggerDuration, roundUpNice } from "./globals.js";
-import { BarStack } from "./barstack.js";
+import { BarStack, isInside } from "./barstack.js";
+import { copyText } from "./clipboard.js";
 import { TriggerSource } from "./trigger_source.js";
 
 // While a graph follows live data, its duration statistics are requested this often.
 const statsIntervalMs = 1000;
+
+// After the mouse has left the bar that a tooltip is for, the tooltip stays this long: time to move to its copy icon.
+const tooltipGraceMs = 600;
+
+// The copy icon shows that it has copied, or could not, this long.
+const copyFeedbackMs = 1200;
 
 // The column left of the graph area that names the process and thread of every row, it is left out of a canvas
 // that is narrower than this.
@@ -68,6 +75,9 @@ export class Graph {
         this.marginPx = 8;          // invisible margin around the graph area, holds the zero-point markers
         this.rowLabelWidthPx = 0;   // width of the column with the names of the rows, left of the margin, set per frame
         this.lastBars = null;       // the rows of the last frame, with their positions
+        this.lastTooltip = null;    // the tooltip of the last frame, see 'BarStack.tooltip', and 'shownAtMs': when it was last for a bar
+        /** @type {{state: "copied" | "failed", untilMs: number} | null} */
+        this.copyFeedback = null;   // { state, untilMs } for a moment after the copy icon was pressed
         this.graphWidthPx = 0;      // size of the graph area, excluding the margin
         this.graphHeightPx = 0;
         this.zeroShiftUs = 0;
@@ -115,6 +125,15 @@ export class Graph {
             }
 
             this.mouseX = this.#toGraphX(e);
+            this.mouseY = this.#toGraphY(e);
+            this.mouseInside = true;
+
+            // the copy icon of the tooltip: that is no start of a measurement
+            if (this.#overCopyIcon()) {
+                this.#copyTooltip();
+                return;
+            }
+
             this.shiftHeld = e.shiftKey;
             this.selectionStartX = this.getCursorX();
             this.selectionEndX = this.selectionStartX;
@@ -122,6 +141,7 @@ export class Graph {
         });
 
         this.canvas.addEventListener("mousemove", (e) => {
+            this.mouseInside = true;
             this.mouseX = this.#toGraphX(e);
             this.mouseY = this.#toGraphY(e);
             this.shiftHeld = e.shiftKey;
@@ -208,6 +228,24 @@ export class Graph {
         };
         this.canvas.addEventListener("pointerup", endTouch);
         this.canvas.addEventListener("pointercancel", endTouch);
+    }
+
+    // whether the mouse is over the copy icon of the tooltip, a little more than what is drawn
+    #overCopyIcon() {
+        const icon = this.lastTooltip?.icon;
+        return Boolean(icon && this.mouseInside && isInside(this.mouseX, this.mouseY, icon, 3));
+    }
+
+    // copies the text of the tooltip, and shows the icon as a check mark, or as a cross when the browser did not allow it
+    #copyTooltip() {
+        const text = this.lastTooltip?.text;
+        if (!text) {
+            return;
+        }
+        const show = (/** @type {boolean} */ copied) => {
+            this.copyFeedback = { state: copied ? "copied" : "failed", untilMs: performance.now() + copyFeedbackMs };
+        };
+        copyText(text).then(show, () => show(false));
     }
 
     // mouse position in graph area coordinates, (0, 0) is the top-left of the graph area
@@ -905,6 +943,7 @@ export class Graph {
 
         this.lastBars = null;
         if (data.length === 0) {
+            this.lastTooltip = null;
             return;
         }
 
@@ -972,8 +1011,23 @@ export class Graph {
             }
         }
 
+        // the tooltip of the last frame stays while the mouse is in it, and a moment after it left the bar: see 'BarStack.drawEvents()'
+        const nowMs = performance.now();
+        bars.previousTooltip = this.lastTooltip;
+        bars.keepPreviousTooltip = this.lastTooltip !== null && nowMs - this.lastTooltip.shownAtMs < tooltipGraceMs;
+        bars.mouseInside = this.mouseInside;
+        bars.copyFeedback = this.copyFeedback && nowMs < this.copyFeedback.untilMs ? this.copyFeedback.state : null;
+
         bars.drawEvents();
         this.hoveredBar = bars.hover;
+
+        // a tooltip that stays keeps the time it was last for a bar, one for a bar gets the time of now
+        const shownAtMs = bars.tooltip?.pinned ? this.lastTooltip?.shownAtMs ?? nowMs : nowMs;
+        this.lastTooltip = bars.tooltip ? { ...bars.tooltip, shownAtMs } : null;
+
+        const overIcon = this.#overCopyIcon();
+        this.canvas.style.cursor = overIcon ? "pointer" : "";
+        this.canvas.title = overIcon ? "Copy this text to the clipboard" : "";
     }
 
     resize(width, height) {

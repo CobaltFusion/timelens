@@ -60,6 +60,11 @@ function getColor(name) {
     return `hsl(${hue}, 80%, 65%)`;
 }
 
+/** Whether the point is in the rectangle, which can be 'slack' pixels bigger on every side. */
+export function isInside(x, y, rect, slack = 0) {
+    return x >= rect.x - slack && x <= rect.x + rect.width + slack && y >= rect.y - slack && y <= rect.y + rect.height + slack;
+}
+
 export class BarStack {
     constructor(ctx, mouseX, mouseY, pixelsPerMicrosecond, startPointUs, endPointUs, zeroPointUs) {
         this.ctx = ctx;
@@ -75,6 +80,24 @@ export class BarStack {
         this.lines = new Map();
         this.beginTime = Infinity;
         this.hover = null;   // the hover shows the offset from the zero-point
+
+        // The tooltip from the previous frame, positioned at the end of the bar it belonged to.
+        // Keep it visible while the mouse is over it and briefly after the mouse leaves,
+        // allowing the mouse to reach the icon inside it. See drawEvents() and keepPreviousTooltip.
+        // Populated by the caller.
+        this.previousTooltip = null;
+        this.keepPreviousTooltip = false;
+        this.mouseInside = true;            // false when the mouse is not over the graph
+        /** @type {"copied" | "failed" | null} */
+        this.copyFeedback = null;           // what the icon shows for a moment after it was pressed
+
+        /**
+         * The tooltip currently displayed in the graph, used for mouse hit-testing.
+          * All coordinates are relative to the graph area. Null if no tooltip was drawn.
+         * @type {{x: number, y: number, width: number, height: number, text: string, hover: {event: import("./globals.js").TSEvent, durationUs: number},
+         *         icon: {x: number, y: number, width: number, height: number}, pinned: boolean} | null}
+         */
+        this.tooltip = null;
         this.durationStats = new Map();   // name -> { count, min, max, mean, m2 }, filled by the caller
         /** @type {{ getProcessName(pid: number): string | undefined, getThreadName(pid: number, tid: number): string | undefined }} */
         this.names = { getProcessName: () => undefined, getThreadName: () => undefined };   // filled by the caller
@@ -168,8 +191,20 @@ export class BarStack {
             }
         }
         // Draw the tooltip last so it is always on top.
-        if (this.hover) {
+        //
+        // The tooltip follows the mouse, which gives no way to press the icon in it: it would run away from the mouse. So the
+        // tooltip of the previous frame stays where it is while the mouse is in it, also over other bars. When the mouse has
+        // left the bar it was for, it stays for a moment, which is the time to move to it.
+        const previous = this.previousTooltip;
+        const pinned = previous ? { x: previous.x, y: previous.y } : null;
+        if (previous && this.mouseInside && isInside(this.mouseX, this.mouseY, previous, 4)) {
+            this.drawTooltip(previous.hover, pinned);
+        }
+        else if (this.hover) {
             this.drawTooltip(this.hover);
+        }
+        else if (previous && this.keepPreviousTooltip) {
+            this.drawTooltip(previous.hover, pinned);
         }
     }
 
@@ -217,7 +252,11 @@ export class BarStack {
         return name ? ` (${name})` : "";
     }
 
-    drawTooltip(hover) {
+    /**
+     * @param {{event: any, durationUs: number}} hover
+     * @param {{x: number, y: number} | null} [position]  where the tooltip stays, instead of following the mouse
+     */
+    drawTooltip(hover, position = null) {
         const event = hover.event;
         const offsetMs = (event.timestamp - this.zeroPointUs) / 1000;
 
@@ -264,14 +303,19 @@ export class BarStack {
         const oneColumn = [...lines, ...statLines];
         const columns = heightOf(oneColumn) + padding <= canvasHeight || statLines.length === 0 ? [oneColumn] : [lines, statLines];
 
+        // the icon that copies the text is in the top right corner, the title does not run into it
+        const iconSize = 14;
+        const iconGap = 8;
+
         const columnWidths = columns.map(widthOf);
-        const tooltipWidth = columnWidths.reduce((sum, width) => sum + width, 0) + columnGap * (columns.length - 1) + padding * 2;
+        const tooltipWidth = columnWidths.reduce((sum, width) => sum + width, 0) + columnGap * (columns.length - 1) + padding * 2 + iconGap + iconSize;
         const tooltipHeight = Math.max(...columns.map(heightOf)) + padding;
 
-        // Position near the mouse, but keep the tooltip inside the graph.
-
-        const tx = Math.max(0, Math.min(this.mouseX + 12, canvasWidth - tooltipWidth));
-        const ty = Math.max(0, Math.min(this.mouseY - 24, canvasHeight - tooltipHeight));
+        // Position near the mouse, but keep the tooltip inside the graph. A tooltip that stays is where it was.
+        const wantedX = position ? position.x : this.mouseX + 12;
+        const wantedY = position ? position.y : this.mouseY - 24;
+        const tx = Math.max(0, Math.min(wantedX, canvasWidth - tooltipWidth));
+        const ty = Math.max(0, Math.min(wantedY, canvasHeight - tooltipHeight));
 
         // Background
         this.ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
@@ -295,6 +339,56 @@ export class BarStack {
             }
             columnX += columnWidths[index] + columnGap;
         });
+
+        // The icon, in line with the title.
+        const icon = { x: tx + tooltipWidth - padding - iconSize, y: ty + padding / 2 + (titleFont.height - iconSize) / 2, width: iconSize, height: iconSize };
+        this.drawCopyIcon(icon);
+
+        // all that is shown, one line each, is what the icon copies
+        this.tooltip = {
+            x: tx, y: ty, width: tooltipWidth, height: tooltipHeight, text: oneColumn.map(line => line.text).join("\n"),
+            hover, icon, pinned: position !== null
+        };
+    }
+
+    // The icon to copy the tooltip with: two sheets of paper. After it was pressed, a check mark or a cross for a moment.
+    drawCopyIcon({ x, y, width: size }) {
+        const ctx = this.ctx;
+        const over = this.mouseInside && isInside(this.mouseX, this.mouseY, { x, y, width: size, height: size }, 3);
+
+        ctx.save();
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        if (this.copyFeedback === "copied") {
+            ctx.strokeStyle = "#00ff88";
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(x + 2, y + size / 2 + 1);
+            ctx.lineTo(x + size * 0.4, y + size - 3);
+            ctx.lineTo(x + size - 2, y + 3);
+            ctx.stroke();
+        }
+        else if (this.copyFeedback === "failed") {
+            ctx.strokeStyle = "#ff5577";
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(x + 3, y + 3);
+            ctx.lineTo(x + size - 3, y + size - 3);
+            ctx.moveTo(x + size - 3, y + 3);
+            ctx.lineTo(x + 3, y + size - 3);
+            ctx.stroke();
+        }
+        else {
+            ctx.strokeStyle = over ? "#ffffff" : "#00ff88";
+            ctx.globalAlpha = over ? 1 : 0.75;
+            ctx.lineWidth = 1.4;
+            const sheet = size - 4;
+            ctx.strokeRect(x + 4.5, y + 0.5, sheet - 1, sheet - 1);         // the sheet behind
+            ctx.fillStyle = "rgba(0, 0, 0, 0.95)";                          // the sheet in front hides the corner of the one behind
+            ctx.fillRect(x + 0.5, y + 4.5, sheet - 1, sheet - 1);
+            ctx.strokeRect(x + 0.5, y + 4.5, sheet - 1, sheet - 1);
+        }
+        ctx.restore();
     }
 
     // Draws the bar with its text, and remembers it for the tooltip if the mouse is over it.
