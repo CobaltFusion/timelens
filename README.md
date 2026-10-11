@@ -2,8 +2,6 @@
 
 # TimeLens — Real-Time Performance Analysis and Event Tracing
 
-TimeLens shows telemetry logs as signals on an oscilloscope-style timeline in the browser: every event is a bar from its begin to its end, you can trigger on an event, freeze the view, and measure timing.
-
 TimeLens is an open-source performance analysis and event-tracing tool for software developers. It collects and visualizes timestamped events to help investigate application behavior, timing, latency, and performance bottlenecks.
 
 Developed by Jan Wilmans (janwilmans), TimeLens combines a lightweight telemetry collector with a browser-based timeline visualization for exploring application execution over time.
@@ -15,6 +13,8 @@ Developed by Jan Wilmans (janwilmans), TimeLens combines a lightweight telemetry
 This file describes what is implemented, and how each part is known to work. The [user guide](docs/userguide.md) explains how to use it.
 
 # Key Features (Implemented!)
+
+TimeLens shows telemetry logs as signals on an oscilloscope-style timeline in the browser: every event is a bar from its begin to its end, you can trigger on an event, freeze the view, and measure timing.
 
 - 📈 Oscilloscope-style visualization of log data
   - Treats telemetry streams as signals over time
