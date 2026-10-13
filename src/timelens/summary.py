@@ -173,6 +173,9 @@ class GroupStats:
             self._durations = array("d")    # the memory is not needed anymore
 
 
+RAM_TOTAL, RAM_AVAILABLE, RAM_USED = "ram_total_bytes", "ram_available_bytes", "ram_used_bytes"
+
+
 class Summarizer:
     """Reads events and summarizes the spans per group: (name, pid, tid), and the counters per series: (name, key, pid)."""
 
@@ -264,6 +267,14 @@ class Summarizer:
                     stats = GroupStats(self.keep_durations, self.skip)
                     self.counters[(name, key, pid)] = stats
                 stats.add(value)
+        # the ram in use is the total minus what is available, computed per sample so the percentiles are exact
+        total, available = args.get(RAM_TOTAL), args.get(RAM_AVAILABLE)
+        if is_number(total) and is_number(available):
+            stats = self.counters.get((name, RAM_USED, pid))
+            if stats is None:
+                stats = GroupStats(self.keep_durations, self.skip)
+                self.counters[(name, RAM_USED, pid)] = stats
+            stats.add(total - available)
 
     # Call when all events are added: the spans that are still open are counted, and the percentiles are made.
     def finish(self):
@@ -381,7 +392,23 @@ def format_value(value):
     return f"{value:,.2f}".rstrip("0").rstrip(".") if value != int(value) else f"{int(value):,}"
 
 
+BYTES_SUFFIX = "_bytes"
+MB = 1024 * 1024
+
+
+def in_megabytes(row):
+    """A copy of a counter row of a series in bytes, in MB with the series renamed to '..._mb'. Other rows as they are."""
+    series = str(row["series"])
+    if not series.endswith(BYTES_SUFFIX):
+        return row
+    converted = {key: value / MB if key not in ("count", "name", "series", "process") and value is not None else value
+                 for key, value in row.items()}
+    converted["series"] = series[:-len(BYTES_SUFFIX)] + "_mb"
+    return converted
+
+
 def render_counter_table(rows, percentiles):
+    rows = [in_megabytes(row) for row in rows]
     columns = [("counter", lambda r: "(no name)" if r["name"] in (None, "") else str(r["name"]), "<"),
                ("series", lambda r: str(r["series"]), "<"),
                ("process", lambda r: "-" if r["process"] is None else str(r["process"]), "<"),
@@ -488,7 +515,7 @@ def build_parser():
                              "of the first log file (default: 0)")
     parser.add_argument("--top", type=int, metavar="N", help="only show the first N groups (of spans)")
     parser.add_argument("--format", choices=["table", "csv", "json"], default="table",
-                        help="csv and json have the durations in microseconds (default: table)")
+                        help="csv and json have the durations in microseconds and bytes in bytes (default: table, with MB)")
     parser.add_argument("--no-percentiles", action="store_true", help="do not keep the durations to make percentiles")
     parser.add_argument("--quiet", action="store_true", help="do not show the progress")
     return parser

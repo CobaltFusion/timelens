@@ -32,8 +32,8 @@ def test_interval_from_env():
 def test_sample_has_the_cpu_and_ram_usage():
     values = sample(12.5)
     assert values["cpu_percent"] == 12.5
-    assert 0 <= values["ram_percent"] <= 100
-    assert set(values) <= {"cpu_percent", "ram_percent", "cpu_temp_c"}
+    assert values["ram_total_bytes"] >= values["ram_available_bytes"] > 0
+    assert set(values) <= {"cpu_percent", "ram_total_bytes", "ram_available_bytes", "cpu_temp_c"}
 
 
 def test_writes_lines_the_server_reads(tmp_path):
@@ -60,7 +60,7 @@ def test_writes_lines_the_server_reads(tmp_path):
     summarizer.read_file(path)
     summarizer.finish()
     assert summarizer.counter_events == len(counters) and summarizer.skipped_lines == 0
-    assert {(r["series"], r["process"]) for r in summarizer.counter_rows()} >= {("cpu_percent", "timelens server"), ("ram_percent", "timelens server")}
+    assert {(r["series"], r["process"]) for r in summarizer.counter_rows()} >= {("cpu_percent", "timelens server"), ("ram_used_bytes", "timelens server"), ("ram_available_bytes", "timelens server")}
 
 
 def test_interval_zero_writes_nothing(tmp_path):

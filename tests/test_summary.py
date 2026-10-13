@@ -446,3 +446,23 @@ def test_the_command_line_says_how_many_events_were_ignored(tmp_path):
     # nothing ignored: nothing is said
     write_log(tmp_path / "a.vson", [evt("B", "load", 0), evt("E", "load", 100)])
     assert "ignored" not in run(str(tmp_path), "--quiet")[1]
+
+
+def test_bytes_series_are_shown_in_megabytes():
+    from timelens.summary import in_megabytes
+    row = {"name": "system", "series": "ram_used_bytes", "process": 1, "count": 3, "min": 1048576, "mean": 2097152.0, "stddev": None}
+    shown = in_megabytes(row)
+    assert shown["series"] == "ram_used_mb" and shown["count"] == 3
+    assert shown["min"] == 1 and shown["mean"] == 2 and shown["stddev"] is None
+    other = {"name": "system", "series": "cpu_percent", "process": 1, "count": 3, "min": 5}
+    assert in_megabytes(other) is other
+
+
+def test_ram_used_is_total_minus_available():
+    summarizer = Summarizer()
+    summarizer.add_event(counter(0, ram_total_bytes=100, ram_available_bytes=40))
+    summarizer.add_event(counter(1, ram_total_bytes=100, ram_available_bytes=20))
+    summarizer.add_event(counter(2, ram_total_bytes=100))       # no available: no used
+    summarizer.finish()
+    row = next(r for r in summarizer.counter_rows() if r["series"] == "ram_used_bytes")
+    assert row["count"] == 2 and row["min"] == 60 and row["max"] == 80 and row["mean"] == 70

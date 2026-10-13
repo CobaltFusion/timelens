@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Logs the cpu usage, ram usage and cpu temperature of the machine of the server, as telemetry.
+Logs the cpu usage, ram usage (bytes) and cpu temperature of the machine of the server, as telemetry.
 
 Every sample is a counter event ('ph': 'C') in a '*.vson' file in the folder the server watches, so the
 server reads its own samples like those of any other program:
 
     { "name": "system", "ph": "C", "pid": 1234, "tid": 0, "ts": 6383938378031,
-      "args": {"cpu_percent": 12.5, "ram_percent": 41.0, "cpu_temp_c": 54.0} },
+      "args": {"cpu_percent": 12.5, "ram_total_bytes": 17179869184,
+                "ram_available_bytes": 10307921510, "cpu_temp_c": 54.0} },
 
 'cpu_temp_c' is left out when the temperature can not be read (on Windows psutil can not read it).
 The 'ts' is from the same clock as std::chrono::steady_clock, in microseconds, like the other programs.
@@ -80,9 +81,11 @@ def read_cpu_temperature():
 
 def sample(cpu_percent):
     """The values of one sample, see the module docstring, with the cpu usage measured by the caller."""
+    memory = psutil.virtual_memory()
     values = {
         "cpu_percent": cpu_percent,
-        "ram_percent": psutil.virtual_memory().percent,
+        "ram_total_bytes": memory.total,
+        "ram_available_bytes": memory.available,    # the same on every platform, unlike 'used'
     }
     temperature = read_cpu_temperature()
     if temperature is not None:
