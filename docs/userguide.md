@@ -51,10 +51,10 @@ A program writes its names at the start of its file. For a very large file the s
 The server logs the cpu usage, ram usage (in bytes) and cpu temperature of its own machine, once a second, to `telemetry_timelens_<pid>.vson` in the folder it watches. Every sample is a counter event (`"ph": "C"`), with the process name `timelens server`:
 
 ```json
-{"name": "system", "ph": "C", "pid": 1234, "tid": 0, "ts": 6383938378031, "args": {"cpu_percent": 12.5, "ram_total_bytes": 17179869184, "ram_available_bytes": 10307921510, "cpu_temp_c": 54.0}},
+{"name": "system", "ph": "C", "pid": 1234, "tid": 0, "ts": 6383938378031, "args": {"cpu_percent": 12.5, "cpu_logical_cores": 8, "cpu_freq_mhz": 3600, "ram_total_bytes": 17179869184, "ram_available_bytes": 10307921510, "cpu_temp_c": 54.0}},
 ```
 
-`cpu_temp_c` is left out when the temperature can not be read, like on Windows. Set the environment variable `TIMELENS_SYSTEM_INTERVAL` to another number of seconds, or to `0` to turn it off. The server reads the file like any other log, but does not show counters yet; the [command line summary](#command-line-summary) has statistics of them (bytes shown as MB, with `ram_used` derived as total minus available), and the file can be opened in Perfetto or `chrome://tracing`.
+`cpu_temp_c` is left out when the temperature can not be read, like on Windows, and `cpu_freq_mhz` when the clock can not be read (Windows often reports only the base clock). The file starts with a `system_info` metadata event (cpu model, os, cores, maximum clock) and the summary derives `cpu_busy_cores` (cpu_percent × logical cores) to compare machines. Set the environment variable `TIMELENS_SYSTEM_INTERVAL` to another number of seconds, or to `0` to turn it off. The server reads the file like any other log, but does not show counters yet; the [command line summary](#command-line-summary) has statistics of them (bytes shown as MB, with `ram_used` derived as total minus available), and the file can be opened in Perfetto or `chrome://tracing`.
 
 ## The top bar
 

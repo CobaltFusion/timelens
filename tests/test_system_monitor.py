@@ -33,7 +33,7 @@ def test_sample_has_the_cpu_and_ram_usage():
     values = sample(12.5)
     assert values["cpu_percent"] == 12.5
     assert values["ram_total_bytes"] >= values["ram_available_bytes"] > 0
-    assert set(values) <= {"cpu_percent", "ram_total_bytes", "ram_available_bytes", "cpu_temp_c"}
+    assert set(values) <= {"cpu_percent", "cpu_logical_cores", "cpu_freq_mhz", "ram_total_bytes", "ram_available_bytes", "cpu_temp_c"}
 
 
 def test_writes_lines_the_server_reads(tmp_path):
@@ -50,7 +50,8 @@ def test_writes_lines_the_server_reads(tmp_path):
     names = Names()
     assert names.add(events[0]) is not None and names.processes[events[0]["pid"]] == "timelens server"
 
-    counters = events[1:]
+    assert events[1]["name"] == "system_info" and events[1]["args"]["logical_cores"] >= 1
+    counters = events[2:]
     assert len(counters) >= 2
     assert all(e["ph"] == "C" and e["name"] == "system" and "cpu_percent" in e["args"] for e in counters)
     assert [e["ts"] for e in counters] == sorted(e["ts"] for e in counters)

@@ -173,6 +173,7 @@ class GroupStats:
             self._durations = array("d")    # the memory is not needed anymore
 
 
+CPU_PERCENT, CPU_CORES, CPU_BUSY = "cpu_percent", "cpu_logical_cores", "cpu_busy_cores"
 RAM_TOTAL, RAM_AVAILABLE, RAM_USED = "ram_total_bytes", "ram_available_bytes", "ram_used_bytes"
 
 
@@ -267,14 +268,21 @@ class Summarizer:
                     stats = GroupStats(self.keep_durations, self.skip)
                     self.counters[(name, key, pid)] = stats
                 stats.add(value)
+        # the cores that are busy compare machines better than a percentage
+        percent, cores = args.get(CPU_PERCENT), args.get(CPU_CORES)
+        if is_number(percent) and is_number(cores):
+            self._counter((name, CPU_BUSY, pid)).add(percent / 100 * cores)
         # the ram in use is the total minus what is available, computed per sample so the percentiles are exact
         total, available = args.get(RAM_TOTAL), args.get(RAM_AVAILABLE)
         if is_number(total) and is_number(available):
-            stats = self.counters.get((name, RAM_USED, pid))
-            if stats is None:
-                stats = GroupStats(self.keep_durations, self.skip)
-                self.counters[(name, RAM_USED, pid)] = stats
-            stats.add(total - available)
+            self._counter((name, RAM_USED, pid)).add(total - available)
+
+    def _counter(self, key):
+        stats = self.counters.get(key)
+        if stats is None:
+            stats = GroupStats(self.keep_durations, self.skip)
+            self.counters[key] = stats
+        return stats
 
     # Call when all events are added: the spans that are still open are counted, and the percentiles are made.
     def finish(self):

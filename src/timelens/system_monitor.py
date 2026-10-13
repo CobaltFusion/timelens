@@ -6,10 +6,15 @@ Every sample is a counter event ('ph': 'C') in a '*.vson' file in the folder the
 server reads its own samples like those of any other program:
 
     { "name": "system", "ph": "C", "pid": 1234, "tid": 0, "ts": 6383938378031,
-      "args": {"cpu_percent": 12.5, "ram_total_bytes": 17179869184,
+      "args": {"cpu_percent": 12.5, "cpu_logical_cores": 8, "cpu_freq_mhz": 3600,
+                "ram_total_bytes": 17179869184,
                 "ram_available_bytes": 10307921510, "cpu_temp_c": 54.0} },
 
-'cpu_temp_c' is left out when the temperature can not be read (on Windows psutil can not read it).
+'cpu_temp_c' is left out when the temperature can not be read (on Windows psutil can not read it), and
+'cpu_freq_mhz' when the clock can not be read (Windows often reports only the base clock).
+
+To compare machines the file starts with a metadata event 'system_info' (model, os, logical and physical cores,
+maximum clock), and the summary derives 'cpu_busy_cores' = cpu_percent / 100 * cpu_logical_cores from every sample.
 The 'ts' is from the same clock as std::chrono::steady_clock, in microseconds, like the other programs.
 
 The interval is 'TIMELENS_SYSTEM_INTERVAL' seconds (default 1), 0 turns the logging off.
@@ -22,6 +27,7 @@ import contextlib
 import json
 import logging
 import os
+import platform
 import time
 from pathlib import Path
 
@@ -79,14 +85,51 @@ def read_cpu_temperature():
         return None
 
 
+def read_cpu_frequency():
+    try:
+        freq = psutil.cpu_freq()
+    except (OSError, RuntimeError, NotImplementedError):
+        return None
+    return freq.current if freq is not None and freq.current else None
+
+
+def cpu_model():
+    """The name of the cpu: 'model name' of /proc/cpuinfo on Linux, else what 'platform' knows."""
+    try:
+        with open("/proc/cpuinfo", encoding="utf8") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.partition(":")[2].strip()
+    except OSError:
+        pass
+    return platform.processor() or platform.machine()
+
+
+def system_info_event(pid):
+    """What the machine is, once at the start of the file, so logs of different machines can be compared."""
+    try:
+        freq = psutil.cpu_freq()
+    except (OSError, RuntimeError, NotImplementedError):
+        freq = None
+    args = {"cpu_model": cpu_model(), "os": platform.platform(),
+            "logical_cores": psutil.cpu_count(), "physical_cores": psutil.cpu_count(logical=False)}
+    if freq is not None and freq.max:
+        args["cpu_max_mhz"] = freq.max
+    return {"args": args, "name": "system_info", "cat": "__metadata", "ph": "M", "pid": pid, "tid": 0, "ts": 0}
+
+
 def sample(cpu_percent):
     """The values of one sample, see the module docstring, with the cpu usage measured by the caller."""
     memory = psutil.virtual_memory()
     values = {
         "cpu_percent": cpu_percent,
+        "cpu_logical_cores": psutil.cpu_count(),
         "ram_total_bytes": memory.total,
         "ram_available_bytes": memory.available,    # the same on every platform, unlike 'used'
     }
+    frequency = read_cpu_frequency()
+    if frequency is not None:
+        values["cpu_freq_mhz"] = round(frequency)
     temperature = read_cpu_temperature()
     if temperature is not None:
         values["cpu_temp_c"] = round(temperature, 1)
@@ -128,6 +171,7 @@ class SystemMonitor:
 
         psutil.cpu_percent(interval=None)       # the first call has nothing to measure from, it returns 0
         self._write(process_name_event(self.pid))
+        self._write(system_info_event(self.pid))
         logger.warning("System telemetry every %g s to %s", self.interval_s, self.path)
         self._task = asyncio.create_task(self._run())
 

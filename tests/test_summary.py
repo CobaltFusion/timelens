@@ -466,3 +466,13 @@ def test_ram_used_is_total_minus_available():
     summarizer.finish()
     row = next(r for r in summarizer.counter_rows() if r["series"] == "ram_used_bytes")
     assert row["count"] == 2 and row["min"] == 60 and row["max"] == 80 and row["mean"] == 70
+
+
+def test_cpu_busy_cores_is_percent_of_the_logical_cores():
+    summarizer = Summarizer()
+    summarizer.add_event(counter(0, cpu_percent=50, cpu_logical_cores=8))
+    summarizer.add_event(counter(1, cpu_percent=25, cpu_logical_cores=8))
+    summarizer.add_event(counter(2, cpu_percent=10))            # no cores: no busy cores
+    summarizer.finish()
+    row = next(r for r in summarizer.counter_rows() if r["series"] == "cpu_busy_cores")
+    assert row["count"] == 2 and row["min"] == 2 and row["max"] == 4 and row["mean"] == 3
