@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 from pathlib import Path
 
 from watchfiles import awatch
@@ -21,6 +22,10 @@ TAIL_STEP_BYTES = 1 << 20
 
 # Same as the retention of the span store.
 DEFAULT_HISTORY_US = 30 * 60 * 1_000_000
+
+# A tailer that is at the end of its file looks every this many polls (of 0.1 s) if the file is deleted,
+# otherwise it would poll a deleted file forever and the tailers pile up.
+DELETED_CHECK_POLLS = 10
 
 # At most this many lines at the start of a file are looked at for metadata, see '_metadata_head()'.
 MAX_HEAD_LINES = 1000
@@ -67,6 +72,21 @@ def _last_timestamp(f, offset):
         if ts is not None:
             last = ts
     return last
+
+
+# True when the open file 'f' is no longer at 'path': it was deleted (an open file stays readable
+# and returns EOF forever, on Windows it can not be deleted) or replaced by another file.
+def _is_deleted(f, path):
+    try:
+        opened = os.fstat(f.fileno())
+        if opened.st_nlink == 0:
+            return True
+        current = os.stat(path)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return (current.st_ino, current.st_dev) != (opened.st_ino, opened.st_dev) and opened.st_ino != 0
 
 
 class LogWatcher:
@@ -201,12 +221,19 @@ class LogWatcher:
                 # 'offset' is at the start of a line, so it is also a valid position in text mode
                 f.seek(offset)
 
+                idle_polls = 0
                 while not self._stop.is_set():
                     line = f.readline()
 
                     if not line:
+                        idle_polls += 1
+                        if idle_polls % DELETED_CHECK_POLLS == 0 and _is_deleted(f, path):
+                            logger.info("Stopped tailing %s, it was deleted", path)
+                            return
                         await asyncio.sleep(0.1)
                         continue
+
+                    idle_polls = 0
 
                     try:
                         await self.callback(line, str(path))

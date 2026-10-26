@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
+import asyncio
 import json
+import sys
+
+import pytest
 
 from timelens.logwatcher import TAIL_STEP_BYTES, LogWatcher
 
@@ -53,3 +57,25 @@ def test_offset_is_at_a_line_start(tmp_path):
     with path.open("rb") as f:
         f.seek(offset - 1)
         assert f.read(1) == b"\n"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="an open file can not be deleted on Windows")
+def test_tailer_stops_when_its_file_is_deleted(tmp_path, monkeypatch):
+    monkeypatch.setattr("timelens.logwatcher.DELETED_CHECK_POLLS", 1)
+    path = tmp_path / "gone.vson"
+    write_log(path, 3, 1_000)
+    lines = []
+
+    async def callback(line, _):
+        lines.append(line)
+
+    async def run():
+        watcher = LogWatcher(tmp_path, callback)
+        task = asyncio.create_task(watcher._tail_file(path))
+        await asyncio.sleep(0.3)
+        assert not task.done()      # at the end of the file, waiting for more
+        path.unlink()
+        await asyncio.wait_for(task, 2)
+
+    asyncio.run(run())
+    assert len(lines) == 3
