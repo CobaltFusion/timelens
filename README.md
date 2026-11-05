@@ -45,6 +45,9 @@ TimeLens shows telemetry logs as signals on an oscilloscope-style timeline in th
 1. Put `*.vson` files in `/tmp/logs/telemetry`, or in `c:/temp/logs/telemetry` when that folder does not exist. On Windows, `python tests/python/add_event.py` writes test events there.
 2. Windows: run `start_timelens.bat`. It makes a virtual environment (Python 3.13), installs the dependencies, and opens http://localhost:8080. Linux: `start_timelens.sh`, not verified.
 3. Tools: `python validate.py` runs all checks, `python -m timelens.summary` prints the summary (run it with the virtual environment of the project). Node is only needed for ESLint, the TypeScript check and `obfuscate.bat`.
+4. Tests: `pytest tests` runs the unit tests and the integration tests in `tests/integration`: a real server on a temporary folder, a simulated program that logs live, and a headless browser (Playwright, with Edge or Chrome when installed, otherwise run `python -m playwright install chromium` once; without a browser those tests are skipped). `pytest tests -m "not integration"` runs only the fast tests. `python -m tests.integration.benchmark` measures the CPU time of the page and the server under load, to compare before and after a change.
+
+Environment variables of the server: `TIMELENS_LOG_DIR` watches another folder, `TIMELENS_PEER_DISCOVERY=0` keeps the server off the network (no discovery of other servers), `TIMELENS_SYSTEM_INTERVAL` sets the interval of the [system telemetry](docs/userguide.md#system-telemetry-of-the-server).
 
 A log line looks like this (the file is a JSON array that is never closed, every event ends with a comma):
 

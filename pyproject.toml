@@ -15,4 +15,10 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff",
+    "playwright",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: a test with a real server and a browser, see tests/integration (slower)",
 ]
