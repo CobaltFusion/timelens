@@ -435,7 +435,9 @@ export class BarStack {
             this.drawTextOnBar(`${event.name}`, visibleX1, visibleWidth, y, line.height, durationUs);
         }
 
+        // only when the mouse is over the graph, its last position is kept when it leaves
         const isHovered =
+            this.mouseInside &&
             this.mouseX >= x1 &&
             this.mouseX <= x2 &&
             this.mouseY >= y &&
