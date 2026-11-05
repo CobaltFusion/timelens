@@ -3,6 +3,7 @@
 import asyncio
 import json
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -79,3 +80,30 @@ def test_tailer_stops_when_its_file_is_deleted(tmp_path, monkeypatch):
 
     asyncio.run(run())
     assert len(lines) == 3
+
+
+# glob gives the files in the form the folder was given (relative here, without a drive on Windows for '/tmp/...'),
+# watchfiles reports them as absolute paths: that is the same file, and it must be tailed once, not twice.
+def test_a_file_is_tailed_once_when_the_folder_is_not_absolute(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    folder = tmp_path / "logs"
+    folder.mkdir()
+    path = folder / "app.vson"
+    write_log(path, 3, 1_000)
+    lines = []
+
+    async def callback(line, _):
+        lines.append(line)
+
+    async def run():
+        watcher = LogWatcher(Path("logs"), callback)
+        await watcher.start()
+        await asyncio.sleep(0.5)    # the existing file is tailed, and the folder is watched
+        with path.open("a", encoding="utf8", newline="\n") as f:
+            f.write(json.dumps({"name": "late", "ph": "B", "ts": 5_000}) + ",\n")
+        await asyncio.sleep(3)      # watchfiles reports the change after its debounce of 1.6 seconds
+        await watcher.stop()
+
+    asyncio.run(run())
+    assert len(lines) == 4
+    assert len(set(lines)) == 4
