@@ -61,7 +61,8 @@ def test_writes_lines_the_server_reads(tmp_path):
     summarizer.read_file(path)
     summarizer.finish()
     assert summarizer.counter_events == len(counters) and summarizer.skipped_lines == 0
-    assert {(r["series"], r["process"]) for r in summarizer.counter_rows()} >= {("cpu_percent", "timelens server"), ("ram_used_bytes", "timelens server"), ("ram_available_bytes", "timelens server")}
+    expected = {("cpu_percent", "timelens server"), ("ram_used_bytes", "timelens server"), ("ram_available_bytes", "timelens server")}
+    assert {(r["series"], r["process"]) for r in summarizer.counter_rows()} >= expected
 
 
 def test_interval_zero_writes_nothing(tmp_path):

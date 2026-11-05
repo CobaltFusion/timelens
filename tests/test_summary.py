@@ -342,7 +342,9 @@ def test_table(tmp_path):
 
 def test_sort_and_top(tmp_path):
     logs = str(make_logs(tmp_path))
-    names = lambda *argv: [line.split()[0] for line in run(logs, "--quiet", *argv)[1].splitlines()[2:] if line and line.split()[0] in ("save", "load", "other", "stuck")]
+    def names(*argv):
+        lines = run(logs, "--quiet", *argv)[1].splitlines()[2:]
+        return [line.split()[0] for line in lines if line and line.split()[0] in ("save", "load", "other", "stuck")]
 
     assert names("--sort", "name") == ["load", "other", "save", "stuck"]
     assert names("--sort", "count")[0] == "load"

@@ -368,7 +368,9 @@ def format_duration(duration_us, micro="µ"):
 
 
 def sort_rows(rows, sort):
-    by_name = lambda row: (str(row["name"]), str(row["process"]), str(row["thread"]))
+    def by_name(row):
+        return (str(row["name"]), str(row["process"]), str(row["thread"]))
+
     if sort == "name":
         return sorted(rows, key=by_name)
     key = {"total": "total_us", "count": "count", "mean": "mean_us", "max": "max_us"}[sort]
@@ -438,7 +440,7 @@ def layout_table(columns, rows):
     widths = [max([len(header)] + [len(line[i]) for line in cells]) for i, (header, _, _) in enumerate(columns)]
 
     def line(values):
-        return "  ".join(f"{value:{align}{width}}" for value, width, (_, _, align) in zip(values, widths, columns)).rstrip()
+        return "  ".join(f"{value:{align}{width}}" for value, width, (_, _, align) in zip(values, widths, columns, strict=True)).rstrip()
 
     lines = [line([header for header, _, _ in columns]), line(["-" * width for width in widths])]
     lines.extend(line(values) for values in cells)

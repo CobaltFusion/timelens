@@ -5,9 +5,8 @@ import json
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 LOG_DIR = Path(r"C:\temp\logs\telemetry")
 LOG_FILE = LOG_DIR / "telemetry_test_123_345.vson"
@@ -20,12 +19,12 @@ DEFAULT_ARGS = ["-n", "pre", "-n", "error", "-n", "post", "-c", "loop", "-d", "2
                 "-l", "--real", "--prefix"]
 
 # VSON timestamp epoch.
-_EPOCH = datetime(2026, 9, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(2026, 9, 1, tzinfo=UTC)
 
 
 def _timestamp_us() -> int:
     """Return microseconds since 1-Sept-2026 UTC."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return int((now - _EPOCH).total_seconds() * 1_000_000)
 
 
@@ -197,7 +196,7 @@ def main() -> None:
 
     categories = expand(args.category, "-c/--category")
     durations = expand(args.duration_ms, "-d/--duration-ms")
-    steps = list(zip(args.name, categories, durations))
+    steps = list(zip(args.name, categories, durations, strict=True))
 
     fixed = args.timing == "fixed"
 

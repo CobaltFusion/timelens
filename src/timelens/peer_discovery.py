@@ -92,7 +92,7 @@ class PeerDiscovery:
 
                     logger.info("Discovery request from %s, response: %s", address, response)
 
-                except socket.timeout:
+                except TimeoutError:
                     continue
 
                 except asyncio.CancelledError:

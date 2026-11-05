@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from timelens.speedtest import BLOCK, MAX_BYTES, MEGABYTE, TooLarge, count_upload, cors_headers, download_chunks, parse_bytes
+from timelens.speedtest import BLOCK, MAX_BYTES, MEGABYTE, TooLarge, cors_headers, count_upload, download_chunks, parse_bytes
 
 
 def test_a_megabyte_is_1024_times_1024_bytes():

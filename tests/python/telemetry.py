@@ -7,7 +7,6 @@ import threading
 import time
 from pathlib import Path
 
-
 LOG_DIR = Path(r"C:\temp\logs\telemetry")
 
 # Epoch for all timestamps in this process.

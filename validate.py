@@ -6,6 +6,7 @@ Runs the checks of the project on the command line and prints their output:
   eslint      ESLint, configured in eslint.config.mjs
   typescript  the TypeScript checker on the JavaScript files, configured in tsconfig.json
   lines       text files must use LF line endings (.gitattributes, .editorconfig)
+  ruff        the Python linter, configured in ruff.toml
   tests       pytest
 
 Usage:  python validate.py [check ...] [--quiet]
@@ -117,11 +118,19 @@ def check_tests():
     return Result("tests", code == 0, output)
 
 
+def check_ruff():
+    code, output = run([sys.executable, "-m", "ruff", "check", ".", "--exclude", "venv,node_modules,build,dist"])
+    if "No module named ruff" in output:
+        return Result("ruff", None, note="ruff is not installed, run 'pip install -e \".[dev]\"'")
+    return Result("ruff", code == 0, output)
+
+
 CHECKS = {
     "node": check_node,
     "eslint": check_eslint,
     "typescript": check_typescript,
     "lines": check_line_endings,
+    "ruff": check_ruff,
     "tests": check_tests,
 }
 

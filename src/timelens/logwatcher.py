@@ -9,10 +9,9 @@ import logging
 import os
 from pathlib import Path
 
-from watchfiles import awatch
-
 from timelens.names import is_metadata
 from timelens.vson import parse_line
+from watchfiles import awatch
 
 logger = logging.getLogger(__name__)
 
