@@ -7,15 +7,20 @@ Shared by the server and the command line tools, so they read the files the same
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-# The server watches the first folder that exists, the last one is the fallback.
+# The server watches the first folder that exists, the last one is the fallback. The environment variable
+# TIMELENS_LOG_DIR overrides them, e.g. for the integration tests.
 LOG_DIRECTORIES = (Path("/tmp/logs/telemetry"), Path("c:/temp/logs/telemetry"))
 
 LOG_SUFFIX = ".vson"
 
 
 def default_log_directory():
+    override = os.environ.get("TIMELENS_LOG_DIR")
+    if override:
+        return Path(override)
     for directory in LOG_DIRECTORIES:
         if directory.is_dir():
             return directory

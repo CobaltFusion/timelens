@@ -194,7 +194,7 @@ class Server:
     @asynccontextmanager
     async def lifespan(self, app):
 
-        if not LOG_DIRECTORIES[0].is_dir():
+        if not LOG_DIRECTORIES[0].is_dir() and not os.environ.get("TIMELENS_LOG_DIR"):
             logger.warning("Path missing: %s", LOG_DIRECTORIES[0])
         path = default_log_directory()
 
@@ -203,8 +203,10 @@ class Server:
         self.watcher = LogWatcher(path, self.handle_line, history_us=self.store.retention_us)
         await self.watcher.start()
 
-        self.peer_discovery = PeerDiscovery(http_port=8080)
-        await self.peer_discovery.start()
+        # TIMELENS_PEER_DISCOVERY=0 keeps the server off the network, e.g. for the integration tests
+        if os.environ.get("TIMELENS_PEER_DISCOVERY") != "0":
+            self.peer_discovery = PeerDiscovery(http_port=8080)
+            await self.peer_discovery.start()
 
         # the cpu, ram and temperature of this machine, written to the watched folder, so read back like any log
         self.system_monitor = SystemMonitor(path, interval_from_env())
@@ -369,7 +371,7 @@ class Server:
         return JSONResponse({})
 
     async def servers(self):
-        peers = await self.peer_discovery.discover()
+        peers = await self.peer_discovery.discover() if self.peer_discovery else []
         return JSONResponse({"servers": peers})
 
     # The speed test: the page of any machine measures the latency and the bandwidth to this server.

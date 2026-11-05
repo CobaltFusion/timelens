@@ -673,3 +673,9 @@ class Main {
 
 const main = new Main();
 main.init();
+
+// the integration tests look at the state of the page through this, see tests/integration
+if (new URLSearchParams(window.location.search).get("test") === "1") {
+    // @ts-ignore: a property for the tests only
+    window.timelens = main;
+}
