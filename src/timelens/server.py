@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import functools
 import json
 import logging
 import os
@@ -27,6 +28,12 @@ QUERY_LIMIT = 500_000
 
 # Larger profiles are refused, a profile only holds a few settings per graph.
 PROFILE_MAX_BYTES = 64 * 1024
+
+
+# The name of a log file as the clients see it, every line of a file has the same one.
+@functools.lru_cache(maxsize=4096)
+def source_name(path):
+    return os.path.basename(path)
 
 
 class Server:
@@ -95,7 +102,7 @@ class Server:
         if evt.get("ph") not in SPAN_PHASES:
             return
 
-        evt["source"] = os.path.basename(path)
+        evt["source"] = source_name(path)
 
         self.count = self.count + 1
         evt["count"] = self.count
@@ -150,6 +157,8 @@ class Server:
 
     # Sends 'span' to every client, filtered per client. Clients without a filter share one message.
     async def broadcast_span(self, span):
+        if not self.clients:
+            return      # nobody to send it to, it is not even encoded
 
         dead = []
         unfiltered_data = json.dumps({"type": "span", **span})

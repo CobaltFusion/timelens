@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import bisect
 import logging
+import math
 
 from timelens.names import is_metadata
 
@@ -126,26 +127,30 @@ class SpanStore:
     def stats(self, start_us, end_us, accept=None):
         begin = bisect.bisect_left(self._begin, start_us)
         end = bisect.bisect_right(self._begin, end_us)
-        result = {}
-
+        # the durations per name first: a running graph asks for the statistics of a minute every second, this is the
+        # fast part, the rest is done per name with the builtins
+        durations = {}
         for span in self._spans[begin:end]:
-            if span["end"] is None or (accept is not None and not accept(span)):
+            end_us = span["end"]
+            if end_us is None or (accept is not None and not accept(span)):
                 continue
+            name = span["name"]
+            values = durations.get(name)
+            if values is None:
+                durations[name] = values = []
+            values.append(end_us - span["ts"])
 
-            duration_us = span["end"] - span["ts"]
-            s = result.get(span["name"])
-            if s is None:
-                s = {"count": 0, "min": duration_us, "max": duration_us, "mean": 0.0, "m2": 0.0}
-                result[span["name"]] = s
-
-            # Welford's online algorithm, numerically stable for mean and variance.
-            s["count"] += 1
-            delta = duration_us - s["mean"]
-            s["mean"] += delta / s["count"]
-            s["m2"] += delta * (duration_us - s["mean"])
-            s["min"] = min(s["min"], duration_us)
-            s["max"] = max(s["max"], duration_us)
-
+        # Two passes: the mean, then the sum of the squared differences from it, which is numerically stable.
+        result = {}
+        for name, values in durations.items():
+            mean = math.fsum(values) / len(values)
+            result[name] = {
+                "count": len(values),
+                "min": min(values),
+                "max": max(values),
+                "mean": mean,
+                "m2": math.fsum([(value - mean) * (value - mean) for value in values]),
+            }
         return result
 
     # The time of the first or last ('which') edge in [start_us, end_us] of a span whose
