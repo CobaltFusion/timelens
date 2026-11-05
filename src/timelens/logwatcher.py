@@ -152,6 +152,9 @@ class LogWatcher:
                     break
 
     def _start_tailer(self, path, tg: asyncio.TaskGroup):
+        # glob gives the path as the folder was given (on Windows '/tmp/...' has no drive), watchfiles an absolute
+        # one: without resolving, one file got two tailers and every event was read twice
+        path = path.resolve()
         existing = self._tailers.get(path)
 
         if existing is not None and not existing.done():
