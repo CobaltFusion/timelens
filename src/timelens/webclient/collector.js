@@ -55,6 +55,7 @@ export class Collector {
     constructor() {
         this.incoming = new RingBuffer(maxBufferedEvents);
         this.openSpans = new Map();     // span id -> buffered OPEN event, until the span ends
+        this.maxClosedDurationUs = 0;   // the longest duration of a closed event in the buffer (or that was in it), see 'seenUpToUs'
         this.running = true;
         this.audioEnabled = false;
         this.cutoffTime = 0;  // event from before this time are dropped
@@ -137,14 +138,32 @@ export class Collector {
         return makeEvent(name, type, ts, groupId, value, count, pid, Date.now(), end ?? undefined, id, color);
     }
 
+    // Adds an event to the buffer. 'sequence' is its sequence number in the buffer, 'seenUpToUs' the latest time
+    // of all events up to and including this one: it never decreases along the buffer, so the graph can find
+    // where the events start that can still be visible, without looking at all of them (see 'Graph.#scanStart').
+    #push(event, seenUpToUs) {
+        event.sequence = this.incoming.pushCount;
+        event.seenUpToUs = seenUpToUs;
+        this.incoming.push(event);
+    }
+
+    #closed(event) {
+        this.maxClosedDurationUs = Math.max(this.maxClosedDurationUs, event.end_time - event.timestamp);
+    }
+
     #onSpan(span) {
+        // timestamp never go back in time _within one logfile_ or
+        // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
+        this.lastTimepointUs = Math.max(span.end ?? span.ts, this.lastTimepointUs);
+        this.lastSteadyTimepointUs = performance.now() * 1000;
+
         const openEvent = this.openSpans.get(span.id);
         let notification;
 
         if (span.end === null) {
             const newEvent = this.#toEvent(span);
             this.openSpans.set(span.id, newEvent);
-            this.incoming.push(newEvent);
+            this.#push(newEvent, this.lastTimepointUs);
             notification = { ...newEvent };
         }
         else if (openEvent) {
@@ -152,19 +171,16 @@ export class Collector {
             this.openSpans.delete(span.id);
             openEvent.type = EventType.CLOSE;
             openEvent.end_time = span.end;
+            this.#closed(openEvent);
             notification = { ...openEvent, type: EventType.CLOSE, timestamp: span.end, end_time: undefined };
         }
         else {
             // a complete span, or its begin was not received
             const newEvent = this.#toEvent(span);
-            this.incoming.push(newEvent);
+            this.#push(newEvent, this.lastTimepointUs);
+            this.#closed(newEvent);
             notification = { ...newEvent, type: EventType.DURATION };
         }
-
-        // timestamp never go back in time _within one logfile_ or
-        // _within a 'B' -> 'E' series, but unrelated events can arrive out of order!
-        this.lastTimepointUs = Math.max(span.end ?? span.ts, this.lastTimepointUs);
-        this.lastSteadyTimepointUs = performance.now() * 1000;
 
         this.onIncomingEvent?.(notification);
 
@@ -319,6 +335,7 @@ export class Collector {
     clear() {
         this.incoming.clear();
         this.openSpans.clear();
+        this.maxClosedDurationUs = 0;
     }
 
     // returns a reference to the RingBuffer, not a copy
@@ -360,10 +377,15 @@ export class Collector {
         const keptIds = new Set(kept.map(event => event.id));
 
         this.clear();
+        let seenUpToUs = -Infinity;
         for (const event of [...fetched.filter(event => !keptIds.has(event.id)), ...kept]) {
-            this.incoming.push(event);
+            seenUpToUs = Math.max(seenUpToUs, event.end_time ?? event.timestamp);
+            this.#push(event, seenUpToUs);
             if (event.type === EventType.OPEN) {
                 this.openSpans.set(event.id, event);
+            }
+            else {
+                this.#closed(event);
             }
             this.lastTimepointUs = Math.max(event.end_time ?? event.timestamp, this.lastTimepointUs);
         }

@@ -63,6 +63,50 @@ export function movePreTriggerOfView(view, deltaUs) {
     view.widthUs = rightUs - view.startUs;
 }
 
+// The data of a stopped or zoomed graph is an array from the server, that does not change: what 'Graph.#scanStart'
+// needs of it is computed once per array. array -> { seenUpToUs: Float64Array, maxClosedDurationUs, openIndices }
+const staticDataIndex = new WeakMap();
+
+function indexStaticData(data) {
+    let index = staticDataIndex.get(data);
+    if (!index) {
+        const seenUpToUs = new Float64Array(data.length);
+        const openIndices = [];
+        let seen = -Infinity;
+        let maxClosedDurationUs = 0;
+        for (let i = 0; i < data.length; ++i) {
+            const event = data[i];
+            seen = Math.max(seen, event.end_time ?? event.timestamp);
+            seenUpToUs[i] = seen;
+            if (event.type === EventType.OPEN) {
+                openIndices.push(i);
+            }
+            else {
+                maxClosedDurationUs = Math.max(maxClosedDurationUs, event.end_time - event.timestamp);
+            }
+        }
+        index = { seenUpToUs, maxClosedDurationUs, openIndices };
+        staticDataIndex.set(data, index);
+    }
+    return index;
+}
+
+// The first index in [0, length) for which 'isAfter(i)' is true, 'isAfter' is false and then true along the indices.
+function firstIndexWhere(length, isAfter) {
+    let low = 0;
+    let high = length;
+    while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (isAfter(middle)) {
+            high = middle;
+        }
+        else {
+            low = middle + 1;
+        }
+    }
+    return low;
+}
+
 export class Graph {
     constructor(collector) {
         this.collector = collector;
@@ -972,8 +1016,9 @@ export class Graph {
         const isVisible = (startUs, endUs) => endUs >= this.startPointUs && startUs <= graphEndUs;
         const groups = new Map();   // groupId -> { openEvents, lastEndTime }
 
-        for (let i = 0; i < data.length; ++i) {
-            const event = data.at(i);
+        // the events before 'first' can not be visible, except those that are still open
+        const { first, openBefore } = this.#scanStart(data, this.startPointUs);
+        const add = (event) => {
             let group = groups.get(event.groupId);
             if (!group) {
                 group = { openEvents: [], lastEndTime: 0, processId: event.processId };
@@ -992,6 +1037,12 @@ export class Graph {
             else if (isVisible(event.timestamp, eventEndUs)) {
                 bars.getLine(event.groupId).closedEvents.push(event);
             }
+        };
+        for (const event of openBefore) {
+            add(event);
+        }
+        for (let i = first; i < data.length; ++i) {
+            add(data.at(i));
         }
 
         // events that are still open extend to the end of the view
@@ -1028,6 +1079,46 @@ export class Graph {
         const overIcon = this.#overCopyIcon();
         this.canvas.style.cursor = overIcon ? "pointer" : "";
         this.canvas.title = overIcon ? "Copy this text to the clipboard" : "";
+    }
+
+    // Where to start looking for the events that can be visible from 'startUs' on: the buffer holds a minute and
+    // the view is often a fraction of a second, so most events can be skipped. An event begins at or before the
+    // 'seenUpToUs' of its place in the data, and 'seenUpToUs' never decreases along the data: a closed event
+    // where it is earlier than 'startUs' minus the longest duration has ended before 'startUs'. The events that
+    // are still open can be anywhere, they are returned in 'openBefore'. Log files with different clocks only
+    // make the part that is skipped smaller.
+    #scanStart(data, startUs) {
+        if (data.length === 0) {
+            return { first: 0, openBefore: [] };
+        }
+
+        // the collector's buffer, while following live data
+        if (typeof data.firstSequence === "number") {
+            const thresholdUs = startUs - this.collector.maxClosedDurationUs;
+            const first = firstIndexWhere(data.length, i => data.at(i).seenUpToUs >= thresholdUs);
+            const firstSequence = data.firstSequence;
+            const openBefore = [];
+            for (const event of this.collector.openSpans.values()) {
+                if (event.sequence >= firstSequence && event.sequence < firstSequence + first) {
+                    openBefore.push(event);
+                }
+            }
+            openBefore.sort((a, b) => a.sequence - b.sequence);
+            return { first, openBefore };
+        }
+
+        // an array of events from the server
+        const index = indexStaticData(data);
+        const thresholdUs = startUs - index.maxClosedDurationUs;
+        const first = firstIndexWhere(data.length, i => index.seenUpToUs[i] >= thresholdUs);
+        const openBefore = [];
+        for (const i of index.openIndices) {
+            if (i >= first) {
+                break;
+            }
+            openBefore.push(data[i]);
+        }
+        return { first, openBefore };
     }
 
     resize(width, height) {

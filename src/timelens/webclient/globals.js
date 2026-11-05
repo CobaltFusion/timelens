@@ -95,6 +95,8 @@ export const TriggerResult = Object.freeze({
  * @property {number} [id]          span id from the server
  * @property {string} [color]       '#rrggbb' forced by a color filter rule
  * @property {number} [lane]        row within its line, set when the bars are laid out
+ * @property {number} [sequence]    the sequence number in the collector's buffer, see 'Collector.#push'
+ * @property {number} [seenUpToUs]  the latest time of the events in the buffer up to this one, see 'Collector.#push'
  */
 
 export function roundUpNice(value) {
