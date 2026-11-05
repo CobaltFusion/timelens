@@ -224,6 +224,7 @@ class LogWatcher:
                 f.seek(offset)
 
                 idle_polls = 0
+                partial = ""    # the start of a line whose end is not written yet
                 while not self._stop.is_set():
                     line = f.readline()
 
@@ -236,6 +237,14 @@ class LogWatcher:
                         continue
 
                     idle_polls = 0
+
+                    # a program can write a line in parts, e.g. when its buffer is flushed in the middle of a
+                    # line: the line is used when its newline has been written, every event line ends with one
+                    if not line.endswith("\n"):
+                        partial += line
+                        continue
+                    line = partial + line
+                    partial = ""
 
                     try:
                         await self.callback(line, str(path))
